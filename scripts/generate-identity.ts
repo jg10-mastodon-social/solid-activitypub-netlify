@@ -143,7 +143,7 @@ async function generateIdentity() {
     id: `${baseUrl}/actor`,
     type: 'Service',
     preferredUsername: 'actor',
-    inbox: `${baseUrl}/outbox`,
+    inbox: `${baseUrl}/inbox`,
     outbox: `${baseUrl}/outbox`,
     followers: `${baseUrl}/followers`,
     following: `${baseUrl}/following`,
