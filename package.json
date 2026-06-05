@@ -7,9 +7,9 @@
     "generate:identity": "node scripts/generate-identity.ts",
     "build": "npm run generate:identity",
     "test": "vitest run",
-    "test:unit": "vitest run tests/unit",
+    "test:unit": "vitest run unit",
     "test:integration": "vitest run tests/integration",
-    "test:e2e": "vitest run tests/e2e",
+    "test:e2e": "vitest run e2e",
     "dev": "netlify dev --context dev",
     "typecheck": "tsc --noEmit"
   },

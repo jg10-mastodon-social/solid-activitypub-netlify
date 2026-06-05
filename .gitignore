@@ -6,3 +6,4 @@ public/
 .netlify
 src/base-url.ts
 src/private-key.ts
+src/actor-private-key.ts

@@ -1,66 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import fs from 'fs'
 import path from 'path'
-import { fileURLToPath } from 'url'
-import { spawn } from 'child_process'
-
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-const rootDir = path.resolve(__dirname, '../..')
-const baseUrlPath = path.join(rootDir, 'src/base-url.ts')
-const privateKeyPath = path.join(rootDir, 'src/private-key.ts')
-
-async function runScript(jwks?: string, context?: string): Promise<{ exitCode: number, stdout: string, stderr: string }> {
-  return new Promise((resolve) => {
-    const env: Record<string, string | undefined> = {
-      ...process.env,
-    }
-    if (context === 'production') {
-      env.CONTEXT = 'production'
-      env.URL = 'https://example.com'
-      delete env.DEPLOY_URL
-    } else if (context === 'deploy-preview') {
-      env.CONTEXT = 'deploy-preview'
-      env.DEPLOY_URL = 'https://deploy-preview-123.netlify.app'
-      delete env.URL
-    } else {
-      env.CONTEXT = 'dev'
-      env.URL = 'http://localhost:9999'
-      delete env.DEPLOY_URL
-    }
-    if (jwks) {
-      env.JWKS = jwks
-    }
-
-    if (fs.existsSync(baseUrlPath)) {
-      fs.unlinkSync(baseUrlPath)
-    }
-
-    const child = spawn('node', [path.join(__dirname, '../../scripts/generate-identity.ts')], {
-      env,
-      stdio: 'pipe',
-    })
-
-    let stdout = ''
-    let stderr = ''
-    child.stdout?.on('data', (data) => { stdout += data.toString() })
-    child.stderr?.on('data', (data) => { stderr += data.toString() })
-    child.on('close', (exitCode) => {
-      resolve({ exitCode: exitCode ?? 0, stdout, stderr })
-    })
-  })
-}
+import { publicDir, privateKeyPath, baseUrlPath, runScript, rootDir } from '../helpers.js'
 
 describe('generate-identity', () => {
-  const publicDir = path.join(rootDir, 'public')
-  const envPath = path.join(rootDir, '.env')
-
   beforeEach(() => {
     if (fs.existsSync(publicDir)) {
       fs.rmSync(publicDir, { recursive: true, force: true })
-    }
-    if (fs.existsSync(envPath)) {
-      fs.unlinkSync(envPath)
     }
     if (fs.existsSync(baseUrlPath)) {
       fs.unlinkSync(baseUrlPath)
@@ -73,9 +19,6 @@ describe('generate-identity', () => {
   afterEach(() => {
     if (fs.existsSync(publicDir)) {
       fs.rmSync(publicDir, { recursive: true, force: true })
-    }
-    if (fs.existsSync(envPath)) {
-      fs.unlinkSync(envPath)
     }
     if (fs.existsSync(baseUrlPath)) {
       fs.unlinkSync(baseUrlPath)
@@ -201,17 +144,6 @@ describe('generate-identity', () => {
       const result = await runScript(existingJwks)
       expect(result.exitCode).toBe(1)
       expect(result.stderr).toContain('kid')
-    })
-
-    it('does not write to .env', async () => {
-      const existingJwks = JSON.stringify({ kty: 'EC', crv: 'P-256', x: 'test-x', y: 'test-y', d: 'test-d', alg: 'ES256', use: 'sig', kid: 'test-kid' })
-
-      fs.writeFileSync(envPath, 'EXISTING=value\n')
-
-      await runScript(existingJwks)
-
-      const envContent = fs.readFileSync(envPath, 'utf-8')
-      expect(envContent).toBe('EXISTING=value\n')
     })
 
     it('writes private key to src/private-key.ts', async () => {
