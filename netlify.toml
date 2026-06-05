@@ -15,6 +15,16 @@
   HANDLER_BASE_URL = "https://example.com/handlers#"
   SEND_TO_URL = "http://localhost:9999/outbox"
 
+[[headers]]
+  for = "/actor"
+  [headers.values]
+    Content-Type = "application/activity+json"
+
+[[headers]]
+  for = "/.well-known/webfinger"
+  [headers.values]
+    Content-Type = "application/jrd+json"
+
 [dev]
   port = 9999
   framework = "#static"
