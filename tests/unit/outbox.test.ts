@@ -27,6 +27,20 @@ vi.mock('../../src/solidFetch.js', () => ({
   createSolidFetch: mockCreateSolidFetch
 }))
 
+vi.mock('../../src/base-url.js', () => ({
+  baseUrl: 'https://example.com'
+}))
+
+vi.mock('../../src/activity.js', () => ({
+  extractRecipients: vi.fn().mockReturnValue(['https://recipient.example/actor']),
+  fetchActorInbox: vi.fn().mockResolvedValue('https://recipient.example/inbox'),
+  validateActivityActor: vi.fn().mockReturnValue(true)
+}))
+
+vi.mock('../../src/signing.js', () => ({
+  signActivityRequest: vi.fn().mockResolvedValue({ ok: true, status: 200 })
+}))
+
 const { default: handler } = await import('../../netlify/functions/outbox.mts')
 
 function makeContext(overrides: Partial<Context> = {}): Context {
@@ -143,13 +157,19 @@ describe('outbox unit tests', () => {
       status: 404
     })
 
+    const activity = {
+      type: 'Create',
+      actor: 'https://example.com/actor',
+      to: ['https://recipient.example/actor']
+    }
     const req = new Request('http://localhost/outbox', {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
         'authorization': 'DPoP valid-token',
         'dpop': 'valid-dpop'
-      }
+      },
+      body: JSON.stringify(activity)
     })
     const res = await handler(req, makeContext())
 
@@ -170,18 +190,25 @@ describe('outbox unit tests', () => {
       status: 200
     })
 
+    const activity = {
+      type: 'Create',
+      actor: 'https://example.com/actor',
+      to: ['https://recipient.example/actor']
+    }
     const req = new Request('http://localhost/outbox', {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
         'authorization': 'DPoP valid-token',
         'dpop': 'valid-dpop'
-      }
+      },
+      body: JSON.stringify(activity)
     })
     const res = await handler(req, makeContext())
 
     expect(res.status).toBe(200)
-    expect(await res.text()).toBe('ok')
+    const text = await res.text()
+    expect(text).toContain('"status":"ok"')
   })
 
   it('returns 204 for OPTIONS with CORS headers', async () => {
@@ -229,13 +256,19 @@ describe('outbox unit tests', () => {
       status: 200
     })
 
+    const activity = {
+      type: 'Create',
+      actor: 'https://example.com/actor',
+      to: ['https://recipient.example/actor']
+    }
     const req = new Request('http://localhost/outbox', {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
         'authorization': 'DPoP valid-token',
         'dpop': 'valid-dpop'
-      }
+      },
+      body: JSON.stringify(activity)
     })
     const res = await handler(req, makeContext())
 
