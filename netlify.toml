@@ -1,0 +1,20 @@
+[build]
+  command = "node scripts/generate-identity.ts"
+  publish = "public"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+[context.dev.environment]
+  DEPLOY_URL = "http://localhost:9999"
+  WEBID = "http://localhost:9999/webid"
+  ISSUER = "http://localhost:9999"
+  WHITELISTED_ISSUERS = "http://localhost:9999"
+  OUTBOX_CONFIG_URL = "http://localhost:9999/webhooks.ttl"
+  HANDLER_BASE_URL = "https://example.com/handlers#"
+  SEND_TO_URL = "http://localhost:9999/outbox"
+
+[dev]
+  port = 9999
+  framework = "#static"

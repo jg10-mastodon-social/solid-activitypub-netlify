@@ -1,0 +1,31 @@
+{
+  "name": "solid-activitypub-netlify",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "generate:identity": "node scripts/generate-identity.ts",
+    "build": "npm run generate:identity",
+    "test": "vitest run",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "test:e2e": "vitest run tests/e2e",
+    "dev": "netlify dev --context dev",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@netlify/functions": "^2.8.1",
+    "@soid/core": "^0.1.0",
+    "@solid/access-token-verifier": "^2.1.1",
+    "jose": "^5.9.6",
+    "jsonld": "^8.3.2",
+    "n3": "^1.23.1"
+  },
+  "devDependencies": {
+    "@types/jsonld": "^1.5.15",
+    "@types/node": "^22.10.5",
+    "typescript": "^5.7.2",
+    "undici": "^6.21.0",
+    "vitest": "^2.1.8"
+  }
+}
