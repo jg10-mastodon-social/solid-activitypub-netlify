@@ -17,7 +17,13 @@ vi.mock('../../src/auth.js', () => ({
 vi.mock('../../src/activity.js', () => ({
   extractRecipients: vi.fn().mockReturnValue(['https://recipient.example/actor']),
   fetchActorInbox: vi.fn().mockResolvedValue('https://recipient.example/inbox'),
-  validateActivityActor: mockValidateActivityActor
+  validateActivityActor: mockValidateActivityActor,
+  validateContext: vi.fn().mockReturnValue(true),
+  normalizeActivity: vi.fn().mockImplementation((activity) => ({
+    ...activity,
+    id: 'http://localhost:9999/activities/normalized-id',
+    published: '2025-12-19T11:34:14.000Z'
+  }))
 }))
 
 vi.mock('../../src/signing.js', () => ({
@@ -122,7 +128,8 @@ describe('outbox integration tests', () => {
     const activity = {
       type: 'Create',
       actor: 'http://localhost:9999/actor',
-      to: ['https://recipient.example/actor']
+      to: ['https://recipient.example/actor'],
+      '@context': 'https://www.w3.org/ns/activitystreams'
     }
     const req = new Request('http://localhost/outbox', {
       method: 'POST',
@@ -146,7 +153,8 @@ describe('outbox integration tests', () => {
     const activity = {
       type: 'Create',
       actor: 'https://wrong.example/actor',
-      to: ['https://recipient.example/actor']
+      to: ['https://recipient.example/actor'],
+      '@context': 'https://www.w3.org/ns/activitystreams'
     }
     const req = new Request('http://localhost/outbox', {
       method: 'POST',

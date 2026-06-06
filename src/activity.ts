@@ -1,4 +1,6 @@
 import type { SolidFetch } from './types.js'
+// @ts-ignore
+import { baseUrl } from './base-url.js'
 
 export interface Activity {
   type: string
@@ -11,12 +13,32 @@ export interface Activity {
   object?: unknown
   id?: string
   published?: string
+  '@context'?: string | string[]
   [key: string]: unknown
 }
 
 export type ActivityRecipient = string
 
 const PUBLIC_IRI = 'https://www.w3.org/ns/activitystreams#Public'
+
+function toIso8601(date: Date): string {
+  return date.toISOString()
+}
+
+export function validateContext(activity: Activity): boolean {
+  if (!activity['@context']) {
+    throw new Error('Activity must include @context')
+  }
+  return true
+}
+
+export function normalizeActivity(activity: Activity): Activity {
+  return {
+    ...activity,
+    id: `${baseUrl}/activities/${Date.now()}`,
+    published: activity.published || toIso8601(new Date())
+  }
+}
 
 function normalizeToArray(value: string | string[] | undefined): string[] {
   if (!value) return []

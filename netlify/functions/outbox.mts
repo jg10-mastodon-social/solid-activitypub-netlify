@@ -2,7 +2,7 @@ import type { Config, Context } from '@netlify/functions'
 import { verifyDpopToken } from '../../src/auth.js'
 import { loadConfig } from '../../src/config.js'
 import { createSolidFetch } from '../../src/solidFetch.js'
-import { extractRecipients, fetchActorInbox, validateActivityActor } from '../../src/activity.js'
+import { extractRecipients, fetchActorInbox, validateActivityActor, validateContext, normalizeActivity } from '../../src/activity.js'
 import { signActivityRequest } from '../../src/signing.js'
 import type { Activity } from '../../src/activity.js'
 import type { SolidFetch } from '../../src/types.js'
@@ -89,6 +89,16 @@ export default async (req: Request, context: Context) => {
   }
 
   try {
+    validateContext(activity)
+  } catch (error) {
+    console.log(`[outbox] Context validation failed: ${error}`)
+    return new Response(JSON.stringify({
+      error: 'validation_failed',
+      message: error instanceof Error ? error.message : 'Activity must include @context'
+    }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } })
+  }
+
+  try {
     validateActivityActor(activity, actorUrl)
   } catch (error) {
     console.log(`[outbox] Actor validation failed: ${error}`)
@@ -97,6 +107,8 @@ export default async (req: Request, context: Context) => {
       headers: CORS_HEADERS
     })
   }
+
+  activity = normalizeActivity(activity)
 
   try {
     const fetchFn = await createSolidFetch(config.webId, config.issuer)
@@ -124,6 +136,8 @@ export default async (req: Request, context: Context) => {
 
     const responseBody = JSON.stringify({
       status: 'ok',
+      id: activity.id,
+      published: activity.published,
       delivered: successCount,
       failed: failCount,
       results: deliveryResults

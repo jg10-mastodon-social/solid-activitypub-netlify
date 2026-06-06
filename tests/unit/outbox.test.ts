@@ -34,7 +34,18 @@ vi.mock('../../src/base-url.js', () => ({
 vi.mock('../../src/activity.js', () => ({
   extractRecipients: vi.fn().mockReturnValue(['https://recipient.example/actor']),
   fetchActorInbox: vi.fn().mockResolvedValue('https://recipient.example/inbox'),
-  validateActivityActor: vi.fn().mockReturnValue(true)
+  validateActivityActor: vi.fn().mockReturnValue(true),
+  validateContext: vi.fn().mockImplementation((activity) => {
+    if (!activity['@context']) {
+      throw new Error('Activity must include @context')
+    }
+    return true
+  }),
+  normalizeActivity: vi.fn().mockImplementation((activity) => ({
+    ...activity,
+    id: 'https://example.com/activities/normalized-id',
+    published: '2025-12-19T11:34:14.000Z'
+  }))
 }))
 
 vi.mock('../../src/signing.js', () => ({
@@ -160,7 +171,8 @@ describe('outbox unit tests', () => {
     const activity = {
       type: 'Create',
       actor: 'https://example.com/actor',
-      to: ['https://recipient.example/actor']
+      to: ['https://recipient.example/actor'],
+      '@context': 'https://www.w3.org/ns/activitystreams'
     }
     const req = new Request('http://localhost/outbox', {
       method: 'POST',
@@ -178,6 +190,34 @@ describe('outbox unit tests', () => {
     expect(text).toContain('Failed to fetch config')
   })
 
+  it('returns 400 when @context is missing', async () => {
+    mockVerifyDpopToken.mockResolvedValue({
+      success: true,
+      payload: { webid: 'https://example.com/webid#me', client_id: 'client1', iss: 'https://issuer.example', iat: 0, exp: 0 }
+    })
+
+    const activity = {
+      type: 'Create',
+      actor: 'https://example.com/actor',
+      to: ['https://recipient.example/actor']
+    }
+    const req = new Request('http://localhost/outbox', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'authorization': 'DPoP valid-token',
+        'dpop': 'valid-dpop'
+      },
+      body: JSON.stringify(activity)
+    })
+    const res = await handler(req, makeContext())
+
+    expect(res.status).toBe(400)
+    const text = await res.text()
+    expect(text).toContain('validation_failed')
+    expect(text).toContain('Activity must include @context')
+  })
+
   it('returns 200 on success', async () => {
     mockVerifyDpopToken.mockResolvedValue({
       success: true,
@@ -193,7 +233,8 @@ describe('outbox unit tests', () => {
     const activity = {
       type: 'Create',
       actor: 'https://example.com/actor',
-      to: ['https://recipient.example/actor']
+      to: ['https://recipient.example/actor'],
+      '@context': 'https://www.w3.org/ns/activitystreams'
     }
     const req = new Request('http://localhost/outbox', {
       method: 'POST',
@@ -259,7 +300,8 @@ describe('outbox unit tests', () => {
     const activity = {
       type: 'Create',
       actor: 'https://example.com/actor',
-      to: ['https://recipient.example/actor']
+      to: ['https://recipient.example/actor'],
+      '@context': 'https://www.w3.org/ns/activitystreams'
     }
     const req = new Request('http://localhost/outbox', {
       method: 'POST',

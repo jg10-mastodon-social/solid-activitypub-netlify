@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { Activity, ActivityRecipient } from '../../src/activity.js'
 
+vi.mock('./base-url.js', () => ({
+  baseUrl: 'https://example.com'
+}))
+
 const mockFetch = vi.fn()
 
 describe('activity types', () => {
@@ -208,5 +212,82 @@ describe('validateActivityActor', () => {
     }
     expect(() => validateActivityActor(activity, 'https://example.com/actor'))
       .toThrow('Activity actor missing')
+  })
+})
+
+describe('validateContext', () => {
+  it('should pass when @context is present', async () => {
+    const { validateContext } = await import('../../src/activity.js')
+    const activity: Activity = {
+      type: 'Create',
+      actor: 'https://example.com/actor',
+      '@context': 'https://www.w3.org/ns/activitystreams'
+    }
+    const result = validateContext(activity)
+    expect(result).toBe(true)
+  })
+
+  it('should throw when @context is missing', async () => {
+    const { validateContext } = await import('../../src/activity.js')
+    const activity: Activity = {
+      type: 'Create',
+      actor: 'https://example.com/actor'
+    }
+    expect(() => validateContext(activity))
+      .toThrow('Activity must include @context')
+  })
+})
+
+describe('normalizeActivity', () => {
+  it('should override existing id with generated id', async () => {
+    const { normalizeActivity } = await import('../../src/activity.js')
+    const activity: Activity = {
+      type: 'Create',
+      actor: 'https://example.com/actor',
+      id: 'https://example.com/activities/old-id',
+      '@context': 'https://www.w3.org/ns/activitystreams'
+    }
+    const normalized = normalizeActivity(activity)
+    expect(normalized.id).toMatch(/^https:\/\/example\.com\/activities\/\d+$/)
+    expect(normalized.id).not.toBe('https://example.com/activities/old-id')
+  })
+
+  it('should add published in ISO 8601 format if missing', async () => {
+    const { normalizeActivity } = await import('../../src/activity.js')
+    const activity: Activity = {
+      type: 'Create',
+      actor: 'https://example.com/actor',
+      '@context': 'https://www.w3.org/ns/activitystreams'
+    }
+    const normalized = normalizeActivity(activity)
+    expect(normalized.published).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z$/)
+  })
+
+  it('should preserve existing published if present', async () => {
+    const { normalizeActivity } = await import('../../src/activity.js')
+    const activity: Activity = {
+      type: 'Create',
+      actor: 'https://example.com/actor',
+      published: '2025-12-19T11:34:14.000Z',
+      '@context': 'https://www.w3.org/ns/activitystreams'
+    }
+    const normalized = normalizeActivity(activity)
+    expect(normalized.published).toBe('2025-12-19T11:34:14.000Z')
+  })
+
+  it('should preserve all other activity properties', async () => {
+    const { normalizeActivity } = await import('../../src/activity.js')
+    const activity: Activity = {
+      type: 'Create',
+      actor: 'https://example.com/actor',
+      to: ['https://example.com/recipient'],
+      object: { type: 'Note', content: 'Hello' },
+      '@context': 'https://www.w3.org/ns/activitystreams'
+    }
+    const normalized = normalizeActivity(activity)
+    expect(normalized.type).toBe('Create')
+    expect(normalized.actor).toBe('https://example.com/actor')
+    expect(normalized.to).toEqual(['https://example.com/recipient'])
+    expect(normalized.object).toEqual({ type: 'Note', content: 'Hello' })
   })
 })
