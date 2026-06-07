@@ -19,11 +19,17 @@
   for = "/actor"
   [headers.values]
     Content-Type = "application/activity+json"
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type"
 
 [[headers]]
   for = "/.well-known/webfinger"
   [headers.values]
     Content-Type = "application/jrd+json"
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type"
 
 [dev]
   port = 9999
