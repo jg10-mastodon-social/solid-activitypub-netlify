@@ -37,8 +37,7 @@ export default async (req: Request, context: Context) => {
   try {
     const config = loadConfig()
     const fetchFn = await createSolidFetch(config.webId, config.issuer)
-    const inboxUrl = `${config.baseUrl}/inbox/`
-    await handleInboxActivity(activity, fetchFn, inboxUrl)
+    await handleInboxActivity(activity, fetchFn, config.inboxUrl)
     return new Response('ok', { status: 200, headers: CORS_HEADERS })
   } catch (error) {
     console.error(`[inbox] Error: ${error}`)

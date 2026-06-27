@@ -10,6 +10,7 @@ export interface EnvConfig {
   HANDLER_BASE_URL: string
   SEND_TO_URL: string
   ADMIN_WEBID?: string
+  INBOX_URL: string
 }
 
 export function loadConfig(): Config {
@@ -22,6 +23,12 @@ export function loadConfig(): Config {
   }
   if (!process.env.HANDLER_BASE_URL) {
     throw new Error('HANDLER_BASE_URL is required')
+  }
+  if (!process.env.INBOX_URL) {
+    throw new Error('INBOX_URL is required')
+  }
+  if (!process.env.INBOX_URL.endsWith('/')) {
+    throw new Error('INBOX_URL must end with /')
   }
 
   const webId = process.env.WEBID || `${baseUrl}/webid`
@@ -41,5 +48,6 @@ export function loadConfig(): Config {
     outboxConfigUrl: process.env.OUTBOX_CONFIG_URL,
     handlerBaseUrl: process.env.HANDLER_BASE_URL,
     adminWebId,
+    inboxUrl: process.env.INBOX_URL,
   }
 }

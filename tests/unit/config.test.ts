@@ -27,6 +27,7 @@ describe('loadConfig', () => {
     process.env.WHITELISTED_ISSUERS = 'https://mocked.example.com'
     process.env.OUTBOX_CONFIG_URL = 'https://mocked.example.com/webhooks.ttl'
     process.env.HANDLER_BASE_URL = 'https://mocked.example.com/handlers#'
+    process.env.INBOX_URL = 'https://pod.example.com/inbox/'
 
     const { loadConfig } = await import('../../src/config.js')
     const config = loadConfig()
@@ -42,6 +43,7 @@ describe('loadConfig', () => {
     process.env.WHITELISTED_ISSUERS = 'https://mocked.example.com'
     process.env.OUTBOX_CONFIG_URL = 'https://mocked.example.com/webhooks.ttl'
     process.env.HANDLER_BASE_URL = 'https://mocked.example.com/handlers#'
+    process.env.INBOX_URL = 'https://pod.example.com/inbox/'
 
     const { loadConfig } = await import('../../src/config.js')
     const config = loadConfig()
@@ -54,6 +56,7 @@ describe('loadConfig', () => {
     process.env.WHITELISTED_ISSUERS = 'https://mocked.example.com'
     process.env.OUTBOX_CONFIG_URL = 'https://mocked.example.com/webhooks.ttl'
     process.env.HANDLER_BASE_URL = 'https://mocked.example.com/handlers#'
+    process.env.INBOX_URL = 'https://pod.example.com/inbox/'
 
     const { loadConfig } = await import('../../src/config.js')
     const config = loadConfig()
@@ -66,6 +69,7 @@ describe('loadConfig', () => {
     process.env.WHITELISTED_ISSUERS = 'https://mocked.example.com'
     process.env.OUTBOX_CONFIG_URL = 'https://mocked.example.com/webhooks.ttl'
     process.env.HANDLER_BASE_URL = 'https://mocked.example.com/handlers#'
+    process.env.INBOX_URL = 'https://pod.example.com/inbox/'
 
     const { loadConfig } = await import('../../src/config.js')
     const config = loadConfig()
@@ -77,6 +81,7 @@ describe('loadConfig', () => {
     delete process.env.WHITELISTED_ISSUERS
     process.env.OUTBOX_CONFIG_URL = 'https://mocked.example.com/webhooks.ttl'
     process.env.HANDLER_BASE_URL = 'https://mocked.example.com/handlers#'
+    process.env.INBOX_URL = 'https://pod.example.com/inbox/'
 
     const { loadConfig } = await import('../../src/config.js')
 
@@ -87,6 +92,7 @@ describe('loadConfig', () => {
     delete process.env.WEBHOOK_CONFIG_URL
     process.env.WHITELISTED_ISSUERS = 'https://mocked.example.com'
     process.env.HANDLER_BASE_URL = 'https://mocked.example.com/handlers#'
+    process.env.INBOX_URL = 'https://pod.example.com/inbox/'
 
     const { loadConfig } = await import('../../src/config.js')
 
@@ -97,6 +103,7 @@ describe('loadConfig', () => {
     delete process.env.HANDLER_BASE_URL
     process.env.WHITELISTED_ISSUERS = 'https://mocked.example.com'
     process.env.OUTBOX_CONFIG_URL = 'https://mocked.example.com/webhooks.ttl'
+    process.env.INBOX_URL = 'https://pod.example.com/inbox/'
 
     const { loadConfig } = await import('../../src/config.js')
 
@@ -107,6 +114,7 @@ describe('loadConfig', () => {
     process.env.WHITELISTED_ISSUERS = 'https://issuer1.example.com, https://issuer2.example.com ,https://issuer3.example.com'
     process.env.OUTBOX_CONFIG_URL = 'https://mocked.example.com/webhooks.ttl'
     process.env.HANDLER_BASE_URL = 'https://mocked.example.com/handlers#'
+    process.env.INBOX_URL = 'https://pod.example.com/inbox/'
 
     const { loadConfig } = await import('../../src/config.js')
     const config = loadConfig()
@@ -123,6 +131,7 @@ describe('loadConfig', () => {
     process.env.WHITELISTED_ISSUERS = 'https://mocked.example.com'
     process.env.OUTBOX_CONFIG_URL = 'https://mocked.example.com/webhooks.ttl'
     process.env.HANDLER_BASE_URL = 'https://mocked.example.com/handlers#'
+    process.env.INBOX_URL = 'https://pod.example.com/inbox/'
 
     const { loadConfig } = await import('../../src/config.js')
     const config = loadConfig()
@@ -135,10 +144,45 @@ describe('loadConfig', () => {
     process.env.WHITELISTED_ISSUERS = 'https://mocked.example.com'
     process.env.OUTBOX_CONFIG_URL = 'https://mocked.example.com/webhooks.ttl'
     process.env.HANDLER_BASE_URL = 'https://mocked.example.com/handlers#'
+    process.env.INBOX_URL = 'https://pod.example.com/inbox/'
 
     const { loadConfig } = await import('../../src/config.js')
     const config = loadConfig()
 
     expect(config.adminWebId).toBe('')
+  })
+
+  it('returns inboxUrl when INBOX_URL is valid', async () => {
+    process.env.WHITELISTED_ISSUERS = 'https://mocked.example.com'
+    process.env.OUTBOX_CONFIG_URL = 'https://mocked.example.com/webhooks.ttl'
+    process.env.HANDLER_BASE_URL = 'https://mocked.example.com/handlers#'
+    process.env.INBOX_URL = 'https://pod.example.com/inbox/'
+
+    const { loadConfig } = await import('../../src/config.js')
+    const config = loadConfig()
+
+    expect(config.inboxUrl).toBe('https://pod.example.com/inbox/')
+  })
+
+  it('throws when INBOX_URL is missing', async () => {
+    delete process.env.INBOX_URL
+    process.env.WHITELISTED_ISSUERS = 'https://mocked.example.com'
+    process.env.OUTBOX_CONFIG_URL = 'https://mocked.example.com/webhooks.ttl'
+    process.env.HANDLER_BASE_URL = 'https://mocked.example.com/handlers#'
+
+    const { loadConfig } = await import('../../src/config.js')
+
+    expect(() => loadConfig()).toThrow('INBOX_URL is required')
+  })
+
+  it('throws when INBOX_URL does not end with /', async () => {
+    process.env.WHITELISTED_ISSUERS = 'https://mocked.example.com'
+    process.env.OUTBOX_CONFIG_URL = 'https://mocked.example.com/webhooks.ttl'
+    process.env.HANDLER_BASE_URL = 'https://mocked.example.com/handlers#'
+    process.env.INBOX_URL = 'https://pod.example.com/inbox'
+
+    const { loadConfig } = await import('../../src/config.js')
+
+    expect(() => loadConfig()).toThrow('INBOX_URL must end with /')
   })
 })

@@ -20,6 +20,7 @@ export interface Config {
   outboxConfigUrl: string
   handlerBaseUrl: string
   adminWebId: string
+  inboxUrl: string
 }
 
 export interface TokenPayload {
