@@ -1,4 +1,7 @@
 import type { Config, Context } from '@netlify/functions'
+import { createSolidFetch } from '../../src/solidFetch.js'
+import { loadConfig } from '../../src/config.js'
+import { handleInboxActivity } from '../../src/handlers/inbox.js'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -19,9 +22,23 @@ export default async (req: Request, context: Context) => {
     return new Response(null, { status: 204, headers: CORS_HEADERS })
   }
 
+  let activity: Record<string, unknown>
   try {
-    const body = await req.json()
-    console.log('[inbox] Incoming message:', JSON.stringify(body, null, 2))
+    activity = await req.json() as Record<string, unknown>
+  } catch {
+    return new Response('Invalid JSON body', {
+      status: 400,
+      headers: CORS_HEADERS
+    })
+  }
+
+  console.log('[inbox] Incoming message:', JSON.stringify(activity, null, 2))
+
+  try {
+    const config = loadConfig()
+    const fetchFn = await createSolidFetch(config.webId, config.issuer)
+    const inboxUrl = `${config.baseUrl}/inbox/`
+    await handleInboxActivity(activity, fetchFn, inboxUrl)
     return new Response('ok', { status: 200, headers: CORS_HEADERS })
   } catch (error) {
     console.error(`[inbox] Error: ${error}`)
