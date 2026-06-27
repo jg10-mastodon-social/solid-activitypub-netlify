@@ -17,7 +17,7 @@ describe('inbox function', () => {
     })
     const context = {}
 
-    const response = await handler(req, context)
+    const response = await handler(req, context as any)
 
     expect(response.status).toBe(204)
   })
@@ -35,7 +35,7 @@ describe('inbox function', () => {
       headers: { 'content-type': 'application/json' },
       body: 'not json'
     })
-    const context = {}
+    const context = {} as any
 
     const response = await handler(req, context)
 
