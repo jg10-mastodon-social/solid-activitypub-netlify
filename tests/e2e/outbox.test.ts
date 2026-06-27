@@ -126,7 +126,12 @@ describe('outbox e2e tests', () => {
         'content-type': 'application/json',
         'authorization': `DPoP ${token}`,
         'dpop': dpopHeader
-      }
+      },
+      body: JSON.stringify({
+        type: 'Create',
+        '@context': 'https://www.w3.org/ns/activitystreams',
+        actor: `${devServerUrl}/actor`
+      })
     })
 
     expect(res.status).toBe(500)
