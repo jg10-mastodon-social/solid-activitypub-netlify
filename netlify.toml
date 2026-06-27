@@ -14,7 +14,7 @@
   OUTBOX_CONFIG_URL = "http://localhost:9999/webhooks.ttl"
   HANDLER_BASE_URL = "https://example.com/handlers#"
   SEND_TO_URL = "http://localhost:9999/outbox"
-  INBOX_URL = "http://localhost:9999/inbox/"
+  INBOX_URL = "http://localhost:9998/inbox/"
 
 [[headers]]
   for = "/actor"

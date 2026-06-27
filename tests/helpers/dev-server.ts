@@ -1,7 +1,7 @@
 import { spawn, ChildProcess } from 'child_process'
-import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { startMockSolidServer, stopMockSolidServer, getMockSolidServer } from './mock-solid-server.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -9,6 +9,7 @@ const rootDir = path.resolve(__dirname, '../..')
 
 const DEV_PORT = 9999
 const DEV_URL = `http://localhost:${DEV_PORT}`
+const MOCK_SOLID_PORT = 9998
 
 let serverProcess: ChildProcess | null = null
 let serverReady = false
@@ -63,6 +64,10 @@ export async function startDevServer(): Promise<void> {
 
   console.log('Generating identity files...')
   await generateIdentity()
+
+  console.log('Starting mock Solid server...')
+  await startMockSolidServer(MOCK_SOLID_PORT)
+
   console.log('Starting netlify dev...')
 
   return new Promise((resolve, reject) => {
@@ -107,4 +112,8 @@ export function stopDevServer(): void {
     serverProcess = null
     serverReady = false
   }
+  console.log('Stopping mock Solid server...')
+  stopMockSolidServer()
 }
+
+export { getMockSolidServer }

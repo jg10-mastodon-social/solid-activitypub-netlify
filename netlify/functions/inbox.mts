@@ -37,7 +37,13 @@ export default async (req: Request, context: Context) => {
   try {
     const config = loadConfig()
     const fetchFn = await createSolidFetch(config.webId, config.issuer)
-    await handleInboxActivity(activity, fetchFn, config.inboxUrl)
+    const success = await handleInboxActivity(activity, fetchFn, config.inboxUrl)
+    if (!success) {
+      return new Response('Failed to process activity', {
+        status: 500,
+        headers: CORS_HEADERS
+      })
+    }
     return new Response('ok', { status: 200, headers: CORS_HEADERS })
   } catch (error) {
     console.error(`[inbox] Error: ${error}`)
