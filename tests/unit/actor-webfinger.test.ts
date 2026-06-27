@@ -61,11 +61,11 @@ describe('actor and webfinger', () => {
       expect(actor.preferredUsername).toBe('actor')
     })
 
-    it('sets inbox to outbox endpoint', async () => {
+    it('sets inbox and outbox endpoints', async () => {
       await runScript(undefined, 'production')
       const actorPath = path.join(publicDir, 'actor')
       const actor = JSON.parse(fs.readFileSync(actorPath, 'utf-8'))
-      expect(actor.inbox).toBe('https://example.com/outbox')
+      expect(actor.inbox).toBe('https://example.com/inbox')
       expect(actor.outbox).toBe('https://example.com/outbox')
     })
 

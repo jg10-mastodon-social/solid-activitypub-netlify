@@ -17,7 +17,7 @@ describe('actor endpoint', () => {
     expect(actor.type).toBe('Service')
     expect(actor.id).toBe(`${devServerUrl}/actor`)
     expect(actor.preferredUsername).toBe('actor')
-    expect(actor.inbox).toBe(`${devServerUrl}/outbox`)
+    expect(actor.inbox).toBe(`${devServerUrl}/inbox`)
     expect(actor.outbox).toBe(`${devServerUrl}/outbox`)
     expect(actor.followers).toBe(`${devServerUrl}/followers`)
     expect(actor.following).toBe(`${devServerUrl}/following`)
