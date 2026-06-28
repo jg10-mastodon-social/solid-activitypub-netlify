@@ -39,7 +39,8 @@ describe('updatePageNext', () => {
     const { updatePageNext } = await import('../../src/services/updatePageNext.js')
     mockFetch.mockResolvedValue({
       ok: false,
-      status: 500
+      status: 500,
+      text: () => Promise.resolve('Server error')
     })
 
     await expect(updatePageNext(
@@ -47,5 +48,25 @@ describe('updatePageNext', () => {
       'https://example.com/inbox/pages/124',
       mockFetch as SolidFetch
     )).rejects.toThrow('Failed to update page next link')
+  })
+
+  it('should include page URL and response body in error message on failure', async () => {
+    const { updatePageNext } = await import('../../src/services/updatePageNext.js')
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 403,
+      text: () => Promise.resolve('Forbidden access')
+    })
+
+    await expect(updatePageNext(
+      'https://example.com/inbox/pages/123',
+      'https://example.com/inbox/pages/124',
+      mockFetch as SolidFetch
+    )).rejects.toThrow('https://example.com/inbox/pages/123')
+    await expect(updatePageNext(
+      'https://example.com/inbox/pages/123',
+      'https://example.com/inbox/pages/124',
+      mockFetch as SolidFetch
+    )).rejects.toThrow('Forbidden access')
   })
 })

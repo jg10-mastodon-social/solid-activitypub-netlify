@@ -20,6 +20,7 @@ _:patch a solid:InsertDeletePatch;
   })
 
   if (!response.ok) {
-    throw new Error(`Failed to update page next link: ${response.status}`)
+    const text = await response.text()
+    throw new Error(`Failed to update page next link on ${pageUrl}: ${response.status} ${text}`)
   }
 }

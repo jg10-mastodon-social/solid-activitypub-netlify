@@ -39,7 +39,8 @@ describe('updateInbox', () => {
     const { updateInboxFirst } = await import('../../src/services/updateInbox.js')
     mockFetch.mockResolvedValue({
       ok: false,
-      status: 500
+      status: 500,
+      text: () => Promise.resolve('Server error')
     })
 
     await expect(updateInboxFirst(
@@ -47,5 +48,25 @@ describe('updateInbox', () => {
       'https://example.com/inbox/pages/123',
       mockFetch as SolidFetch
     )).rejects.toThrow('Failed to update inbox first pointer')
+  })
+
+  it('should include inbox URL and response body in error message on failure', async () => {
+    const { updateInboxFirst } = await import('../../src/services/updateInbox.js')
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 403,
+      text: () => Promise.resolve('Forbidden access')
+    })
+
+    await expect(updateInboxFirst(
+      'https://example.com/inbox/',
+      'https://example.com/inbox/pages/123',
+      mockFetch as SolidFetch
+    )).rejects.toThrow('https://example.com/inbox/')
+    await expect(updateInboxFirst(
+      'https://example.com/inbox/',
+      'https://example.com/inbox/pages/123',
+      mockFetch as SolidFetch
+    )).rejects.toThrow('Forbidden access')
   })
 })

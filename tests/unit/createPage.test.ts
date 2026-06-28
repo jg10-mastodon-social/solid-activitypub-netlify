@@ -100,4 +100,19 @@ describe('createPage', () => {
       mockFetch as SolidFetch
     )).rejects.toThrow('Already exists')
   })
+
+  it('should include page URL in error message on failure', async () => {
+    const { createPage } = await import('../../src/services/createPage.js')
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 403,
+      text: () => Promise.resolve('Forbidden')
+    })
+
+    await expect(createPage(
+      'https://example.com/inbox/pages/123',
+      'https://example.com/inbox/',
+      mockFetch as SolidFetch
+    )).rejects.toThrow('https://example.com/inbox/pages/123')
+  })
 })

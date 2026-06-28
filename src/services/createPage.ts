@@ -28,6 +28,7 @@ export async function createPage(
     if (response.status === 409) {
       throw new Error('Already exists')
     }
-    throw new Error(`Failed to create page: ${response.status}`)
+    const text = await response.text()
+    throw new Error(`Failed to create page ${pageUrl}: ${response.status} ${text}`)
   }
 }

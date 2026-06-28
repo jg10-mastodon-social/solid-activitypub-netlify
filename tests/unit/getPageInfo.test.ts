@@ -66,10 +66,23 @@ describe('getPageInfo', () => {
     const { getPageInfo } = await import('../../src/services/getPageInfo.js')
     mockFetch.mockResolvedValue({
       ok: false,
-      status: 500
+      status: 500,
+      text: () => Promise.resolve('Server error')
     })
 
     await expect(getPageInfo('https://example.com/inbox/pages/123', mockFetch as SolidFetch))
       .rejects.toThrow('Failed to fetch page')
+  })
+
+  it('should include page URL in error message on failure', async () => {
+    const { getPageInfo } = await import('../../src/services/getPageInfo.js')
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 403,
+      text: () => Promise.resolve('Forbidden')
+    })
+
+    await expect(getPageInfo('https://example.com/inbox/pages/123', mockFetch as SolidFetch))
+      .rejects.toThrow('https://example.com/inbox/pages/123')
   })
 })

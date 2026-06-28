@@ -52,16 +52,18 @@ export async function derivePageUrl(
 
   try {
     await createPage(newPageUrl, inboxUrl, fetch, firstPageUrl ?? undefined)
+    console.log(`[derivePageUrl] Created new page ${newPageUrl}`)
   } catch (error) {
     if (error instanceof Error && error.message.includes('Already exists')) {
       return newPageUrl
     }
-    throw error
+    throw new Error(`Failed to create page ${newPageUrl}: ${error}`)
   }
 
   if (firstPageUrl) {
     try {
       await updatePageNext(firstPageUrl, newPageUrl, fetch)
+      console.log(`[derivePageUrl] Added next link on ${firstPageUrl} to ${newPageUrl}`)
     } catch (error) {
       console.warn(`[derivePageUrl] Could not update page next link: ${error}`)
     }
@@ -69,6 +71,7 @@ export async function derivePageUrl(
 
   try {
     await updateInboxFirst(inboxUrl, newPageUrl, fetch)
+    console.log(`[derivePageUrl] Updated inbox first link to ${newPageUrl}`)
   } catch (error) {
     console.warn(`[derivePageUrl] Could not update inbox first link: ${error}`)
   }

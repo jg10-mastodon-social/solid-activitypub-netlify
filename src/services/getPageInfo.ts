@@ -19,11 +19,12 @@ export async function getPageInfo(
     },
   })
 
+  const text = await response.text()
+
   if (!response.ok) {
-    throw new Error(`Failed to fetch page: ${response.status}`)
+    throw new Error(`Failed to fetch page ${pageUrl}: ${response.status} ${text}`)
   }
 
-  const text = await response.text()
   const parser = new Parser({ baseIRI: pageUrl })
   const store = new Store()
   const quads = parser.parse(text)
