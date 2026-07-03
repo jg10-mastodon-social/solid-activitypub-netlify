@@ -6,11 +6,10 @@ export interface EnvConfig {
   WEBID: string
   ISSUER: string
   WHITELISTED_ISSUERS: string
-  OUTBOX_CONFIG_URL: string
+  SOLID_STORAGE_BASE_URL: string
   HANDLER_BASE_URL: string
   SEND_TO_URL: string
   ADMIN_WEBID?: string
-  INBOX_URL: string
 }
 
 export function loadConfig(): Config {
@@ -18,17 +17,14 @@ export function loadConfig(): Config {
   if (!whitelistedIssuersStr) {
     throw new Error('WHITELISTED_ISSUERS is required')
   }
-  if (!process.env.OUTBOX_CONFIG_URL) {
-    throw new Error('OUTBOX_CONFIG_URL is required')
+  if (!process.env.SOLID_STORAGE_BASE_URL) {
+    throw new Error('SOLID_STORAGE_BASE_URL is required')
   }
   if (!process.env.HANDLER_BASE_URL) {
     throw new Error('HANDLER_BASE_URL is required')
   }
-  if (!process.env.INBOX_URL) {
-    throw new Error('INBOX_URL is required')
-  }
-  if (!process.env.INBOX_URL.endsWith('/')) {
-    throw new Error('INBOX_URL must end with /')
+  if (!process.env.SOLID_STORAGE_BASE_URL.endsWith('/')) {
+    throw new Error('SOLID_STORAGE_BASE_URL must end with /')
   }
 
   const webId = process.env.WEBID || `${baseUrl}/webid`
@@ -37,6 +33,9 @@ export function loadConfig(): Config {
   const sendToUrl = process.env.SEND_TO_URL || `${baseUrl}${outboxEndpoint}`
   const adminWebId = process.env.ADMIN_WEBID || ''
   const whitelistedIssuers = whitelistedIssuersStr.split(',').map((s) => s.trim())
+  const solidStorageBaseUrl = process.env.SOLID_STORAGE_BASE_URL
+  const inboxUrl = `${solidStorageBaseUrl}inbox/`
+  const outboxUrl = `${solidStorageBaseUrl}outbox/`
 
   return {
     webId,
@@ -45,9 +44,10 @@ export function loadConfig(): Config {
     outboxEndpoint,
     sendToUrl,
     whitelistedIssuers,
-    outboxConfigUrl: process.env.OUTBOX_CONFIG_URL,
+    solidStorageBaseUrl,
     handlerBaseUrl: process.env.HANDLER_BASE_URL,
     adminWebId,
-    inboxUrl: process.env.INBOX_URL,
+    inboxUrl,
+    outboxUrl,
   }
 }

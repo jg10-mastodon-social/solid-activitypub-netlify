@@ -17,10 +17,11 @@ export interface Config {
   outboxEndpoint: string
   sendToUrl: string
   whitelistedIssuers: string[]
-  outboxConfigUrl: string
+  solidStorageBaseUrl: string
   handlerBaseUrl: string
   adminWebId: string
   inboxUrl: string
+  outboxUrl: string
 }
 
 export interface TokenPayload {

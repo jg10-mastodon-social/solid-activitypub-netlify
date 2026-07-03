@@ -36,7 +36,7 @@ vi.mock('../../src/solidFetch.js', () => ({
 
 beforeAll(() => {
   process.env.WHITELISTED_ISSUERS = 'https://issuer.example'
-  process.env.OUTBOX_CONFIG_URL = 'https://pod.example.com/webhooks.ttl'
+  process.env.SOLID_STORAGE_BASE_URL = 'http://localhost:9998/'
   process.env.WEBID = 'http://localhost:9999/webid'
   process.env.ISSUER = 'http://localhost:9999'
   process.env.HANDLER_BASE_URL = 'https://example.com/handlers#'

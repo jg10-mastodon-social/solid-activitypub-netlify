@@ -113,8 +113,8 @@ export default async (req: Request, context: Context) => {
   try {
     const fetchFn = await createSolidFetch(config.webId, config.issuer)
 
-    console.log(`[outbox] Fetching config from ${config.outboxConfigUrl}`)
-    const response = await fetchFn(config.outboxConfigUrl, {
+    console.log(`[outbox] Fetching config from ${config.outboxUrl}`)
+    const response = await fetchFn(config.outboxUrl, {
       headers: { accept: 'text/turtle,application/x-turtle' }
     })
 

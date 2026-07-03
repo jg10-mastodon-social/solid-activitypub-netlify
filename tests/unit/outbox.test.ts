@@ -17,7 +17,7 @@ vi.mock('../../src/config.js', () => ({
     outboxEndpoint: '/outbox',
     sendToUrl: 'https://example.com/outbox',
     whitelistedIssuers: ['https://issuer.example'],
-    outboxConfigUrl: 'https://pod.example.com/webhooks.ttl',
+    outboxUrl: 'https://pod.example.com/outbox/',
     handlerBaseUrl: 'https://example.com/handlers#',
     adminWebId: ''
   })

@@ -25,9 +25,8 @@ describe('loadConfig', () => {
 
   it('uses baseUrl from base-url module', async () => {
     process.env.WHITELISTED_ISSUERS = 'https://mocked.example.com'
-    process.env.OUTBOX_CONFIG_URL = 'https://mocked.example.com/webhooks.ttl'
     process.env.HANDLER_BASE_URL = 'https://mocked.example.com/handlers#'
-    process.env.INBOX_URL = 'https://pod.example.com/inbox/'
+    process.env.SOLID_STORAGE_BASE_URL = 'https://pod.example.com/'
 
     const { loadConfig } = await import('../../src/config.js')
     const config = loadConfig()
@@ -41,9 +40,8 @@ describe('loadConfig', () => {
   it('derives webId from baseUrl if WEBID is not set', async () => {
     delete process.env.WEBID
     process.env.WHITELISTED_ISSUERS = 'https://mocked.example.com'
-    process.env.OUTBOX_CONFIG_URL = 'https://mocked.example.com/webhooks.ttl'
     process.env.HANDLER_BASE_URL = 'https://mocked.example.com/handlers#'
-    process.env.INBOX_URL = 'https://pod.example.com/inbox/'
+    process.env.SOLID_STORAGE_BASE_URL = 'https://pod.example.com/'
 
     const { loadConfig } = await import('../../src/config.js')
     const config = loadConfig()
@@ -54,9 +52,8 @@ describe('loadConfig', () => {
   it('derives issuer from baseUrl if ISSUER is not set', async () => {
     delete process.env.ISSUER
     process.env.WHITELISTED_ISSUERS = 'https://mocked.example.com'
-    process.env.OUTBOX_CONFIG_URL = 'https://mocked.example.com/webhooks.ttl'
     process.env.HANDLER_BASE_URL = 'https://mocked.example.com/handlers#'
-    process.env.INBOX_URL = 'https://pod.example.com/inbox/'
+    process.env.SOLID_STORAGE_BASE_URL = 'https://pod.example.com/'
 
     const { loadConfig } = await import('../../src/config.js')
     const config = loadConfig()
@@ -67,9 +64,8 @@ describe('loadConfig', () => {
   it('derives sendToUrl from baseUrl if SEND_TO_URL is not set', async () => {
     delete process.env.SEND_TO_URL
     process.env.WHITELISTED_ISSUERS = 'https://mocked.example.com'
-    process.env.OUTBOX_CONFIG_URL = 'https://mocked.example.com/webhooks.ttl'
     process.env.HANDLER_BASE_URL = 'https://mocked.example.com/handlers#'
-    process.env.INBOX_URL = 'https://pod.example.com/inbox/'
+    process.env.SOLID_STORAGE_BASE_URL = 'https://pod.example.com/'
 
     const { loadConfig } = await import('../../src/config.js')
     const config = loadConfig()
@@ -79,31 +75,28 @@ describe('loadConfig', () => {
 
   it('throws when WHITELISTED_ISSUERS is missing', async () => {
     delete process.env.WHITELISTED_ISSUERS
-    process.env.OUTBOX_CONFIG_URL = 'https://mocked.example.com/webhooks.ttl'
     process.env.HANDLER_BASE_URL = 'https://mocked.example.com/handlers#'
-    process.env.INBOX_URL = 'https://pod.example.com/inbox/'
+    process.env.SOLID_STORAGE_BASE_URL = 'https://pod.example.com/'
 
     const { loadConfig } = await import('../../src/config.js')
 
     expect(() => loadConfig()).toThrow('WHITELISTED_ISSUERS is required')
   })
 
-  it('throws when WEBHOOK_CONFIG_URL is missing', async () => {
-    delete process.env.WEBHOOK_CONFIG_URL
+  it('throws when SOLID_STORAGE_BASE_URL is missing', async () => {
+    delete process.env.SOLID_STORAGE_BASE_URL
     process.env.WHITELISTED_ISSUERS = 'https://mocked.example.com'
     process.env.HANDLER_BASE_URL = 'https://mocked.example.com/handlers#'
-    process.env.INBOX_URL = 'https://pod.example.com/inbox/'
 
     const { loadConfig } = await import('../../src/config.js')
 
-    expect(() => loadConfig()).toThrow('OUTBOX_CONFIG_URL is required')
+    expect(() => loadConfig()).toThrow('SOLID_STORAGE_BASE_URL is required')
   })
 
   it('throws when HANDLER_BASE_URL is missing', async () => {
     delete process.env.HANDLER_BASE_URL
     process.env.WHITELISTED_ISSUERS = 'https://mocked.example.com'
-    process.env.OUTBOX_CONFIG_URL = 'https://mocked.example.com/webhooks.ttl'
-    process.env.INBOX_URL = 'https://pod.example.com/inbox/'
+    process.env.SOLID_STORAGE_BASE_URL = 'https://pod.example.com/'
 
     const { loadConfig } = await import('../../src/config.js')
 
@@ -112,9 +105,8 @@ describe('loadConfig', () => {
 
   it('parses comma-separated whitelisted issuers', async () => {
     process.env.WHITELISTED_ISSUERS = 'https://issuer1.example.com, https://issuer2.example.com ,https://issuer3.example.com'
-    process.env.OUTBOX_CONFIG_URL = 'https://mocked.example.com/webhooks.ttl'
     process.env.HANDLER_BASE_URL = 'https://mocked.example.com/handlers#'
-    process.env.INBOX_URL = 'https://pod.example.com/inbox/'
+    process.env.SOLID_STORAGE_BASE_URL = 'https://pod.example.com/'
 
     const { loadConfig } = await import('../../src/config.js')
     const config = loadConfig()
@@ -129,9 +121,8 @@ describe('loadConfig', () => {
   it('sets adminWebId from ADMIN_WEBID env var', async () => {
     process.env.ADMIN_WEBID = 'https://admin.example.com/webid#me'
     process.env.WHITELISTED_ISSUERS = 'https://mocked.example.com'
-    process.env.OUTBOX_CONFIG_URL = 'https://mocked.example.com/webhooks.ttl'
     process.env.HANDLER_BASE_URL = 'https://mocked.example.com/handlers#'
-    process.env.INBOX_URL = 'https://pod.example.com/inbox/'
+    process.env.SOLID_STORAGE_BASE_URL = 'https://pod.example.com/'
 
     const { loadConfig } = await import('../../src/config.js')
     const config = loadConfig()
@@ -142,9 +133,8 @@ describe('loadConfig', () => {
   it('defaults adminWebId to empty string if not set', async () => {
     delete process.env.ADMIN_WEBID
     process.env.WHITELISTED_ISSUERS = 'https://mocked.example.com'
-    process.env.OUTBOX_CONFIG_URL = 'https://mocked.example.com/webhooks.ttl'
     process.env.HANDLER_BASE_URL = 'https://mocked.example.com/handlers#'
-    process.env.INBOX_URL = 'https://pod.example.com/inbox/'
+    process.env.SOLID_STORAGE_BASE_URL = 'https://pod.example.com/'
 
     const { loadConfig } = await import('../../src/config.js')
     const config = loadConfig()
@@ -152,37 +142,35 @@ describe('loadConfig', () => {
     expect(config.adminWebId).toBe('')
   })
 
-  it('returns inboxUrl when INBOX_URL is valid', async () => {
+  it('returns inboxUrl and outboxUrl when SOLID_STORAGE_BASE_URL is valid', async () => {
     process.env.WHITELISTED_ISSUERS = 'https://mocked.example.com'
-    process.env.OUTBOX_CONFIG_URL = 'https://mocked.example.com/webhooks.ttl'
     process.env.HANDLER_BASE_URL = 'https://mocked.example.com/handlers#'
-    process.env.INBOX_URL = 'https://pod.example.com/inbox/'
+    process.env.SOLID_STORAGE_BASE_URL = 'https://pod.example.com/'
 
     const { loadConfig } = await import('../../src/config.js')
     const config = loadConfig()
 
     expect(config.inboxUrl).toBe('https://pod.example.com/inbox/')
+    expect(config.outboxUrl).toBe('https://pod.example.com/outbox/')
   })
 
-  it('throws when INBOX_URL is missing', async () => {
-    delete process.env.INBOX_URL
+  it('throws when SOLID_STORAGE_BASE_URL is missing', async () => {
+    delete process.env.SOLID_STORAGE_BASE_URL
     process.env.WHITELISTED_ISSUERS = 'https://mocked.example.com'
-    process.env.OUTBOX_CONFIG_URL = 'https://mocked.example.com/webhooks.ttl'
     process.env.HANDLER_BASE_URL = 'https://mocked.example.com/handlers#'
 
     const { loadConfig } = await import('../../src/config.js')
 
-    expect(() => loadConfig()).toThrow('INBOX_URL is required')
+    expect(() => loadConfig()).toThrow('SOLID_STORAGE_BASE_URL is required')
   })
 
-  it('throws when INBOX_URL does not end with /', async () => {
+  it('throws when SOLID_STORAGE_BASE_URL does not end with /', async () => {
     process.env.WHITELISTED_ISSUERS = 'https://mocked.example.com'
-    process.env.OUTBOX_CONFIG_URL = 'https://mocked.example.com/webhooks.ttl'
     process.env.HANDLER_BASE_URL = 'https://mocked.example.com/handlers#'
-    process.env.INBOX_URL = 'https://pod.example.com/inbox'
+    process.env.SOLID_STORAGE_BASE_URL = 'https://pod.example.com'
 
     const { loadConfig } = await import('../../src/config.js')
 
-    expect(() => loadConfig()).toThrow('INBOX_URL must end with /')
+    expect(() => loadConfig()).toThrow('SOLID_STORAGE_BASE_URL must end with /')
   })
 })
