@@ -11,9 +11,7 @@ export async function createPage(
   as:partOf <${inboxUrl}>.`
 
   if (prevPageUrl) {
-    body += `\n  as:prev <${prevPageUrl}>.`
-  } else {
-    body += '.'
+    body += `\n<${pageUrl}> as:prev <${prevPageUrl}>.`
   }
 
   const response = await fetch(pageUrl, {

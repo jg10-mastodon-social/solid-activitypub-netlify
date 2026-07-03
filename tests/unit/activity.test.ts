@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { Activity, ActivityRecipient } from '../../src/activity.js'
 
-vi.mock('./base-url.js', () => ({
+vi.mock('../../src/base-url.js', () => ({
   baseUrl: 'https://example.com'
 }))
 
@@ -288,6 +288,66 @@ describe('normalizeActivity', () => {
     expect(normalized.type).toBe('Create')
     expect(normalized.actor).toBe('https://example.com/actor')
     expect(normalized.to).toEqual(['https://example.com/recipient'])
-    expect(normalized.object).toEqual({ type: 'Note', content: 'Hello' })
+    expect((normalized.object as any).type).toBe('Note')
+    expect((normalized.object as any).content).toBe('Hello')
+    expect((normalized.object as any).id).toMatch(/^https:\/\/example\.com\/actor\/status\/\d+$/)
+    expect(normalized.id).toMatch(/^https:\/\/example\.com\/actor\/status\/\d+-activity$/)
+  })
+
+  it('should generate object id and derive activity id when object has no id', async () => {
+    const { normalizeActivity } = await import('../../src/activity.js')
+    const activity: Activity = {
+      type: 'Create',
+      actor: 'https://example.com/actor',
+      '@context': 'https://www.w3.org/ns/activitystreams',
+      object: { type: 'Note', content: 'Hello world' }
+    }
+    const normalized = normalizeActivity(activity)
+    expect((normalized.object as any).id).toMatch(/^https:\/\/example\.com\/actor\/status\/\d+$/)
+    expect(normalized.id).toBe(`${(normalized.object as any).id}-activity`)
+  })
+
+  it('should derive activity id from existing object id', async () => {
+    const { normalizeActivity } = await import('../../src/activity.js')
+    const activity: Activity = {
+      type: 'Create',
+      actor: 'https://example.com/actor',
+      id: 'https://example.com/activities/old-id',
+      '@context': 'https://www.w3.org/ns/activitystreams',
+      object: {
+        type: 'Note',
+        id: 'https://example.com/actor/status/existing-id',
+        content: 'Hello'
+      }
+    }
+    const normalized = normalizeActivity(activity)
+    expect((normalized.object as any).id).toBe('https://example.com/actor/status/existing-id')
+    expect(normalized.id).toBe('https://example.com/actor/status/existing-id-activity')
+  })
+
+  it('should not modify object when it is a string reference', async () => {
+    const { normalizeActivity } = await import('../../src/activity.js')
+    const activity: Activity = {
+      type: 'Delete',
+      actor: 'https://example.com/actor',
+      '@context': 'https://www.w3.org/ns/activitystreams',
+      object: 'https://example.com/notes/123'
+    }
+    const normalized = normalizeActivity(activity)
+    expect(normalized.object).toBe('https://example.com/notes/123')
+    expect(normalized.id).toMatch(/^https:\/\/example\.com\/activities\/\d+$/)
+  })
+
+  it('should generate id for non-Note objects like Article', async () => {
+    const { normalizeActivity } = await import('../../src/activity.js')
+    const activity: Activity = {
+      type: 'Create',
+      actor: 'https://example.com/actor',
+      '@context': 'https://www.w3.org/ns/activitystreams',
+      object: { type: 'Article', name: 'My Article' }
+    }
+    const normalized = normalizeActivity(activity)
+    expect((normalized.object as any).id).toMatch(/^https:\/\/example\.com\/actor\/status\/\d+$/)
+    expect(normalized.id).toBe(`${(normalized.object as any).id}-activity`)
   })
 })

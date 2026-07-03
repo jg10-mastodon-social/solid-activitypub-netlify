@@ -115,4 +115,43 @@ describe('createPage', () => {
       mockFetch as SolidFetch
     )).rejects.toThrow('https://example.com/inbox/pages/123')
   })
+
+  it('should produce well-formed Turtle without prevPageUrl', async () => {
+    const { createPage } = await import('../../src/services/createPage.js')
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 201
+    })
+
+    await createPage(
+      'https://example.com/inbox/pages/123',
+      'https://example.com/inbox/',
+      mockFetch as SolidFetch
+    )
+
+    const putCall = mockFetch.mock.calls[0]
+    const body = putCall[1].body as string
+    expect(body).not.toContain('..')
+    expect(body).toMatch(/\.\s*$/m)
+  })
+
+  it('should produce well-formed Turtle with prevPageUrl', async () => {
+    const { createPage } = await import('../../src/services/createPage.js')
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 201
+    })
+
+    await createPage(
+      'https://example.com/inbox/pages/123',
+      'https://example.com/inbox/',
+      mockFetch as SolidFetch,
+      'https://example.com/inbox/pages/122'
+    )
+
+    const putCall = mockFetch.mock.calls[0]
+    const body = putCall[1].body as string
+    expect(body).not.toContain('..')
+    expect(body).toMatch(/\.\s*$/m)
+  })
 })

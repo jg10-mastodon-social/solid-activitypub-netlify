@@ -33,9 +33,22 @@ export function validateContext(activity: Activity): boolean {
 }
 
 export function normalizeActivity(activity: Activity): Activity {
+  let objectId: string | undefined
+
+  if (activity.object && typeof activity.object === 'object' && !Array.isArray(activity.object)) {
+    const obj = activity.object as Record<string, unknown>
+
+    if (!obj.id) {
+      objectId = `${activity.actor}/status/${Date.now()}`
+      obj.id = objectId
+    } else {
+      objectId = obj.id as string
+    }
+  }
+
   return {
     ...activity,
-    id: `${baseUrl}/activities/${Date.now()}`,
+    id: objectId ? `${objectId}-activity` : `${baseUrl}/activities/${Date.now()}`,
     published: activity.published || toIso8601(new Date())
   }
 }
