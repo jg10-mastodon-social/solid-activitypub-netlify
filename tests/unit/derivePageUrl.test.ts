@@ -140,17 +140,30 @@ describe('derivePageUrl', () => {
       @prefix as: <https://www.w3.org/ns/activitystreams#>.
       <https://example.com/inbox/> a as:OrderedCollection.
     `
+    const items: string[] = []
+    for (let i = 0; i < 200; i++) {
+      items.push(`<https://example.com/activities/${i}>`)
+    }
     const pageTurtle = `
       @prefix as: <https://www.w3.org/ns/activitystreams#>.
       <https://example.com/inbox/pages/123> a as:OrderedCollectionPage;
-        as:items <https://example.com/activities/1>.
+        as:items ${items.join(', ')}.
     `
-    mockFetch.mockImplementation((url: string) => {
+    mockFetch.mockImplementation((url: string, init?: RequestInit) => {
       if (url === 'https://example.com/inbox/') {
+        if (init?.method === 'HEAD') {
+          return Promise.resolve({
+            ok: true,
+            headers: new Map([['link', '<https://example.com/inbox/.meta>; rel="describedby"']])
+          })
+        }
         return Promise.resolve({ ok: true, text: () => Promise.resolve(inboxTurtle) })
       }
       if (url === 'https://example.com/inbox/pages/123') {
         return Promise.resolve({ ok: true, text: () => Promise.resolve(pageTurtle) })
+      }
+      if (url === 'https://example.com/inbox/.meta') {
+        return Promise.resolve({ ok: true, status: 200 })
       }
       return Promise.resolve({ ok: true, status: 201 })
     })

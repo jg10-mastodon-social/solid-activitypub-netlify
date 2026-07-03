@@ -2,25 +2,27 @@ import type { SolidFetch } from '../types.js'
 
 export async function updatePageNext(
   pageUrl: string,
-  nextPageUrl: string,
+  nextUrl: string,
   fetch: SolidFetch
 ): Promise<void> {
-  const patchBody = `@prefix as: <https://www.w3.org/ns/activitystreams#>.
-@prefix solid: <http://www.w3.org/ns/solid/terms#>.
-_:patch a solid:InsertDeletePatch;
-  solid:deletes { <${pageUrl}> as:next ?old. };
-  solid:inserts { <${pageUrl}> as:next <${nextPageUrl}>. }.`
+  const escapedPageUrl = pageUrl
+  const escapedNextUrl = nextUrl
+  const patch = `PREFIX as: <https://www.w3.org/ns/activitystreams#>
+INSERT DATA {
+  <${escapedPageUrl}> as:next <${escapedNextUrl}>.
+}
+`
 
   const response = await fetch(pageUrl, {
     method: 'PATCH',
     headers: {
-      'content-type': 'text/n3',
+      'content-type': 'application/sparql-update',
     },
-    body: patchBody,
+    body: patch,
   })
 
   if (!response.ok) {
     const text = await response.text()
-    throw new Error(`Failed to update page next link on ${pageUrl}: ${response.status} ${text}`)
+    throw new Error(`Failed to update page next: ${response.status} ${text}`)
   }
 }

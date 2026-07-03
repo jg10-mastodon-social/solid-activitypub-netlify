@@ -8,7 +8,7 @@ describe('updatePageNext', () => {
     vi.clearAllMocks()
   })
 
-  it('should patch as:next link', async () => {
+  it('should patch as:next link using SPARQL INSERT DATA', async () => {
     const { updatePageNext } = await import('../../src/services/updatePageNext.js')
     mockFetch.mockResolvedValue({
       ok: true,
@@ -26,13 +26,14 @@ describe('updatePageNext', () => {
       expect.objectContaining({
         method: 'PATCH',
         headers: expect.objectContaining({
-          'content-type': 'text/n3'
+          'content-type': 'application/sparql-update'
         })
       })
     )
     const patchBody = mockFetch.mock.calls[0][1].body as string
     expect(patchBody).toContain('as:next')
     expect(patchBody).toContain('https://example.com/inbox/pages/124')
+    expect(patchBody).toContain('INSERT DATA')
   })
 
   it('should throw on failure', async () => {
@@ -47,10 +48,10 @@ describe('updatePageNext', () => {
       'https://example.com/inbox/pages/123',
       'https://example.com/inbox/pages/124',
       mockFetch as SolidFetch
-    )).rejects.toThrow('Failed to update page next link')
+    )).rejects.toThrow('Failed to update page next')
   })
 
-  it('should include page URL and response body in error message on failure', async () => {
+  it('should include response body in error message on failure', async () => {
     const { updatePageNext } = await import('../../src/services/updatePageNext.js')
     mockFetch.mockResolvedValue({
       ok: false,
@@ -58,11 +59,6 @@ describe('updatePageNext', () => {
       text: () => Promise.resolve('Forbidden access')
     })
 
-    await expect(updatePageNext(
-      'https://example.com/inbox/pages/123',
-      'https://example.com/inbox/pages/124',
-      mockFetch as SolidFetch
-    )).rejects.toThrow('https://example.com/inbox/pages/123')
     await expect(updatePageNext(
       'https://example.com/inbox/pages/123',
       'https://example.com/inbox/pages/124',

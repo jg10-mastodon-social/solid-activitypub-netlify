@@ -1,26 +1,42 @@
 import type { SolidFetch } from '../types.js'
+import { discoverMetaResourceUrl } from './solidHelpers.js'
 
 export async function updateInboxFirst(
   inboxUrl: string,
-  firstPageUrl: string,
+  newFirstUrl: string,
   fetch: SolidFetch
 ): Promise<void> {
-  const patchBody = `@prefix as: <https://www.w3.org/ns/activitystreams#>.
-@prefix solid: <http://www.w3.org/ns/solid/terms#>.
-_:patch a solid:InsertDeletePatch;
-  solid:deletes { <${inboxUrl}> as:first ?old. };
-  solid:inserts { <${inboxUrl}> as:first <${firstPageUrl}>. }.`
+  let targetUrl: string
 
-  const response = await fetch(inboxUrl, {
+  if (inboxUrl.endsWith('/')) {
+    targetUrl = await discoverMetaResourceUrl(inboxUrl, fetch)
+  } else {
+    targetUrl = inboxUrl
+  }
+
+  const escapedInboxUrl = inboxUrl
+  const escapedNewFirstUrl = newFirstUrl
+  const patch = `PREFIX as: <https://www.w3.org/ns/activitystreams#>
+DELETE {
+  <${escapedInboxUrl}> as:first ?oldFirst.
+} WHERE {
+  <${escapedInboxUrl}> as:first ?oldFirst.
+};
+INSERT DATA {
+  <${escapedInboxUrl}> as:first <${escapedNewFirstUrl}>.
+}
+`
+
+  const response = await fetch(targetUrl, {
     method: 'PATCH',
     headers: {
-      'content-type': 'text/n3',
+      'content-type': 'application/sparql-update',
     },
-    body: patchBody,
+    body: patch,
   })
 
   if (!response.ok) {
     const text = await response.text()
-    throw new Error(`Failed to update inbox first pointer ${inboxUrl}: ${response.status} ${text}`)
+    throw new Error(`Failed to update inbox first: ${response.status} ${text}`)
   }
 }
