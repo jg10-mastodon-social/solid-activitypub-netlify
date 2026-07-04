@@ -160,6 +160,43 @@ describe('inbox function', () => {
     expect(body).not.toContain('http://pod.example.com/inbox/')
   })
 
+  it('returns 502 when pod unreachable', async () => {
+    const { default: handler } = await import('../../netlify/functions/inbox.mjs')
+    const { createSolidFetch } = await import('../../src/solidFetch.js')
+    const mockFetch = vi.fn().mockRejectedValue(new Error('Pod unreachable'))
+    ;(createSolidFetch as ReturnType<typeof vi.fn>).mockResolvedValue(mockFetch)
+
+    const req = new Request('https://example.com/inbox/', {
+      method: 'GET',
+      headers: { Accept: 'text/turtle' }
+    })
+    const context = {}
+
+    const response = await handler(req, context as any)
+
+    expect(response.status).toBe(502)
+  })
+
+  it('returns pod error status when pod returns error', async () => {
+    const { default: handler } = await import('../../netlify/functions/inbox.mjs')
+    const { createSolidFetch } = await import('../../src/solidFetch.js')
+    const mockFetch = vi.fn().mockResolvedValue(new Response('Not Found', {
+      status: 404,
+      headers: { 'Content-Type': 'text/plain' }
+    }))
+    ;(createSolidFetch as ReturnType<typeof vi.fn>).mockResolvedValue(mockFetch)
+
+    const req = new Request('https://example.com/inbox/', {
+      method: 'GET',
+      headers: { Accept: 'text/turtle' }
+    })
+    const context = {}
+
+    const response = await handler(req, context as any)
+
+    expect(response.status).toBe(404)
+  })
+
   it('should return 400 for invalid JSON', async () => {
     const { default: handler } = await import('../../netlify/functions/inbox.mjs')
 

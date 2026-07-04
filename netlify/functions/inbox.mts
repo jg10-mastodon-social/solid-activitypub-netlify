@@ -44,8 +44,8 @@ export default async (req: Request, context: Context) => {
       })
     } catch (error) {
       console.error(`[inbox] Error: ${error}`)
-      return new Response(error instanceof Error ? error.message : 'Internal error', {
-        status: 500,
+      return new Response(error instanceof Error ? error.message : 'Bad Gateway', {
+        status: 502,
         headers: CORS_HEADERS
       })
     }
