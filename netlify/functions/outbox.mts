@@ -4,6 +4,8 @@ import { loadConfig } from '../../src/config.js'
 import { createSolidFetch } from '../../src/solidFetch.js'
 import { extractRecipients, fetchActorInbox, validateActivityActor, validateContext, normalizeActivity } from '../../src/activity.js'
 import { signActivityRequest } from '../../src/signing.js'
+import { derivePageUrl } from '../../src/services/derivePageUrl.js'
+import { persistActivityItem } from '../../src/services/persistActivity.js'
 import type { Activity } from '../../src/activity.js'
 import type { SolidFetch } from '../../src/types.js'
 // @ts-ignore
@@ -133,6 +135,10 @@ export default async (req: Request, context: Context) => {
     const successCount = deliveryResults.filter(r => r.ok).length
     const failCount = deliveryResults.filter(r => !r.ok).length
     console.log(`[outbox] Delivered to ${successCount}/${deliveryResults.length} recipients`)
+
+    const outboxPageUrl = await derivePageUrl(config.outboxUrl, fetchFn)
+    await persistActivityItem(activity, outboxPageUrl, fetchFn, { skolemizeBase: `${baseUrl}/.well-known/genid/` })
+    console.log(`[outbox] Persisted activity to outbox`)
 
     const responseBody = JSON.stringify({
       status: 'ok',

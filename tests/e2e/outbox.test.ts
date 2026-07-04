@@ -1,7 +1,13 @@
-import { describe, it, expect } from 'vitest'
-import { devServerUrl } from '../helpers/dev-server.js'
+import { describe, it, expect, beforeEach } from 'vitest'
+import { devServerUrl, getMockSolidServer } from '../helpers/dev-server.js'
 
 describe('outbox e2e tests', () => {
+  beforeEach(() => {
+    const mockServer = getMockSolidServer()
+    if (mockServer) {
+      mockServer.setError(false)
+    }
+  })
   it('returns 401 without authorization header', async () => {
     const res = await fetch(`${devServerUrl}/outbox`, {
       method: 'POST',
@@ -79,7 +85,10 @@ describe('outbox e2e tests', () => {
     expect(key).not.toHaveProperty('q')
   })
 
-  it('returns 500 when config fetch fails with 404', async () => {
+  it('returns 200 when activity received and persisted to Solid pod', async () => {
+    const mockServer = getMockSolidServer()
+    expect(mockServer).not.toBeNull()
+
     const { importJWK, SignJWT, calculateJwkThumbprint, generateKeyPair, exportJWK } = await import('jose')
     const { randomUUID, createHash } = await import('crypto')
     // @ts-ignore
@@ -120,6 +129,14 @@ describe('outbox e2e tests', () => {
       .setIssuedAt(now)
       .sign(dpopKeyPair.privateKey)
 
+    const activity = {
+      type: 'Create',
+      '@context': 'https://www.w3.org/ns/activitystreams',
+      actor: `${devServerUrl}/actor`,
+      to: ['https://recipient.example/actor'],
+      object: { type: 'Note', content: 'Hello from outbox' }
+    }
+
     const res = await fetch(`${devServerUrl}/outbox`, {
       method: 'POST',
       headers: {
@@ -127,14 +144,14 @@ describe('outbox e2e tests', () => {
         'authorization': `DPoP ${token}`,
         'dpop': dpopHeader
       },
-      body: JSON.stringify({
-        type: 'Create',
-        '@context': 'https://www.w3.org/ns/activitystreams',
-        actor: `${devServerUrl}/actor`
-      })
+      body: JSON.stringify(activity)
     })
 
-    expect(res.status).toBe(500)
-    expect(await res.text()).toContain('404')
+    expect(res.status).toBe(200)
+
+    const patchedOutboxPages = mockServer!.getPatchedOutboxPages()
+    expect(patchedOutboxPages.length).toBe(1)
+    expect(patchedOutboxPages[0].body).toContain('Create')
+    expect(patchedOutboxPages[0].body).toContain('Hello from outbox')
   })
 })

@@ -14,7 +14,9 @@ export class MockSolidServer {
   private errorType: 'unreachable' | '404' | '500' = '500'
   private createdPages: Set<string> = new Set()
   private inboxFirst: string | null = null
+  private outboxFirst: string | null = null
   private patchedPages: Array<{ url: string; body: string }> = []
+  private patchedOutboxPages: Array<{ url: string; body: string }> = []
 
   constructor(options: MockSolidServerOptions) {
     this.port = options.port
@@ -39,7 +41,9 @@ export class MockSolidServer {
     }
     this.createdPages.clear()
     this.inboxFirst = null
+    this.outboxFirst = null
     this.patchedPages = []
+    this.patchedOutboxPages = []
   }
 
   setError(simulateError: boolean, errorType?: 'unreachable' | '404' | '500'): void {
@@ -57,6 +61,14 @@ export class MockSolidServer {
 
   getInboxFirst(): string | null {
     return this.inboxFirst
+  }
+
+  getOutboxFirst(): string | null {
+    return this.outboxFirst
+  }
+
+  getPatchedOutboxPages(): Array<{ url: string; body: string }> {
+    return [...this.patchedOutboxPages]
   }
 
   private handleRequest(req: http.IncomingMessage, res: http.ServerResponse): void {
@@ -90,6 +102,14 @@ export class MockSolidServer {
       this.handlePatchPage(req, res, pathname)
     } else if (req.method === 'GET' && pathname.startsWith('/inbox/pages/')) {
       this.handleGetPage(req, res, pathname)
+    } else if (req.method === 'GET' && pathname === '/outbox/') {
+      this.handleGetOutbox(req, res, url)
+    } else if (req.method === 'PUT' && pathname.startsWith('/outbox/pages/')) {
+      this.handlePutOutboxPage(req, res, pathname)
+    } else if (req.method === 'PATCH' && pathname.startsWith('/outbox/pages/')) {
+      this.handlePatchOutboxPage(req, res, pathname)
+    } else if (req.method === 'GET' && pathname.startsWith('/outbox/pages/')) {
+      this.handleGetOutboxPage(req, res, pathname)
     } else {
       res.writeHead(404)
       res.end('Not Found')
@@ -174,6 +194,90 @@ export class MockSolidServer {
 
     if (isFull) {
       body += '\n  as:next <http://localhost:${this.port}/inbox/pages/next>.'
+    }
+
+    res.writeHead(200, { 'Content-Type': 'text/turtle' })
+    res.end(body)
+  }
+
+  private handleGetOutbox(req: http.IncomingMessage, res: http.ServerResponse, url: URL): void {
+    const accept = req.headers.accept || ''
+    if (!accept.includes('text/turtle') && !accept.includes('*/*')) {
+      res.writeHead(406)
+      res.end('Not Acceptable')
+      return
+    }
+
+    let body = `@prefix as: <https://www.w3.org/ns/activitystreams#>.
+<http://localhost:${this.port}/outbox/> a as:OrderedCollection.`
+
+    if (this.outboxFirst) {
+      body += `\n  as:first <${this.outboxFirst}>.`
+    }
+
+    res.writeHead(200, { 'Content-Type': 'text/turtle' })
+    res.end(body)
+  }
+
+  private handlePutOutboxPage(req: http.IncomingMessage, res: http.ServerResponse, pathname: string): void {
+    const pageUrl = `http://localhost:${this.port}${pathname}`
+
+    if (this.createdPages.has(pageUrl)) {
+      res.writeHead(409)
+      res.end('Already exists')
+      return
+    }
+
+    this.createdPages.add(pageUrl)
+    if (!this.outboxFirst) {
+      this.outboxFirst = pageUrl
+    }
+    res.writeHead(201)
+    res.end('Created')
+  }
+
+  private handlePatchOutboxPage(req: http.IncomingMessage, res: http.ServerResponse, pathname: string): void {
+    const pageUrl = `http://localhost:${this.port}${pathname}`
+
+    let body = ''
+    req.on('data', chunk => { body += chunk })
+    req.on('end', () => {
+      if (!this.createdPages.has(pageUrl)) {
+        res.writeHead(404)
+        res.end('Page not found')
+        return
+      }
+
+      this.patchedOutboxPages.push({ url: pageUrl, body })
+      res.writeHead(200)
+      res.end('OK')
+    })
+  }
+
+  private handleGetOutboxPage(req: http.IncomingMessage, res: http.ServerResponse, pathname: string): void {
+    const pageUrl = `http://localhost:${this.port}${pathname}`
+    const accept = req.headers.accept || ''
+
+    if (!accept.includes('text/turtle') && !accept.includes('*/*')) {
+      res.writeHead(406)
+      res.end('Not Acceptable')
+      return
+    }
+
+    if (!this.createdPages.has(pageUrl)) {
+      res.writeHead(404)
+      res.end('Not found')
+      return
+    }
+
+    const isFull = this.patchedOutboxPages.filter(p => p.url === pageUrl).length >= 5
+
+    let body = `@prefix as: <https://www.w3.org/ns/activitystreams#>.
+<${pageUrl}> a as:OrderedCollectionPage;
+  as:partOf <http://localhost:${this.port}/outbox/>.`
+
+    if (isFull) {
+      body += '\n  as:next <http://localhost:${this.port}/outbox/pages/next>.'
     }
 
     res.writeHead(200, { 'Content-Type': 'text/turtle' })
