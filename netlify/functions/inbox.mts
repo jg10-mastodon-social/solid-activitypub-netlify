@@ -5,13 +5,13 @@ import { handleInboxActivity } from '../../src/handlers/inbox.js'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
   'Access-Control-Allow-Headers': 'Authorization, DPoP, Content-Type',
 }
 
 export const config: Config = {
   path: '/inbox',
-  method: ['POST', 'OPTIONS'],
+  method: ['POST', 'GET', 'OPTIONS'],
 }
 
 export default async (req: Request, context: Context) => {
@@ -20,6 +20,11 @@ export default async (req: Request, context: Context) => {
   if (req.method === 'OPTIONS') {
     console.log('[inbox] Handling CORS preflight')
     return new Response(null, { status: 204, headers: CORS_HEADERS })
+  }
+
+  if (req.method === 'GET') {
+    console.log('[inbox] Handling GET request')
+    return new Response('ok', { status: 200, headers: CORS_HEADERS })
   }
 
   let activity: Record<string, unknown>

@@ -22,6 +22,32 @@ describe('inbox function', () => {
     expect(response.status).toBe(204)
   })
 
+  it('should return 200 for GET /inbox', async () => {
+    const { default: handler } = await import('../../netlify/functions/inbox.mjs')
+
+    const req = new Request('https://example.com/inbox', {
+      method: 'GET'
+    })
+    const context = {}
+
+    const response = await handler(req, context as any)
+
+    expect(response.status).toBe(200)
+  })
+
+  it('should return 200 for GET /inbox/pages/123', async () => {
+    const { default: handler } = await import('../../netlify/functions/inbox.mjs')
+
+    const req = new Request('https://example.com/inbox/pages/123', {
+      method: 'GET'
+    })
+    const context = {}
+
+    const response = await handler(req, context as any)
+
+    expect(response.status).toBe(200)
+  })
+
   it('should return 400 for invalid JSON', async () => {
     const { default: handler } = await import('../../netlify/functions/inbox.mjs')
 
