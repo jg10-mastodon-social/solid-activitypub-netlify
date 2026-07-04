@@ -200,4 +200,24 @@ describe('outbox function', () => {
 
     expect(response.status).toBe(404)
   })
+
+  it('includes CORS headers on GET response', async () => {
+    const { default: handler } = await import('../../netlify/functions/outbox.mjs')
+    const { createSolidFetch } = await import('../../src/solidFetch.js')
+    const mockFetch = vi.fn().mockResolvedValue(new Response('turtle body', {
+      status: 200,
+      headers: { 'Content-Type': 'text/turtle' }
+    }))
+    ;(createSolidFetch as ReturnType<typeof vi.fn>).mockResolvedValue(mockFetch)
+
+    const req = new Request('https://example.com/outbox/', {
+      method: 'GET',
+      headers: { Accept: 'text/turtle' }
+    })
+    const context = {}
+
+    const response = await handler(req, context as any)
+
+    expect(response.headers.get('Access-Control-Allow-Origin')).toBe('*')
+  })
 })
