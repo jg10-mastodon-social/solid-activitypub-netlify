@@ -163,4 +163,41 @@ describe('outbox function', () => {
     expect(body).toContain('http://public.example.com/outbox/pages/123')
     expect(body).not.toContain('http://pod.example.com/outbox/')
   })
+
+  it('returns 502 when pod unreachable', async () => {
+    const { default: handler } = await import('../../netlify/functions/outbox.mjs')
+    const { createSolidFetch } = await import('../../src/solidFetch.js')
+    const mockFetch = vi.fn().mockRejectedValue(new Error('Pod unreachable'))
+    ;(createSolidFetch as ReturnType<typeof vi.fn>).mockResolvedValue(mockFetch)
+
+    const req = new Request('https://example.com/outbox/', {
+      method: 'GET',
+      headers: { Accept: 'text/turtle' }
+    })
+    const context = {}
+
+    const response = await handler(req, context as any)
+
+    expect(response.status).toBe(502)
+  })
+
+  it('returns pod error status when pod returns error', async () => {
+    const { default: handler } = await import('../../netlify/functions/outbox.mjs')
+    const { createSolidFetch } = await import('../../src/solidFetch.js')
+    const mockFetch = vi.fn().mockResolvedValue(new Response('Not Found', {
+      status: 404,
+      headers: { 'Content-Type': 'text/plain' }
+    }))
+    ;(createSolidFetch as ReturnType<typeof vi.fn>).mockResolvedValue(mockFetch)
+
+    const req = new Request('https://example.com/outbox/', {
+      method: 'GET',
+      headers: { Accept: 'text/turtle' }
+    })
+    const context = {}
+
+    const response = await handler(req, context as any)
+
+    expect(response.status).toBe(404)
+  })
 })
