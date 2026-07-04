@@ -35,7 +35,10 @@ export default async (req: Request, context: Context) => {
       })
       const contentType = podResponse.headers.get('Content-Type') || 'text/turtle'
       const body = await podResponse.text()
-      return new Response(body, {
+      const podInboxBase = config.inboxUrl.slice(0, -1)
+      const publicInboxBase = `${config.baseUrl}/inbox`
+      const rewrittenBody = body.replaceAll(podInboxBase, publicInboxBase)
+      return new Response(rewrittenBody, {
         status: podResponse.status,
         headers: { ...CORS_HEADERS, 'Content-Type': contentType }
       })

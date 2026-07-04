@@ -135,6 +135,31 @@ describe('inbox function', () => {
     expect(response.headers.get('Content-Type')).toBe('text/turtle')
   })
 
+  it('rewrites inbox base URLs in response body', async () => {
+    const { default: handler } = await import('../../netlify/functions/inbox.mjs')
+    const { createSolidFetch } = await import('../../src/solidFetch.js')
+    const podBody = `<http://pod.example.com/inbox/> a <http://www.w3.org/ns/activitystreams#OrderedCollection>.
+  <http://pod.example.com/inbox/pages/123> a <http://www.w3.org/ns/activitystreams#OrderedCollectionPage>.`
+    const mockFetch = vi.fn().mockResolvedValue(new Response(podBody, {
+      status: 200,
+      headers: { 'Content-Type': 'text/turtle' }
+    }))
+    ;(createSolidFetch as ReturnType<typeof vi.fn>).mockResolvedValue(mockFetch)
+
+    const req = new Request('https://example.com/inbox/', {
+      method: 'GET',
+      headers: { Accept: 'text/turtle' }
+    })
+    const context = {}
+
+    const response = await handler(req, context as any)
+    const body = await response.text()
+
+    expect(body).toContain('http://public.example.com/inbox/')
+    expect(body).toContain('http://public.example.com/inbox/pages/123')
+    expect(body).not.toContain('http://pod.example.com/inbox/')
+  })
+
   it('should return 400 for invalid JSON', async () => {
     const { default: handler } = await import('../../netlify/functions/inbox.mjs')
 
