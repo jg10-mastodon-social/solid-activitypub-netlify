@@ -138,4 +138,29 @@ describe('outbox function', () => {
 
     expect(response.headers.get('Content-Type')).toBe('text/turtle')
   })
+
+  it('rewrites outbox base URLs in response body', async () => {
+    const { default: handler } = await import('../../netlify/functions/outbox.mjs')
+    const { createSolidFetch } = await import('../../src/solidFetch.js')
+    const podBody = `<http://pod.example.com/outbox/> a <http://www.w3.org/ns/activitystreams#OrderedCollection>.
+  <http://pod.example.com/outbox/pages/123> a <http://www.w3.org/ns/activitystreams#OrderedCollectionPage>.`
+    const mockFetch = vi.fn().mockResolvedValue(new Response(podBody, {
+      status: 200,
+      headers: { 'Content-Type': 'text/turtle' }
+    }))
+    ;(createSolidFetch as ReturnType<typeof vi.fn>).mockResolvedValue(mockFetch)
+
+    const req = new Request('https://example.com/outbox/', {
+      method: 'GET',
+      headers: { Accept: 'text/turtle' }
+    })
+    const context = {}
+
+    const response = await handler(req, context as any)
+    const body = await response.text()
+
+    expect(body).toContain('http://public.example.com/outbox/')
+    expect(body).toContain('http://public.example.com/outbox/pages/123')
+    expect(body).not.toContain('http://pod.example.com/outbox/')
+  })
 })
