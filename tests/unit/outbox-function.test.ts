@@ -75,4 +75,67 @@ describe('outbox function', () => {
 
     expect(response.status).toBe(200)
   })
+
+  it('forwards GET request to pod with auth', async () => {
+    const { default: handler } = await import('../../netlify/functions/outbox.mjs')
+    const { createSolidFetch } = await import('../../src/solidFetch.js')
+    const mockFetch = vi.fn().mockResolvedValue(new Response('turtle body', {
+      status: 200,
+      headers: { 'Content-Type': 'text/turtle' }
+    }))
+    ;(createSolidFetch as ReturnType<typeof vi.fn>).mockResolvedValue(mockFetch)
+
+    const req = new Request('https://example.com/outbox/', {
+      method: 'GET',
+      headers: { Accept: 'text/turtle' }
+    })
+    const context = {}
+
+    await handler(req, context as any)
+
+    expect(mockFetch).toHaveBeenCalled()
+    const callArgs = mockFetch.mock.calls[0]
+    expect(callArgs[0]).toContain('/outbox/')
+  })
+
+  it('forwards Accept header to pod', async () => {
+    const { default: handler } = await import('../../netlify/functions/outbox.mjs')
+    const { createSolidFetch } = await import('../../src/solidFetch.js')
+    const mockFetch = vi.fn().mockResolvedValue(new Response('turtle body', {
+      status: 200,
+      headers: { 'Content-Type': 'text/turtle' }
+    }))
+    ;(createSolidFetch as ReturnType<typeof vi.fn>).mockResolvedValue(mockFetch)
+
+    const req = new Request('https://example.com/outbox/', {
+      method: 'GET',
+      headers: { Accept: 'text/turtle' }
+    })
+    const context = {}
+
+    await handler(req, context as any)
+
+    const callArgs = mockFetch.mock.calls[0]
+    expect(callArgs[1]?.headers?.accept).toBe('text/turtle')
+  })
+
+  it('passes Content-Type from pod to client', async () => {
+    const { default: handler } = await import('../../netlify/functions/outbox.mjs')
+    const { createSolidFetch } = await import('../../src/solidFetch.js')
+    const mockFetch = vi.fn().mockResolvedValue(new Response('turtle body', {
+      status: 200,
+      headers: { 'Content-Type': 'text/turtle' }
+    }))
+    ;(createSolidFetch as ReturnType<typeof vi.fn>).mockResolvedValue(mockFetch)
+
+    const req = new Request('https://example.com/outbox/', {
+      method: 'GET',
+      headers: { Accept: 'text/turtle' }
+    })
+    const context = {}
+
+    const response = await handler(req, context as any)
+
+    expect(response.headers.get('Content-Type')).toBe('text/turtle')
+  })
 })
