@@ -20,7 +20,7 @@ describe('inbox e2e tests', () => {
 
     expect(res.status).toBe(204)
     expect(res.headers.get('Access-Control-Allow-Origin')).toBe('*')
-    expect(res.headers.get('Access-Control-Allow-Methods')).toBe('POST, OPTIONS')
+    expect(res.headers.get('Access-Control-Allow-Methods')).toBe('POST, GET, OPTIONS')
   })
 
   it('returns 400 for invalid JSON body', async () => {
