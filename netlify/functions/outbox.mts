@@ -13,13 +13,13 @@ import { baseUrl } from '../../src/base-url.js'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
   'Access-Control-Allow-Headers': 'Authorization, DPoP, Content-Type',
 }
 
 export const config: Config = {
   path: '/outbox',
-  method: ['POST', 'OPTIONS'],
+  method: ['POST', 'GET', 'OPTIONS'],
 }
 
 async function distributeActivity(activity: Activity, fetchFn: SolidFetch, actorUrl: string, keyId: string): Promise<{ recipient: string; status: number; ok: boolean }[]> {
@@ -55,6 +55,11 @@ export default async (req: Request, context: Context) => {
   if (req.method === 'OPTIONS') {
     console.log('[outbox] Handling CORS preflight')
     return new Response(null, { status: 204, headers: CORS_HEADERS })
+  }
+
+  if (req.method === 'GET') {
+    console.log('[outbox] Handling GET request')
+    return new Response('ok', { status: 200, headers: CORS_HEADERS })
   }
 
   const config = loadConfig()
