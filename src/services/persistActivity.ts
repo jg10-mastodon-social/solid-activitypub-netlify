@@ -3,7 +3,7 @@ import type { SolidFetch } from '../types.js'
 import { skolemizeBlankNodes } from './activityToRdf.js'
 import { buildInsertDeletePatch } from './buildPatch.js'
 
-export async function persistInboxItem(
+export async function persistActivityItem(
   activity: Record<string, unknown>,
   pageUrl: string,
   fetch: SolidFetch,
@@ -44,6 +44,6 @@ export async function persistInboxItem(
 
   if (!response.ok) {
     const text = await response.text()
-    throw new Error(`Failed to persist inbox item: ${response.status} ${text}`)
+    throw new Error(`Failed to persist activity item: ${response.status} ${text}`)
   }
 }

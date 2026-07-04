@@ -8,26 +8,26 @@ describe('rdfUtils', () => {
     vi.clearAllMocks()
   })
 
-  describe('parseInboxTurtle', () => {
-    it('should parse inbox turtle and return first pointer', async () => {
-      const { parseInboxTurtle } = await import('../../src/services/rdfUtils.js')
+  describe('parseCollectionTurtle', () => {
+    it('should parse collection turtle and return first pointer', async () => {
+      const { parseCollectionTurtle } = await import('../../src/services/rdfUtils.js')
       const turtle = `
         @prefix as: <https://www.w3.org/ns/activitystreams#>.
         <https://example.com/inbox/> a as:OrderedCollection;
           as:first <https://example.com/inbox/pages/123>.
       `
-      const result = await parseInboxTurtle(turtle, 'https://example.com/inbox/')
+      const result = await parseCollectionTurtle(turtle, 'https://example.com/inbox/')
       expect(result).not.toBeNull()
       expect(result?.first).toBe('https://example.com/inbox/pages/123')
     })
 
     it('should return null when inbox has no first pointer', async () => {
-      const { parseInboxTurtle } = await import('../../src/services/rdfUtils.js')
+      const { parseCollectionTurtle } = await import('../../src/services/rdfUtils.js')
       const turtle = `
         @prefix as: <https://www.w3.org/ns/activitystreams#>.
         <https://example.com/inbox/> a as:OrderedCollection.
       `
-      const result = await parseInboxTurtle(turtle, 'https://example.com/inbox/')
+      const result = await parseCollectionTurtle(turtle, 'https://example.com/inbox/')
       expect(result).toBeNull()
     })
   })

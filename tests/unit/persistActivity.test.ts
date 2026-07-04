@@ -11,7 +11,7 @@ vi.mock('jsonld', () => ({
   default: mockJsonLd
 }))
 
-describe('persistInbox', () => {
+describe('persistActivity', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockJsonLd.expand.mockResolvedValue([])
@@ -19,7 +19,7 @@ describe('persistInbox', () => {
   })
 
   it('should send PATCH request to pageUrl', async () => {
-    const { persistInboxItem } = await import('../../src/services/persistInbox.js')
+    const { persistActivityItem } = await import('../../src/services/persistActivity.js')
     mockFetch.mockResolvedValue({
       ok: true,
       status: 200
@@ -31,7 +31,7 @@ describe('persistInbox', () => {
       '@context': 'https://www.w3.org/ns/activitystreams'
     }
 
-    await persistInboxItem(
+    await persistActivityItem(
       activity,
       'https://example.com/inbox/pages/123',
       mockFetch as SolidFetch,
@@ -50,7 +50,7 @@ describe('persistInbox', () => {
   })
 
   it('should throw on non-OK response', async () => {
-    const { persistInboxItem } = await import('../../src/services/persistInbox.js')
+    const { persistActivityItem } = await import('../../src/services/persistActivity.js')
     mockFetch.mockResolvedValue({
       ok: false,
       status: 500,
@@ -63,16 +63,16 @@ describe('persistInbox', () => {
       '@context': 'https://www.w3.org/ns/activitystreams'
     }
 
-    await expect(persistInboxItem(
+    await expect(persistActivityItem(
       activity,
       'https://example.com/inbox/pages/123',
       mockFetch as SolidFetch,
       { skolemizeBase: 'https://example.com/.well-known/genid/' }
-    )).rejects.toThrow('Failed to persist inbox item')
+    )).rejects.toThrow('Failed to persist activity item')
   })
 
   it('should add @context if missing', async () => {
-    const { persistInboxItem } = await import('../../src/services/persistInbox.js')
+    const { persistActivityItem } = await import('../../src/services/persistActivity.js')
     mockFetch.mockResolvedValue({
       ok: true,
       status: 200
@@ -83,7 +83,7 @@ describe('persistInbox', () => {
       actor: 'https://example.com/actor'
     }
 
-    await persistInboxItem(
+    await persistActivityItem(
       activity,
       'https://example.com/inbox/pages/123',
       mockFetch as SolidFetch,

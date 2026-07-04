@@ -1,8 +1,8 @@
 import type { SolidFetch } from '../types.js'
-import { parseInboxTurtle } from './rdfUtils.js'
+import { parseCollectionTurtle } from './rdfUtils.js'
 import { getPageInfo } from './getPageInfo.js'
 import { createPage } from './createPage.js'
-import { updateInboxFirst } from './updateInbox.js'
+import { updateCollectionFirst } from './updateInbox.js'
 import { updatePageNext } from './updatePageNext.js'
 
 function generatePageUrl(inboxUrl: string): string {
@@ -28,7 +28,7 @@ export async function derivePageUrl(
 
     if (inboxResponse.ok) {
       const inboxText = await inboxResponse.text()
-      const collection = await parseInboxTurtle(inboxText, inboxUrl)
+      const collection = await parseCollectionTurtle(inboxText, inboxUrl)
       if (collection && collection.first) {
         firstPageUrl = collection.first
       }
@@ -70,7 +70,7 @@ export async function derivePageUrl(
   }
 
   try {
-    await updateInboxFirst(inboxUrl, newPageUrl, fetch)
+    await updateCollectionFirst(inboxUrl, newPageUrl, fetch)
     console.log(`[derivePageUrl] Updated inbox first link to ${newPageUrl}`)
   } catch (error) {
     console.warn(`[derivePageUrl] Could not update inbox first link: ${error}`)

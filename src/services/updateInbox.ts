@@ -1,7 +1,7 @@
 import type { SolidFetch } from '../types.js'
 import { discoverMetaResourceUrl } from './solidHelpers.js'
 
-export async function updateInboxFirst(
+export async function updateCollectionFirst(
   inboxUrl: string,
   newFirstUrl: string,
   fetch: SolidFetch

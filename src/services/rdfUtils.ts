@@ -6,7 +6,7 @@ interface ChildResource {
   types: string[]
 }
 
-export async function parseInboxTurtle(
+export async function parseCollectionTurtle(
   turtle: string,
   inboxUrl: string
 ): Promise<{ first: string } | null> {

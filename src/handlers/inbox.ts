@@ -1,6 +1,6 @@
 import type { SolidFetch } from '../types.js'
 import { derivePageUrl } from '../services/derivePageUrl.js'
-import { persistInboxItem } from '../services/persistInbox.js'
+import { persistActivityItem } from '../services/persistActivity.js'
 
 export async function handleInboxActivity(
   activity: Record<string, unknown>,
@@ -28,7 +28,7 @@ export async function handleInboxActivity(
   const skolemizeBase = `${url.origin}/.well-known/genid/`
 
   try {
-    await persistInboxItem(activity, pageUrl, fetch, { skolemizeBase })
+    await persistActivityItem(activity, pageUrl, fetch, { skolemizeBase })
     console.log(`[inbox] Persisted activity to inbox`)
   } catch (error) {
     console.error(`[inbox] Error: Failed to persist inbox item: ${error}`)

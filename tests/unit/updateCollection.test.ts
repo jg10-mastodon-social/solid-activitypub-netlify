@@ -3,20 +3,20 @@ import type { SolidFetch } from '../../src/types.js'
 
 const mockFetch = vi.fn()
 
-describe('updateInbox', () => {
+describe('updateCollection', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
   it('should patch as:first pointer using SPARQL format', async () => {
-    const { updateInboxFirst } = await import('../../src/services/updateInbox.js')
+    const { updateCollectionFirst } = await import('../../src/services/updateInbox.js')
     mockFetch.mockResolvedValue({
       ok: true,
       status: 200,
       headers: new Map([['link', '<https://example.com/inbox/.meta>; rel="describedby"']])
     })
 
-    await updateInboxFirst(
+    await updateCollectionFirst(
       'https://example.com/inbox/',
       'https://example.com/inbox/pages/123',
       mockFetch as SolidFetch
@@ -39,7 +39,7 @@ describe('updateInbox', () => {
   })
 
   it('should throw on failure', async () => {
-    const { updateInboxFirst } = await import('../../src/services/updateInbox.js')
+    const { updateCollectionFirst } = await import('../../src/services/updateInbox.js')
     mockFetch.mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -50,7 +50,7 @@ describe('updateInbox', () => {
       text: () => Promise.resolve('Server error')
     })
 
-    await expect(updateInboxFirst(
+    await expect(updateCollectionFirst(
       'https://example.com/inbox/',
       'https://example.com/inbox/pages/123',
       mockFetch as SolidFetch
@@ -58,7 +58,7 @@ describe('updateInbox', () => {
   })
 
   it('should include response body in error message on failure', async () => {
-    const { updateInboxFirst } = await import('../../src/services/updateInbox.js')
+    const { updateCollectionFirst } = await import('../../src/services/updateInbox.js')
     mockFetch.mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -69,7 +69,7 @@ describe('updateInbox', () => {
       text: () => Promise.resolve('Forbidden access')
     })
 
-    await expect(updateInboxFirst(
+    await expect(updateCollectionFirst(
       'https://example.com/inbox/',
       'https://example.com/inbox/pages/123',
       mockFetch as SolidFetch
