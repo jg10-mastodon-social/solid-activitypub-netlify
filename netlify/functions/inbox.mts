@@ -24,7 +24,28 @@ export default async (req: Request, context: Context) => {
 
   if (req.method === 'GET') {
     console.log('[inbox] Handling GET request')
-    return new Response('ok', { status: 200, headers: CORS_HEADERS })
+    try {
+      const config = loadConfig()
+      const fetchFn = await createSolidFetch(config.webId, config.issuer)
+      const url = new URL(req.url)
+      const targetUrl = `${config.inboxUrl}${url.pathname.slice('/inbox'.length)}`
+      const acceptHeader = req.headers.get('Accept') || 'text/turtle'
+      const podResponse = await fetchFn(targetUrl, {
+        headers: { accept: acceptHeader }
+      })
+      const contentType = podResponse.headers.get('Content-Type') || 'text/turtle'
+      const body = await podResponse.text()
+      return new Response(body, {
+        status: podResponse.status,
+        headers: { ...CORS_HEADERS, 'Content-Type': contentType }
+      })
+    } catch (error) {
+      console.error(`[inbox] Error: ${error}`)
+      return new Response(error instanceof Error ? error.message : 'Internal error', {
+        status: 500,
+        headers: CORS_HEADERS
+      })
+    }
   }
 
   let activity: Record<string, unknown>
