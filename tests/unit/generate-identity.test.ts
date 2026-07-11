@@ -4,7 +4,23 @@ import path from 'path'
 import { publicDir, privateKeyPath, baseUrlPath, runScript, rootDir } from '../helpers.js'
 
 describe('generate-identity', () => {
+  let originalBaseUrlContent: string | null = null
+  let originalPrivateKeyContent: string | null = null
+
   beforeEach(() => {
+    // Save original content
+    if (fs.existsSync(baseUrlPath)) {
+      originalBaseUrlContent = fs.readFileSync(baseUrlPath, 'utf-8')
+    } else {
+      originalBaseUrlContent = null
+    }
+    if (fs.existsSync(privateKeyPath)) {
+      originalPrivateKeyContent = fs.readFileSync(privateKeyPath, 'utf-8')
+    } else {
+      originalPrivateKeyContent = null
+    }
+
+    // Delete for clean state
     if (fs.existsSync(publicDir)) {
       fs.rmSync(publicDir, { recursive: true, force: true })
     }
@@ -17,13 +33,20 @@ describe('generate-identity', () => {
   })
 
   afterEach(() => {
+    // Clean up generated files
     if (fs.existsSync(publicDir)) {
       fs.rmSync(publicDir, { recursive: true, force: true })
     }
-    if (fs.existsSync(baseUrlPath)) {
+
+    // Restore original content
+    if (originalBaseUrlContent !== null) {
+      fs.writeFileSync(baseUrlPath, originalBaseUrlContent)
+    } else if (fs.existsSync(baseUrlPath)) {
       fs.unlinkSync(baseUrlPath)
     }
-    if (fs.existsSync(privateKeyPath)) {
+    if (originalPrivateKeyContent !== null) {
+      fs.writeFileSync(privateKeyPath, originalPrivateKeyContent)
+    } else if (fs.existsSync(privateKeyPath)) {
       fs.unlinkSync(privateKeyPath)
     }
   })

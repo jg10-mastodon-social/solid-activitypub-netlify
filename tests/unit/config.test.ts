@@ -1,26 +1,19 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import fs from 'fs'
-import path from 'path'
-import { fileURLToPath } from 'url'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-const rootDir = path.resolve(__dirname, '../..')
-const baseUrlPath = path.join(rootDir, 'src/base-url.ts')
+// Mock the base-url module
+vi.mock('../../src/base-url.js', () => ({
+  baseUrl: 'https://mocked.example.com'
+}))
 
 describe('loadConfig', () => {
   const originalEnv = process.env
 
   beforeEach(() => {
-    fs.writeFileSync(baseUrlPath, "export const baseUrl = 'https://mocked.example.com'\n")
     process.env = { ...originalEnv }
   })
 
   afterEach(() => {
     process.env = originalEnv
-    if (fs.existsSync(baseUrlPath)) {
-      fs.unlinkSync(baseUrlPath)
-    }
   })
 
   it('uses baseUrl from base-url module', async () => {

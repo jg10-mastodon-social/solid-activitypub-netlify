@@ -33,10 +33,6 @@ export async function runScript(jwks?: string, context?: string): Promise<{ exit
       env.JWKS = jwks
     }
 
-    if (fs.existsSync(baseUrlPath)) {
-      fs.unlinkSync(baseUrlPath)
-    }
-
     const child = spawn('node', [path.join(__dirname, '../scripts/generate-identity.ts')], {
       env,
       stdio: 'pipe',

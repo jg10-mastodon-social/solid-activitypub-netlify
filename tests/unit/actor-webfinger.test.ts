@@ -4,7 +4,23 @@ import path from 'path'
 import { publicDir, actorPrivateKeyPath, baseUrlPath, runScript, rootDir } from '../helpers.js'
 
 describe('actor and webfinger', () => {
+  let originalBaseUrlContent: string | null = null
+  let originalActorPrivateKeyContent: string | null = null
+
   beforeEach(() => {
+    // Save original content
+    if (fs.existsSync(baseUrlPath)) {
+      originalBaseUrlContent = fs.readFileSync(baseUrlPath, 'utf-8')
+    } else {
+      originalBaseUrlContent = null
+    }
+    if (fs.existsSync(actorPrivateKeyPath)) {
+      originalActorPrivateKeyContent = fs.readFileSync(actorPrivateKeyPath, 'utf-8')
+    } else {
+      originalActorPrivateKeyContent = null
+    }
+
+    // Delete for clean state
     if (fs.existsSync(publicDir)) {
       fs.rmSync(publicDir, { recursive: true, force: true })
     }
@@ -17,11 +33,21 @@ describe('actor and webfinger', () => {
   })
 
   afterEach(() => {
+    // Clean up generated files
     if (fs.existsSync(publicDir)) {
       fs.rmSync(publicDir, { recursive: true, force: true })
     }
-    if (fs.existsSync(baseUrlPath)) {
+
+    // Restore original content
+    if (originalBaseUrlContent !== null) {
+      fs.writeFileSync(baseUrlPath, originalBaseUrlContent)
+    } else if (fs.existsSync(baseUrlPath)) {
       fs.unlinkSync(baseUrlPath)
+    }
+    if (originalActorPrivateKeyContent !== null) {
+      fs.writeFileSync(actorPrivateKeyPath, originalActorPrivateKeyContent)
+    } else if (fs.existsSync(actorPrivateKeyPath)) {
+      fs.unlinkSync(actorPrivateKeyPath)
     }
   })
 
