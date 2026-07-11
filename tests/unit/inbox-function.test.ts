@@ -52,7 +52,7 @@ describe('inbox function', () => {
     const req = new Request('https://example.com/inbox', {
       method: 'GET'
     })
-    const context = {}
+    const context = { params: {} }
 
     const response = await handler(req, context as any)
 
@@ -65,7 +65,7 @@ describe('inbox function', () => {
     const req = new Request('https://example.com/inbox/pages/123', {
       method: 'GET'
     })
-    const context = {}
+    const context = { params: { page: 'pages/123' } }
 
     const response = await handler(req, context as any)
 
@@ -85,13 +85,38 @@ describe('inbox function', () => {
       method: 'GET',
       headers: { Accept: 'text/turtle' }
     })
-    const context = {}
+    const context = { params: {} }
 
     await handler(req, context as any)
 
     expect(mockFetch).toHaveBeenCalled()
     const callArgs = mockFetch.mock.calls[0]
     expect(callArgs[0]).toContain('/inbox/')
+  })
+
+  it('does not create double slashes when proxying inbox subpaths', async () => {
+    const { default: handler } = await import('../../netlify/functions/inbox.mjs')
+    const { createSolidFetch } = await import('../../src/solidFetch.js')
+    const mockFetch = vi.fn().mockResolvedValue(new Response('turtle body', {
+      status: 200,
+      headers: { 'Content-Type': 'text/turtle' }
+    }))
+    ;(createSolidFetch as ReturnType<typeof vi.fn>).mockResolvedValue(mockFetch)
+
+    const req = new Request('https://example.com/inbox/pages/123', {
+      method: 'GET',
+      headers: { Accept: 'text/turtle' }
+    })
+    const context = { params: { page: 'pages/123' } }
+
+    await handler(req, context as any)
+
+    expect(mockFetch).toHaveBeenCalled()
+    const callArgs = mockFetch.mock.calls[0]
+    const fetchedUrl = callArgs[0] as string
+    expect(fetchedUrl).toBe('http://pod.example.com/inbox/pages/123')
+    expect(fetchedUrl).not.toContain('inbox//pages')
+    expect(fetchedUrl).not.toContain('//pages')
   })
 
   it('forwards Accept header to pod', async () => {
@@ -107,7 +132,7 @@ describe('inbox function', () => {
       method: 'GET',
       headers: { Accept: 'text/turtle' }
     })
-    const context = {}
+    const context = { params: {} }
 
     await handler(req, context as any)
 
@@ -128,7 +153,7 @@ describe('inbox function', () => {
       method: 'GET',
       headers: { Accept: 'text/turtle' }
     })
-    const context = {}
+    const context = { params: {} }
 
     const response = await handler(req, context as any)
 
@@ -150,7 +175,7 @@ describe('inbox function', () => {
       method: 'GET',
       headers: { Accept: 'text/turtle' }
     })
-    const context = {}
+    const context = { params: {} }
 
     const response = await handler(req, context as any)
     const body = await response.text()
@@ -170,7 +195,7 @@ describe('inbox function', () => {
       method: 'GET',
       headers: { Accept: 'text/turtle' }
     })
-    const context = {}
+    const context = { params: {} }
 
     const response = await handler(req, context as any)
 
@@ -190,7 +215,7 @@ describe('inbox function', () => {
       method: 'GET',
       headers: { Accept: 'text/turtle' }
     })
-    const context = {}
+    const context = { params: {} }
 
     const response = await handler(req, context as any)
 
@@ -210,7 +235,7 @@ describe('inbox function', () => {
       method: 'GET',
       headers: { Accept: 'text/turtle' }
     })
-    const context = {}
+    const context = { params: {} }
 
     const response = await handler(req, context as any)
 
@@ -233,7 +258,7 @@ describe('inbox function', () => {
         Origin: 'https://solid.example.app'
       }
     })
-    const context = {}
+    const context = { params: {} }
 
     const response = await handler(req, context as any)
 
@@ -253,7 +278,7 @@ describe('inbox function', () => {
       method: 'GET',
       headers: { Accept: 'text/turtle' }
     })
-    const context = {}
+    const context = { params: {} }
 
     const response = await handler(req, context as any)
 

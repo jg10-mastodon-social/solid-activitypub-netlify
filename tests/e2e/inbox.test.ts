@@ -80,4 +80,38 @@ describe('inbox e2e tests', () => {
 
     expect(res.status).toBe(500)
   })
+
+  it('returns 200 for GET /inbox/pages/:id (routing test)', async () => {
+    const mockServer = getMockSolidServer()
+    expect(mockServer).not.toBeNull()
+
+    const activity = {
+      type: 'Create',
+      '@context': 'https://www.w3.org/ns/activitystreams',
+      actor: 'https://other.example/actor',
+      object: { type: 'Note', content: 'Test page content' }
+    }
+
+    const postRes = await fetch(`${devServerUrl}/inbox`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(activity)
+    })
+    expect(postRes.status).toBe(200)
+
+    const pages = mockServer!.getCreatedPages()
+    expect(pages.length).toBeGreaterThan(0)
+    const pageUrl = pages[pages.length - 1]
+    const pagePath = pageUrl.replace('http://localhost:9998', '')
+
+    const res = await fetch(`${devServerUrl}${pagePath}`, {
+      method: 'GET',
+      headers: { accept: 'text/turtle' }
+    })
+
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-type')).toMatch(/text\/turtle/)
+    const body = await res.text()
+    expect(body).toContain('OrderedCollectionPage')
+  })
 })
