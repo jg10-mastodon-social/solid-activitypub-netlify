@@ -156,7 +156,7 @@ describe('outbox unit tests', () => {
     expect(await res.text()).toBe('Issuer not allowed')
   })
 
-  it('returns 500 when config fetch fails', async () => {
+  it('returns 500 when pod operations fail', async () => {
     mockVerifyDpopToken.mockResolvedValue({
       success: true,
       payload: { webid: 'https://example.com/webid#me', client_id: 'client1', iss: 'https://issuer.example', iat: 0, exp: 0 }
@@ -187,7 +187,7 @@ describe('outbox unit tests', () => {
 
     expect(res.status).toBe(500)
     const text = await res.text()
-    expect(text).toContain('Failed to fetch config')
+    expect(text).toContain('Failed to create page')
   })
 
   it('returns 400 when @context is missing', async () => {
@@ -264,7 +264,7 @@ describe('outbox unit tests', () => {
 
     expect(res.status).toBe(204)
     expect(res.headers.get('Access-Control-Allow-Origin')).toBe('*')
-    expect(res.headers.get('Access-Control-Allow-Methods')).toBe('POST, OPTIONS')
+    expect(res.headers.get('Access-Control-Allow-Methods')).toBe('POST, GET, OPTIONS')
     expect(res.headers.get('Access-Control-Allow-Headers')).toBe('Authorization, DPoP, Content-Type')
   })
 

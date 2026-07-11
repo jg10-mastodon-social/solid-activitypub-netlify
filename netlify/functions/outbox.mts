@@ -2,14 +2,8 @@ import type { Config, Context } from '@netlify/functions'
 import { verifyDpopToken } from '../../src/auth.js'
 import { loadConfig } from '../../src/config.js'
 import { createSolidFetch } from '../../src/solidFetch.js'
-import { extractRecipients, fetchActorInbox, validateActivityActor, validateContext, normalizeActivity } from '../../src/activity.js'
-import { signActivityRequest } from '../../src/signing.js'
-import { derivePageUrl } from '../../src/services/derivePageUrl.js'
-import { persistActivityItem } from '../../src/services/persistActivity.js'
+import { handleOutboxActivity } from '../../src/handlers/outbox.js'
 import type { Activity } from '../../src/activity.js'
-import type { SolidFetch } from '../../src/types.js'
-// @ts-ignore
-import { baseUrl } from '../../src/base-url.js'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -20,33 +14,6 @@ const CORS_HEADERS = {
 export const config: Config = {
   path: '/outbox',
   method: ['POST', 'GET', 'OPTIONS'],
-}
-
-async function distributeActivity(activity: Activity, fetchFn: SolidFetch, actorUrl: string, keyId: string): Promise<{ recipient: string; status: number; ok: boolean }[]> {
-  const recipients = extractRecipients(activity)
-  console.log(`[outbox] Distributing to ${recipients.length} recipients`)
-
-  const results = []
-  for (const recipient of recipients) {
-    try {
-      console.log(`[outbox] Fetching inbox for ${recipient}`)
-      const inboxUrl = await fetchActorInbox(recipient, fetchFn)
-      console.log(`[outbox] Sending to inbox: ${inboxUrl}`)
-
-      const response = await signActivityRequest(
-        inboxUrl,
-        JSON.stringify(activity),
-        keyId,
-        fetchFn
-      )
-      console.log(`[outbox] Delivery to ${recipient} returned ${response.status}`)
-      results.push({ recipient, status: response.status, ok: response.ok })
-    } catch (error) {
-      console.error(`[outbox] Failed to deliver to ${recipient}: ${error}`)
-      results.push({ recipient, status: 0, ok: false })
-    }
-  }
-  return results
 }
 
 export default async (req: Request, context: Context) => {
@@ -87,7 +54,7 @@ export default async (req: Request, context: Context) => {
   }
 
   const config = loadConfig()
-  const actorUrl = `${baseUrl}/actor`
+  const actorUrl = `${config.baseUrl}/actor`
   const keyId = `${actorUrl}#main-key`
 
   const authHeader = req.headers.get('authorization')
@@ -120,62 +87,16 @@ export default async (req: Request, context: Context) => {
   }
 
   try {
-    validateContext(activity)
-  } catch (error) {
-    console.log(`[outbox] Context validation failed: ${error}`)
-    return new Response(JSON.stringify({
-      error: 'validation_failed',
-      message: error instanceof Error ? error.message : 'Activity must include @context'
-    }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } })
-  }
-
-  try {
-    validateActivityActor(activity, actorUrl)
-  } catch (error) {
-    console.log(`[outbox] Actor validation failed: ${error}`)
-    return new Response(error instanceof Error ? error.message : 'Actor mismatch', {
-      status: 403,
-      headers: CORS_HEADERS
-    })
-  }
-
-  activity = normalizeActivity(activity)
-
-  try {
     const fetchFn = await createSolidFetch(config.webId, config.issuer)
+    const result = await handleOutboxActivity(activity, fetchFn, config.outboxUrl, actorUrl, keyId)
 
-    console.log(`[outbox] Fetching config from ${config.outboxUrl}`)
-    const response = await fetchFn(config.outboxUrl, {
-      headers: { accept: 'text/turtle,application/x-turtle' }
-    })
-
-    if (!response.ok) {
-      console.error(`[outbox] Config fetch failed: ${response.status}`)
-      return new Response(`Failed to fetch config: ${response.status}`, {
-        status: 500,
-        headers: CORS_HEADERS
-      })
-    }
-
-    console.log(`[outbox] Config fetched successfully`)
-
-    const deliveryResults = await distributeActivity(activity, fetchFn, actorUrl, keyId)
-
-    const successCount = deliveryResults.filter(r => r.ok).length
-    const failCount = deliveryResults.filter(r => !r.ok).length
-    console.log(`[outbox] Delivered to ${successCount}/${deliveryResults.length} recipients`)
-
-    const outboxPageUrl = await derivePageUrl(config.outboxUrl, fetchFn)
-    await persistActivityItem(activity, outboxPageUrl, fetchFn, { skolemizeBase: `${baseUrl}/.well-known/genid/` })
-    console.log(`[outbox] Persisted activity to outbox`)
+    console.log(`[outbox] Delivered to ${result.delivered}/${result.results.length} recipients`)
 
     const responseBody = JSON.stringify({
       status: 'ok',
-      id: activity.id,
-      published: activity.published,
-      delivered: successCount,
-      failed: failCount,
-      results: deliveryResults
+      delivered: result.delivered,
+      failed: result.failed,
+      results: result.results
     })
 
     return new Response(responseBody, {
@@ -183,8 +104,18 @@ export default async (req: Request, context: Context) => {
       headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' }
     })
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    if (errorMessage.includes('@context')) {
+      return new Response(JSON.stringify({
+        error: 'validation_failed',
+        message: errorMessage
+      }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } })
+    }
+    if (errorMessage.includes('Actor mismatch')) {
+      return new Response(errorMessage, { status: 403, headers: CORS_HEADERS })
+    }
     console.error(`[outbox] Error: ${error}`)
-    return new Response(error instanceof Error ? error.message : 'Internal error', {
+    return new Response(errorMessage, {
       status: 500,
       headers: CORS_HEADERS
     })
