@@ -217,6 +217,49 @@ describe('inbox function', () => {
     expect(response.headers.get('Access-Control-Allow-Origin')).toBe('*')
   })
 
+  it('echoes Origin header when present in request', async () => {
+    const { default: handler } = await import('../../netlify/functions/inbox.mjs')
+    const { createSolidFetch } = await import('../../src/solidFetch.js')
+    const mockFetch = vi.fn().mockResolvedValue(new Response('turtle body', {
+      status: 200,
+      headers: { 'Content-Type': 'text/turtle' }
+    }))
+    ;(createSolidFetch as ReturnType<typeof vi.fn>).mockResolvedValue(mockFetch)
+
+    const req = new Request('https://example.com/inbox/', {
+      method: 'GET',
+      headers: {
+        Accept: 'text/turtle',
+        Origin: 'https://solid.example.app'
+      }
+    })
+    const context = {}
+
+    const response = await handler(req, context as any)
+
+    expect(response.headers.get('Access-Control-Allow-Origin')).toBe('https://solid.example.app')
+  })
+
+  it('includes Vary: Origin header for cache awareness', async () => {
+    const { default: handler } = await import('../../netlify/functions/inbox.mjs')
+    const { createSolidFetch } = await import('../../src/solidFetch.js')
+    const mockFetch = vi.fn().mockResolvedValue(new Response('turtle body', {
+      status: 200,
+      headers: { 'Content-Type': 'text/turtle' }
+    }))
+    ;(createSolidFetch as ReturnType<typeof vi.fn>).mockResolvedValue(mockFetch)
+
+    const req = new Request('https://example.com/inbox/', {
+      method: 'GET',
+      headers: { Accept: 'text/turtle' }
+    })
+    const context = {}
+
+    const response = await handler(req, context as any)
+
+    expect(response.headers.get('Vary')).toContain('Origin')
+  })
+
   it('should return 400 for invalid JSON', async () => {
     const { default: handler } = await import('../../netlify/functions/inbox.mjs')
 

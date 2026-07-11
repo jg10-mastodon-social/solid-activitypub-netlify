@@ -5,11 +5,12 @@ import { createSolidFetch } from '../../src/solidFetch.js'
 import { handleOutboxActivity } from '../../src/handlers/outbox.js'
 import type { Activity } from '../../src/activity.js'
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
+const getCorsHeaders = (origin: string | null) => ({
+  'Access-Control-Allow-Origin': origin ?? '*',
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
   'Access-Control-Allow-Headers': 'Authorization, DPoP, Content-Type',
-}
+  'Vary': 'Origin',
+})
 
 export const config: Config = {
   path: '/outbox',
@@ -18,10 +19,11 @@ export const config: Config = {
 
 export default async (req: Request, context: Context) => {
   console.log('[outbox] Received request')
+  const corsHeaders = getCorsHeaders(req.headers.get('Origin'))
 
   if (req.method === 'OPTIONS') {
     console.log('[outbox] Handling CORS preflight')
-    return new Response(null, { status: 204, headers: CORS_HEADERS })
+    return new Response(null, { status: 204, headers: corsHeaders })
   }
 
   if (req.method === 'GET') {
@@ -42,13 +44,13 @@ export default async (req: Request, context: Context) => {
       const rewrittenBody = body.replaceAll(podOutboxBase, publicOutboxBase)
       return new Response(rewrittenBody, {
         status: podResponse.status,
-        headers: { ...CORS_HEADERS, 'Content-Type': contentType }
+        headers: { ...corsHeaders, 'Content-Type': contentType }
       })
     } catch (error) {
       console.error(`[outbox] Error: ${error}`)
       return new Response(error instanceof Error ? error.message : 'Bad Gateway', {
         status: 502,
-        headers: CORS_HEADERS
+        headers: corsHeaders
       })
     }
   }
@@ -72,7 +74,7 @@ export default async (req: Request, context: Context) => {
     console.log(`[outbox] Auth failed: ${authResult.message}`)
     return new Response(authResult.message, {
       status: authResult.statusCode,
-      headers: CORS_HEADERS
+      headers: corsHeaders
     })
   }
 
@@ -83,7 +85,7 @@ export default async (req: Request, context: Context) => {
     const body = await req.json()
     activity = body as Activity
   } catch {
-    return new Response('Invalid JSON body', { status: 400, headers: CORS_HEADERS })
+    return new Response('Invalid JSON body', { status: 400, headers: corsHeaders })
   }
 
   try {
@@ -101,7 +103,7 @@ export default async (req: Request, context: Context) => {
 
     return new Response(responseBody, {
       status: 200,
-      headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
@@ -109,15 +111,15 @@ export default async (req: Request, context: Context) => {
       return new Response(JSON.stringify({
         error: 'validation_failed',
         message: errorMessage
-      }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } })
+      }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
     if (errorMessage.includes('Actor mismatch')) {
-      return new Response(errorMessage, { status: 403, headers: CORS_HEADERS })
+      return new Response(errorMessage, { status: 403, headers: corsHeaders })
     }
     console.error(`[outbox] Error: ${error}`)
     return new Response(errorMessage, {
       status: 500,
-      headers: CORS_HEADERS
+      headers: corsHeaders
     })
   }
 }

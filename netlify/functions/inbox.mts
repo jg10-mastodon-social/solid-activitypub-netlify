@@ -3,11 +3,12 @@ import { createSolidFetch } from '../../src/solidFetch.js'
 import { loadConfig } from '../../src/config.js'
 import { handleInboxActivity } from '../../src/handlers/inbox.js'
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
+const getCorsHeaders = (origin: string | null) => ({
+  'Access-Control-Allow-Origin': origin ?? '*',
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
   'Access-Control-Allow-Headers': 'Authorization, DPoP, Content-Type',
-}
+  'Vary': 'Origin',
+})
 
 export const config: Config = {
   path: '/inbox',
@@ -16,10 +17,11 @@ export const config: Config = {
 
 export default async (req: Request, context: Context) => {
   console.log('[inbox] Received request')
+  const corsHeaders = getCorsHeaders(req.headers.get('Origin'))
 
   if (req.method === 'OPTIONS') {
     console.log('[inbox] Handling CORS preflight')
-    return new Response(null, { status: 204, headers: CORS_HEADERS })
+    return new Response(null, { status: 204, headers: corsHeaders })
   }
 
   if (req.method === 'GET') {
@@ -40,13 +42,13 @@ export default async (req: Request, context: Context) => {
       const rewrittenBody = body.replaceAll(podInboxBase, publicInboxBase)
       return new Response(rewrittenBody, {
         status: podResponse.status,
-        headers: { ...CORS_HEADERS, 'Content-Type': contentType }
+        headers: { ...corsHeaders, 'Content-Type': contentType }
       })
     } catch (error) {
       console.error(`[inbox] Error: ${error}`)
       return new Response(error instanceof Error ? error.message : 'Bad Gateway', {
         status: 502,
-        headers: CORS_HEADERS
+        headers: corsHeaders
       })
     }
   }
@@ -57,7 +59,7 @@ export default async (req: Request, context: Context) => {
   } catch {
     return new Response('Invalid JSON body', {
       status: 400,
-      headers: CORS_HEADERS
+      headers: corsHeaders
     })
   }
 
@@ -70,15 +72,15 @@ export default async (req: Request, context: Context) => {
     if (!success) {
       return new Response('Failed to process activity', {
         status: 500,
-        headers: CORS_HEADERS
+        headers: corsHeaders
       })
     }
-    return new Response('ok', { status: 200, headers: CORS_HEADERS })
+    return new Response('ok', { status: 200, headers: corsHeaders })
   } catch (error) {
     console.error(`[inbox] Error: ${error}`)
     return new Response(error instanceof Error ? error.message : 'Internal error', {
       status: 500,
-      headers: CORS_HEADERS
+      headers: corsHeaders
     })
   }
 }
