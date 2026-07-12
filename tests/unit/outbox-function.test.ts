@@ -56,7 +56,7 @@ describe('outbox function', () => {
     const req = new Request('https://example.com/outbox', {
       method: 'GET'
     })
-    const context = {}
+    const context = { params: {} }
 
     const response = await handler(req, context as any)
 
@@ -69,7 +69,7 @@ describe('outbox function', () => {
     const req = new Request('https://example.com/outbox/pages/123', {
       method: 'GET'
     })
-    const context = {}
+    const context = { params: { page: 'pages/123' } }
 
     const response = await handler(req, context as any)
 
@@ -89,13 +89,38 @@ describe('outbox function', () => {
       method: 'GET',
       headers: { Accept: 'text/turtle' }
     })
-    const context = {}
+    const context = { params: {} }
 
     await handler(req, context as any)
 
     expect(mockFetch).toHaveBeenCalled()
     const callArgs = mockFetch.mock.calls[0]
     expect(callArgs[0]).toContain('/outbox/')
+  })
+
+  it('does not create double slashes when proxying outbox subpaths', async () => {
+    const { default: handler } = await import('../../netlify/functions/outbox.mjs')
+    const { createSolidFetch } = await import('../../src/solidFetch.js')
+    const mockFetch = vi.fn().mockResolvedValue(new Response('turtle body', {
+      status: 200,
+      headers: { 'Content-Type': 'text/turtle' }
+    }))
+    ;(createSolidFetch as ReturnType<typeof vi.fn>).mockResolvedValue(mockFetch)
+
+    const req = new Request('https://example.com/outbox/pages/123', {
+      method: 'GET',
+      headers: { Accept: 'text/turtle' }
+    })
+    const context = { params: { page: 'pages/123' } }
+
+    await handler(req, context as any)
+
+    expect(mockFetch).toHaveBeenCalled()
+    const callArgs = mockFetch.mock.calls[0]
+    const fetchedUrl = callArgs[0] as string
+    expect(fetchedUrl).toBe('http://pod.example.com/outbox/pages/123')
+    expect(fetchedUrl).not.toContain('outbox//pages')
+    expect(fetchedUrl).not.toContain('//pages')
   })
 
   it('forwards Accept header to pod', async () => {
@@ -111,7 +136,7 @@ describe('outbox function', () => {
       method: 'GET',
       headers: { Accept: 'text/turtle' }
     })
-    const context = {}
+    const context = { params: {} }
 
     await handler(req, context as any)
 
@@ -132,7 +157,7 @@ describe('outbox function', () => {
       method: 'GET',
       headers: { Accept: 'text/turtle' }
     })
-    const context = {}
+    const context = { params: {} }
 
     const response = await handler(req, context as any)
 
@@ -154,7 +179,7 @@ describe('outbox function', () => {
       method: 'GET',
       headers: { Accept: 'text/turtle' }
     })
-    const context = {}
+    const context = { params: {} }
 
     const response = await handler(req, context as any)
     const body = await response.text()
@@ -174,7 +199,7 @@ describe('outbox function', () => {
       method: 'GET',
       headers: { Accept: 'text/turtle' }
     })
-    const context = {}
+    const context = { params: {} }
 
     const response = await handler(req, context as any)
 
@@ -194,7 +219,7 @@ describe('outbox function', () => {
       method: 'GET',
       headers: { Accept: 'text/turtle' }
     })
-    const context = {}
+    const context = { params: {} }
 
     const response = await handler(req, context as any)
 
@@ -214,7 +239,7 @@ describe('outbox function', () => {
       method: 'GET',
       headers: { Accept: 'text/turtle' }
     })
-    const context = {}
+    const context = { params: {} }
 
     const response = await handler(req, context as any)
 
@@ -237,7 +262,7 @@ describe('outbox function', () => {
         Origin: 'https://solid.example.app'
       }
     })
-    const context = {}
+    const context = { params: {} }
 
     const response = await handler(req, context as any)
 
@@ -257,7 +282,7 @@ describe('outbox function', () => {
       method: 'GET',
       headers: { Accept: 'text/turtle' }
     })
-    const context = {}
+    const context = { params: {} }
 
     const response = await handler(req, context as any)
 

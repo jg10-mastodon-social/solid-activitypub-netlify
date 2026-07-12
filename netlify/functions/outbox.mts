@@ -13,7 +13,7 @@ const getCorsHeaders = (origin: string | null) => ({
 })
 
 export const config: Config = {
-  path: '/outbox',
+  path: '/outbox/:page*',
   method: ['POST', 'GET', 'OPTIONS'],
 }
 
@@ -31,8 +31,8 @@ export default async (req: Request, context: Context) => {
     try {
       const config = loadConfig()
       const fetchFn = await createSolidFetch(config.webId, config.issuer)
-      const url = new URL(req.url)
-      const targetUrl = `${config.outboxUrl}${url.pathname.slice('/outbox'.length)}`
+      const page = context.params.page
+      const targetUrl = page ? `${config.outboxUrl}${page}` : config.outboxUrl
       const acceptHeader = req.headers.get('Accept') || 'text/turtle'
       const podResponse = await fetchFn(targetUrl, {
         headers: { accept: acceptHeader }
