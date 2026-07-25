@@ -23,6 +23,7 @@ DELETE {
   <${escapedInboxUrl}> as:first ?oldFirst.
 };
 INSERT DATA {
+  <${escapedInboxUrl}> a as:OrderedCollection.
   <${escapedInboxUrl}> as:first <${escapedNewFirstUrl}>.
 }
 `

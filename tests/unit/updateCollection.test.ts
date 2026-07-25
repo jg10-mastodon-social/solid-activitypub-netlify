@@ -38,6 +38,26 @@ describe('updateCollection', () => {
     expect(patchBody).toContain('WHERE')
   })
 
+  it('should insert as:OrderedCollection type along with as:first', async () => {
+    const { updateCollectionFirst } = await import('../../src/services/updateInbox.js')
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Map([['link', '<https://example.com/inbox/.meta>; rel="describedby"']])
+    })
+
+    await updateCollectionFirst(
+      'https://example.com/inbox/',
+      'https://example.com/inbox/pages/123',
+      mockFetch as SolidFetch
+    )
+
+    expect(mockFetch).toHaveBeenCalledTimes(2)
+    const patchBody = mockFetch.mock.calls[1][1].body as string
+    expect(patchBody).toContain('a as:OrderedCollection')
+    expect(patchBody).toContain('as:first')
+  })
+
   it('should throw on failure', async () => {
     const { updateCollectionFirst } = await import('../../src/services/updateInbox.js')
     mockFetch.mockResolvedValueOnce({
