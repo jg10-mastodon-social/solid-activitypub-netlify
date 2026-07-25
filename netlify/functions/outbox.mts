@@ -8,7 +8,7 @@ import type { Activity } from '../../src/activity.js'
 const getCorsHeaders = (origin: string | null) => ({
   'Access-Control-Allow-Origin': origin ?? '*',
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
-  'Access-Control-Allow-Headers': 'Authorization, DPoP, Content-Type',
+  'Access-Control-Allow-Headers': 'Authorization, DPoP, Content-Type, Accept',
   'Vary': 'Origin',
 })
 

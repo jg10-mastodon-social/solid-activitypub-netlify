@@ -265,7 +265,7 @@ describe('outbox unit tests', () => {
     expect(res.status).toBe(204)
     expect(res.headers.get('Access-Control-Allow-Origin')).toBe('*')
     expect(res.headers.get('Access-Control-Allow-Methods')).toBe('POST, GET, OPTIONS')
-    expect(res.headers.get('Access-Control-Allow-Headers')).toBe('Authorization, DPoP, Content-Type')
+    expect(res.headers.get('Access-Control-Allow-Headers')).toBe('Authorization, DPoP, Content-Type, Accept')
   })
 
   it('includes CORS headers on 401 response', async () => {

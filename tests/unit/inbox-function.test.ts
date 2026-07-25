@@ -46,6 +46,24 @@ describe('inbox function', () => {
     expect(response.status).toBe(204)
   })
 
+  it('allows Accept header in CORS preflight', async () => {
+    const { default: handler } = await import('../../netlify/functions/inbox.mjs')
+
+    const req = new Request('https://example.com/inbox', {
+      method: 'OPTIONS',
+      headers: {
+        'Access-Control-Request-Method': 'GET',
+        'Access-Control-Request-Headers': 'Accept'
+      }
+    })
+    const context = {}
+
+    const response = await handler(req, context as any)
+
+    expect(response.status).toBe(204)
+    expect(response.headers.get('Access-Control-Allow-Headers')).toContain('Accept')
+  })
+
   it('should return 200 for GET /inbox', async () => {
     const { default: handler } = await import('../../netlify/functions/inbox.mjs')
 
