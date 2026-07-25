@@ -23,7 +23,7 @@ describe('inbox handler', () => {
       '@context': 'https://www.w3.org/ns/activitystreams'
     }
 
-    await handleInboxActivity(activity, mockFetch as SolidFetch, 'https://example.com/inbox/')
+    await handleInboxActivity(activity, mockFetch as SolidFetch, 'https://example.com/inbox/', 'https://example.com/actor', 'https://example.com/actor#main-key')
 
     expect(mockFetch).toHaveBeenCalled()
   })
@@ -43,7 +43,7 @@ describe('inbox handler', () => {
       '@context': 'https://www.w3.org/ns/activitystreams'
     }
 
-    const result = await handleInboxActivity(activity, mockFetch as SolidFetch, 'https://example.com/inbox/')
+    const result = await handleInboxActivity(activity, mockFetch as SolidFetch, 'https://example.com/inbox/', 'https://example.com/actor', 'https://example.com/actor#main-key')
 
     expect(result).toBe(true)
     expect(mockFetch).not.toHaveBeenCalled()
@@ -62,7 +62,7 @@ describe('inbox handler', () => {
       '@context': 'https://www.w3.org/ns/activitystreams'
     }
 
-    const result = await handleInboxActivity(activity, mockFetch as SolidFetch, 'https://example.com/inbox/')
+    const result = await handleInboxActivity(activity, mockFetch as SolidFetch, 'https://example.com/inbox/', 'https://example.com/actor', 'https://example.com/actor#main-key')
 
     expect(result).toBe(true)
   })
@@ -78,8 +78,83 @@ describe('inbox handler', () => {
       '@context': 'https://www.w3.org/ns/activitystreams'
     }
 
-    const result = await handleInboxActivity(activity, mockFetch as SolidFetch, 'https://example.com/inbox/')
+    const result = await handleInboxActivity(activity, mockFetch as SolidFetch, 'https://example.com/inbox/', 'https://example.com/actor', 'https://example.com/actor#main-key')
 
     expect(result).toBe(false)
+  })
+
+  it('should skip persistence for Follow activities and send Accept', async () => {
+    const { handleInboxActivity } = await import('../../src/handlers/inbox.js')
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ inbox: 'https://other.example/inbox' })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200
+      })
+
+    const activity = {
+      type: 'Follow',
+      actor: 'https://other.example/actor',
+      object: 'https://example.com/actor',
+      '@context': 'https://www.w3.org/ns/activitystreams'
+    }
+
+    const result = await handleInboxActivity(activity, mockFetch as SolidFetch, 'https://example.com/inbox/', 'https://example.com/actor', 'https://example.com/actor#main-key')
+
+    expect(result).toBe(true)
+  })
+
+  it('should detect Follow with as: prefix', async () => {
+    const { handleInboxActivity } = await import('../../src/handlers/inbox.js')
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ inbox: 'https://other.example/inbox' })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200
+      })
+
+    const activity = {
+      type: 'as:Follow',
+      actor: 'https://other.example/actor',
+      object: 'https://example.com/actor',
+      '@context': 'https://www.w3.org/ns/activitystreams'
+    }
+
+    const result = await handleInboxActivity(activity, mockFetch as SolidFetch, 'https://example.com/inbox/', 'https://example.com/actor', 'https://example.com/actor#main-key')
+
+    expect(result).toBe(true)
+  })
+
+  it('should detect Follow in array type', async () => {
+    const { handleInboxActivity } = await import('../../src/handlers/inbox.js')
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ inbox: 'https://other.example/inbox' })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200
+      })
+
+    const activity = {
+      type: ['as:Follow', 'Activity'],
+      actor: 'https://other.example/actor',
+      object: 'https://example.com/actor',
+      '@context': 'https://www.w3.org/ns/activitystreams'
+    }
+
+    const result = await handleInboxActivity(activity, mockFetch as SolidFetch, 'https://example.com/inbox/', 'https://example.com/actor', 'https://example.com/actor#main-key')
+
+    expect(result).toBe(true)
   })
 })
