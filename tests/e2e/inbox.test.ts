@@ -114,4 +114,37 @@ describe('inbox e2e tests', () => {
     const body = await res.text()
     expect(body).toContain('OrderedCollectionPage')
   })
+
+  it('returns 200 for Follow activity and sends Accept to follower', async () => {
+    const mockServer = getMockSolidServer()
+    expect(mockServer).not.toBeNull()
+
+    const activity = {
+      type: 'Follow',
+      '@context': 'https://www.w3.org/ns/activitystreams',
+      actor: 'http://localhost:9998/actor',
+      object: 'http://localhost:9999/actor'
+    }
+
+    const res = await fetch(`${devServerUrl}/inbox`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(activity)
+    })
+
+    expect(res.status).toBe(200)
+    expect(await res.text()).toBe('ok')
+
+    const patchedInboxPages = mockServer!.getPatchedPages()
+    const followPatches = patchedInboxPages.filter(p => p.body.includes('Follow'))
+    expect(followPatches.length).toBe(0)
+
+    const receivedActivities = mockServer!.getReceivedActivities()
+    expect(receivedActivities.length).toBe(1)
+    expect(receivedActivities[0].body).toContain('Accept')
+
+    const patchedFollowers = mockServer!.getPatchedFollowers()
+    expect(patchedFollowers.length).toBe(1)
+    expect(patchedFollowers[0].body).toContain('http://localhost:9998/actor')
+  })
 })
