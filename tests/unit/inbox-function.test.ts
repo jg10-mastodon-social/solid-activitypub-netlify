@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
+vi.mock('../../src/auth.js', () => ({
+  verifyDpopToken: vi.fn().mockResolvedValue({ success: true, payload: { webid: 'https://example.com/webid' } })
+}))
+
 vi.mock('../../src/handlers/inbox.js', () => ({
   handleInboxActivity: vi.fn().mockResolvedValue(true)
 }))
@@ -321,5 +325,153 @@ describe('inbox function', () => {
     const response = await handler(req, context)
 
     expect(response.status).toBe(400)
+  })
+
+  describe('GET authentication', () => {
+    it('returns 401 when Authorization header is missing', async () => {
+      const { default: handler } = await import('../../netlify/functions/inbox.mjs')
+      const { verifyDpopToken } = await import('../../src/auth.js')
+      ;(verifyDpopToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        success: false,
+        statusCode: 401,
+        message: 'Authorization required'
+      })
+
+      const req = new Request('https://example.com/inbox/', {
+        method: 'GET'
+      })
+      const context = { params: {} }
+
+      const response = await handler(req, context as any)
+
+      expect(response.status).toBe(401)
+    })
+
+    it('returns 401 when DPoP header is missing', async () => {
+      const { default: handler } = await import('../../netlify/functions/inbox.mjs')
+      const { verifyDpopToken } = await import('../../src/auth.js')
+      ;(verifyDpopToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        success: false,
+        statusCode: 401,
+        message: 'DPoP header required'
+      })
+
+      const req = new Request('https://example.com/inbox/', {
+        method: 'GET',
+        headers: { Authorization: 'DPoP token' }
+      })
+      const context = { params: {} }
+
+      const response = await handler(req, context as any)
+
+      expect(response.status).toBe(401)
+    })
+
+    it('returns 403 when issuer is not whitelisted', async () => {
+      const { default: handler } = await import('../../netlify/functions/inbox.mjs')
+      const { verifyDpopToken } = await import('../../src/auth.js')
+      ;(verifyDpopToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        success: false,
+        statusCode: 403,
+        message: 'Issuer not allowed'
+      })
+
+      const req = new Request('https://example.com/inbox/', {
+        method: 'GET',
+        headers: {
+          Authorization: 'DPoP token',
+          DPoP: 'dpop-header'
+        }
+      })
+      const context = { params: {} }
+
+      const response = await handler(req, context as any)
+
+      expect(response.status).toBe(403)
+    })
+
+    it('calls verifyDpopToken with correct parameters for GET /inbox', async () => {
+      const { default: handler } = await import('../../netlify/functions/inbox.mjs')
+      const { createSolidFetch } = await import('../../src/solidFetch.js')
+      const mockFetch = vi.fn().mockResolvedValue(new Response('turtle body', {
+        status: 200,
+        headers: { 'Content-Type': 'text/turtle' }
+      }))
+      ;(createSolidFetch as ReturnType<typeof vi.fn>).mockResolvedValue(mockFetch)
+
+      const req = new Request('https://example.com/inbox/', {
+        method: 'GET',
+        headers: {
+          Authorization: 'DPoP token',
+          DPoP: 'dpop-header'
+        }
+      })
+      const context = { params: {} }
+
+      await handler(req, context as any)
+
+      const { verifyDpopToken } = await import('../../src/auth.js')
+      expect(verifyDpopToken).toHaveBeenCalledWith(
+        'DPoP token',
+        'dpop-header',
+        'http://pod.example.com/inbox/',
+        'GET',
+        ['https://example.com']
+      )
+    })
+
+    it('calls verifyDpopToken with page path for GET /inbox/pages/123', async () => {
+      const { default: handler } = await import('../../netlify/functions/inbox.mjs')
+      const { createSolidFetch } = await import('../../src/solidFetch.js')
+      const mockFetch = vi.fn().mockResolvedValue(new Response('turtle body', {
+        status: 200,
+        headers: { 'Content-Type': 'text/turtle' }
+      }))
+      ;(createSolidFetch as ReturnType<typeof vi.fn>).mockResolvedValue(mockFetch)
+
+      const req = new Request('https://example.com/inbox/pages/123', {
+        method: 'GET',
+        headers: {
+          Authorization: 'DPoP token',
+          DPoP: 'dpop-header'
+        }
+      })
+      const context = { params: { page: 'pages/123' } }
+
+      await handler(req, context as any)
+
+      const { verifyDpopToken } = await import('../../src/auth.js')
+      expect(verifyDpopToken).toHaveBeenCalledWith(
+        'DPoP token',
+        'dpop-header',
+        'http://pod.example.com/inbox/pages/123',
+        'GET',
+        ['https://example.com']
+      )
+    })
+
+    it('proceeds to pod fetch when auth succeeds', async () => {
+      const { default: handler } = await import('../../netlify/functions/inbox.mjs')
+      const { createSolidFetch } = await import('../../src/solidFetch.js')
+      const mockFetch = vi.fn().mockResolvedValue(new Response('turtle body', {
+        status: 200,
+        headers: { 'Content-Type': 'text/turtle' }
+      }))
+      ;(createSolidFetch as ReturnType<typeof vi.fn>).mockResolvedValue(mockFetch)
+
+      const req = new Request('https://example.com/inbox/', {
+        method: 'GET',
+        headers: {
+          Authorization: 'DPoP token',
+          DPoP: 'dpop-header'
+        }
+      })
+      const context = { params: {} }
+
+      const response = await handler(req, context as any)
+
+      expect(mockFetch).toHaveBeenCalled()
+      expect(response.status).toBe(200)
+    })
   })
 })

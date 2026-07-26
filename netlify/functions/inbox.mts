@@ -1,5 +1,6 @@
 import type { Config, Context } from '@netlify/functions'
 import { createSolidFetch } from '../../src/solidFetch.js'
+import { verifyDpopToken } from '../../src/auth.js'
 import { loadConfig } from '../../src/config.js'
 import { handleInboxActivity } from '../../src/handlers/inbox.js'
 
@@ -26,11 +27,31 @@ export default async (req: Request, context: Context) => {
 
   if (req.method === 'GET') {
     console.log('[inbox] Handling GET request')
+    const config = loadConfig()
+    const page = context.params.page
+    const targetUrl = page ? `${config.inboxUrl}${page}` : config.inboxUrl
+
+    const authHeader = req.headers.get('authorization')
+    const dpopHeader = req.headers.get('dpop')
+
+    const authResult = await verifyDpopToken(
+      authHeader ?? undefined,
+      dpopHeader ?? undefined,
+      targetUrl,
+      'GET',
+      config.whitelistedIssuers
+    )
+
+    if (!authResult.success) {
+      console.log(`[inbox] Auth failed: ${authResult.message}`)
+      return new Response(authResult.message, {
+        status: authResult.statusCode,
+        headers: corsHeaders
+      })
+    }
+
     try {
-      const config = loadConfig()
       const fetchFn = await createSolidFetch(config.webId, config.issuer)
-      const page = context.params.page
-      const targetUrl = page ? `${config.inboxUrl}${page}` : config.inboxUrl
       const acceptHeader = req.headers.get('Accept') || 'text/turtle'
       const podResponse = await fetchFn(targetUrl, {
         headers: { accept: acceptHeader }
