@@ -2,6 +2,7 @@ import type { SolidFetch } from '../types.js'
 import { derivePageUrl } from '../services/derivePageUrl.js'
 import { persistActivityItem } from '../services/persistActivity.js'
 import { sendFollowAccept } from '../services/sendFollowAccept.js'
+import { addToFollowers } from '../services/addToFollowers.js'
 
 export function isFollowActivity(activity: Record<string, unknown>): boolean {
   const activityType = activity.type
@@ -14,7 +15,8 @@ export async function handleInboxActivity(
   fetch: SolidFetch,
   inboxUrl: string,
   actorUrl?: string,
-  keyId?: string
+  keyId?: string,
+  solidStorageBaseUrl?: string
 ): Promise<boolean> {
   const activityType = activity.type
   const isDelete = activityType === 'Delete' || activityType === 'as:Delete'
@@ -33,6 +35,15 @@ export async function handleInboxActivity(
         await sendFollowAccept(activity, fetch, actorUrl, keyId)
       } catch (error) {
         console.error(`[inbox] Error: Failed to send Accept: ${error}`)
+        return false
+      }
+    }
+    if (solidStorageBaseUrl && actorUrl) {
+      try {
+        const followerActor = activity.actor as string
+        await addToFollowers(followerActor, fetch, solidStorageBaseUrl, actorUrl)
+      } catch (error) {
+        console.error(`[inbox] Error: Failed to add to followers: ${error}`)
         return false
       }
     }

@@ -68,7 +68,16 @@ export default async (req: Request, context: Context) => {
   try {
     const config = loadConfig()
     const fetchFn = await createSolidFetch(config.webId, config.issuer)
-    const success = await handleInboxActivity(activity, fetchFn, config.inboxUrl)
+    const actorUrl = `${config.baseUrl}/actor`
+    const keyId = `${actorUrl}#main-key`
+    const success = await handleInboxActivity(
+      activity,
+      fetchFn,
+      config.inboxUrl,
+      actorUrl,
+      keyId,
+      config.solidStorageBaseUrl
+    )
     if (!success) {
       return new Response('Failed to process activity', {
         status: 500,

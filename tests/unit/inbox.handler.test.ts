@@ -95,6 +95,23 @@ describe('inbox handler', () => {
         ok: true,
         status: 200
       })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve('')
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200
+      })
 
     const activity = {
       type: 'Follow',
@@ -103,7 +120,7 @@ describe('inbox handler', () => {
       '@context': 'https://www.w3.org/ns/activitystreams'
     }
 
-    const result = await handleInboxActivity(activity, mockFetch as SolidFetch, 'https://example.com/inbox/', 'https://example.com/actor', 'https://example.com/actor#main-key')
+    const result = await handleInboxActivity(activity, mockFetch as SolidFetch, 'https://example.com/inbox/', 'https://example.com/actor', 'https://example.com/actor#main-key', 'https://example.com/')
 
     expect(result).toBe(true)
   })
@@ -120,6 +137,23 @@ describe('inbox handler', () => {
         ok: true,
         status: 200
       })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve('')
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200
+      })
 
     const activity = {
       type: 'as:Follow',
@@ -128,7 +162,7 @@ describe('inbox handler', () => {
       '@context': 'https://www.w3.org/ns/activitystreams'
     }
 
-    const result = await handleInboxActivity(activity, mockFetch as SolidFetch, 'https://example.com/inbox/', 'https://example.com/actor', 'https://example.com/actor#main-key')
+    const result = await handleInboxActivity(activity, mockFetch as SolidFetch, 'https://example.com/inbox/', 'https://example.com/actor', 'https://example.com/actor#main-key', 'https://example.com/')
 
     expect(result).toBe(true)
   })
@@ -145,6 +179,23 @@ describe('inbox handler', () => {
         ok: true,
         status: 200
       })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve('')
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200
+      })
 
     const activity = {
       type: ['as:Follow', 'Activity'],
@@ -153,7 +204,7 @@ describe('inbox handler', () => {
       '@context': 'https://www.w3.org/ns/activitystreams'
     }
 
-    const result = await handleInboxActivity(activity, mockFetch as SolidFetch, 'https://example.com/inbox/', 'https://example.com/actor', 'https://example.com/actor#main-key')
+    const result = await handleInboxActivity(activity, mockFetch as SolidFetch, 'https://example.com/inbox/', 'https://example.com/actor', 'https://example.com/actor#main-key', 'https://example.com/')
 
     expect(result).toBe(true)
   })
