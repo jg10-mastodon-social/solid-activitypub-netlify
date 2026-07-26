@@ -208,4 +208,70 @@ describe('inbox handler', () => {
 
     expect(result).toBe(true)
   })
+
+  it('should detect Undo activity', async () => {
+    const { isUndoActivity } = await import('../../src/handlers/inbox.js')
+    const activity = {
+      type: 'Undo',
+      actor: 'https://other.example/actor',
+      object: { type: 'Follow', actor: 'https://other.example/actor', object: 'https://example.com/actor' },
+      '@context': 'https://www.w3.org/ns/activitystreams'
+    }
+    expect(isUndoActivity(activity)).toBe(true)
+  })
+
+  it('should detect Undo with as: prefix', async () => {
+    const { isUndoActivity } = await import('../../src/handlers/inbox.js')
+    const activity = {
+      type: 'as:Undo',
+      actor: 'https://other.example/actor',
+      object: { type: 'Follow', actor: 'https://other.example/actor', object: 'https://example.com/actor' },
+      '@context': 'https://www.w3.org/ns/activitystreams'
+    }
+    expect(isUndoActivity(activity)).toBe(true)
+  })
+
+  it('should detect Undo with array type', async () => {
+    const { isUndoActivity } = await import('../../src/handlers/inbox.js')
+    const activity = {
+      type: ['as:Undo', 'Activity'],
+      actor: 'https://other.example/actor',
+      object: { type: 'Follow', actor: 'https://other.example/actor', object: 'https://example.com/actor' },
+      '@context': 'https://www.w3.org/ns/activitystreams'
+    }
+    expect(isUndoActivity(activity)).toBe(true)
+  })
+
+  it('should detect Undo/Follow activity', async () => {
+    const { isUndoFollow } = await import('../../src/handlers/inbox.js')
+    const activity = {
+      type: 'Undo',
+      actor: 'https://other.example/actor',
+      object: { type: 'Follow', actor: 'https://other.example/actor', object: 'https://example.com/actor' },
+      '@context': 'https://www.w3.org/ns/activitystreams'
+    }
+    expect(isUndoFollow(activity)).toBe(true)
+  })
+
+  it('should detect Undo/Follow with as: prefix', async () => {
+    const { isUndoFollow } = await import('../../src/handlers/inbox.js')
+    const activity = {
+      type: 'as:Undo',
+      actor: 'https://other.example/actor',
+      object: { type: 'as:Follow', actor: 'https://other.example/actor', object: 'https://example.com/actor' },
+      '@context': 'https://www.w3.org/ns/activitystreams'
+    }
+    expect(isUndoFollow(activity)).toBe(true)
+  })
+
+  it('should not detect Undo/Follow when object is not a Follow', async () => {
+    const { isUndoFollow } = await import('../../src/handlers/inbox.js')
+    const activity = {
+      type: 'Undo',
+      actor: 'https://other.example/actor',
+      object: { type: 'Like', actor: 'https://other.example/actor', object: 'https://example.com/note/1' },
+      '@context': 'https://www.w3.org/ns/activitystreams'
+    }
+    expect(isUndoFollow(activity)).toBe(false)
+  })
 })

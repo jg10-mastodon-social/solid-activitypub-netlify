@@ -10,6 +10,19 @@ export function isFollowActivity(activity: Record<string, unknown>): boolean {
     || (Array.isArray(activityType) && activityType.some(t => t === 'Follow' || t === 'as:Follow'))
 }
 
+export function isUndoActivity(activity: Record<string, unknown>): boolean {
+  const activityType = activity.type
+  return activityType === 'Undo' || activityType === 'as:Undo'
+    || (Array.isArray(activityType) && activityType.some(t => t === 'Undo' || t === 'as:Undo'))
+}
+
+export function isUndoFollow(activity: Record<string, unknown>): boolean {
+  if (!isUndoActivity(activity)) return false
+  const object = activity.object
+  if (!object || typeof object !== 'object') return false
+  return isFollowActivity(object as Record<string, unknown>)
+}
+
 export async function handleInboxActivity(
   activity: Record<string, unknown>,
   fetch: SolidFetch,
