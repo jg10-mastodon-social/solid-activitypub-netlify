@@ -3,6 +3,7 @@ import { derivePageUrl } from '../services/derivePageUrl.js'
 import { persistActivityItem } from '../services/persistActivity.js'
 import { sendFollowAccept } from '../services/sendFollowAccept.js'
 import { addToFollowers } from '../services/addToFollowers.js'
+import { removeFromFollowers } from '../services/removeFromFollowers.js'
 
 export function isFollowActivity(activity: Record<string, unknown>): boolean {
   const activityType = activity.type
@@ -61,6 +62,21 @@ export async function handleInboxActivity(
       }
     }
     return true
+  }
+
+  const isUndo = isUndoFollow(activity)
+  if (isUndo) {
+    console.log('[inbox] Undo/Follow activity, removing from followers')
+    const undoObject = activity.object as Record<string, unknown>
+    const followerActor = undoObject.actor as string
+    if (solidStorageBaseUrl && actorUrl) {
+      try {
+        await removeFromFollowers(followerActor, fetch, solidStorageBaseUrl, actorUrl)
+      } catch (error) {
+        console.error(`[inbox] Error: Failed to remove from followers: ${error}`)
+        return false
+      }
+    }
   }
 
   let pageUrl: string | undefined
