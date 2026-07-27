@@ -36,4 +36,21 @@ describe('buildPatch', () => {
       expect(patch).toContain('solid:inserts')
     })
   })
+
+  describe('buildDeletePatch', () => {
+    it('should build a patch that only deletes', async () => {
+      const { buildDeletePatch } = await import('../../src/services/buildPatch.js')
+      const turtle = `<https://example.com/activities/1> a <https://www.w3.org/ns/activitystreams#Follow>.`
+      const patch = buildDeletePatch(turtle, 'https://example.com/activities/1', 'https://example.com/followers/pages/123')
+      expect(patch).toContain('solid:deletes')
+      expect(patch).not.toContain('solid:inserts')
+    })
+
+    it('should include as:items triple for deletion', async () => {
+      const { buildDeletePatch } = await import('../../src/services/buildPatch.js')
+      const turtle = `<https://example.com/activities/1> a <https://www.w3.org/ns/activitystreams#Follow>.`
+      const patch = buildDeletePatch(turtle, 'https://example.com/activities/1', 'https://example.com/followers/pages/123')
+      expect(patch).toContain('as:items <https://example.com/activities/1>')
+    })
+  })
 })

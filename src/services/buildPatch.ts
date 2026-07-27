@@ -37,3 +37,18 @@ export function buildUpdatePatch(
 `
   return patch
 }
+
+export function buildDeletePatch(
+  itemTurtle: string,
+  itemId: string,
+  pageUrl: string
+): string {
+  const patch = `${INSERT_DELETE_PATCH_PREFIX}
+      _:patch a solid:InsertDeletePatch;
+      solid:deletes {
+		      <${pageUrl}> as:items <${itemId}>.
+       ${itemTurtle}
+     }.
+`
+  return patch
+}
