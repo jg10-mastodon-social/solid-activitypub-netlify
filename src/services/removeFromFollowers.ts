@@ -1,6 +1,7 @@
 import type { SolidFetch } from '../types.js'
 import { buildDeletePatch } from './buildPatch.js'
 import { parseCollectionTurtle } from './rdfUtils.js'
+import { Parser, Store } from 'n3'
 
 export async function removeFromFollowers(
   followerActor: string,
@@ -67,53 +68,51 @@ async function removeFromPage(
   }
 
   const text = await response.text()
-  const lines = text.split('\n')
-  const entryLines: string[] = []
-  let entrySubject: string | null = null
-  let isInEntry = false
-  let foundActorTriple = false
-
-  for (const line of lines) {
-    const actorPattern = `<https://www.w3.org/ns/activitystreams#actor> <${followerActor}>`
-    if (line.includes(actorPattern)) {
-      const subjectMatch = line.match(/^<([^>]+)>/)
-      if (subjectMatch) {
-        entrySubject = subjectMatch[1]
-        isInEntry = true
-        foundActorTriple = true
-      }
-    }
-
-    if (isInEntry) {
-      entryLines.push(line)
-      if (line.trim().endsWith('.')) {
-        if (foundActorTriple) {
-          const itemTurtle = entryLines.join('\n')
-          const itemId = entrySubject || `${followerActor}/follow/0`
-
-          const patchBody = buildDeletePatch(itemTurtle, itemId, pageUrl)
-
-          const deleteResponse = await fetch(pageUrl, {
-            method: 'PATCH',
-            headers: {
-              'content-type': 'text/n3',
-            },
-            body: patchBody,
-          })
-
-          if (deleteResponse.ok) {
-            return true
-          }
-        }
-        entryLines.length = 0
-        entrySubject = null
-        isInEntry = false
-        foundActorTriple = false
-      }
-    }
+  const parser = new Parser({ baseIRI: pageUrl })
+  const store = new Store()
+  const quads = parser.parse(text)
+  if (quads) {
+    store.addQuads(quads)
   }
 
-  return false
+  const actorQuads = store.getQuads(
+    null,
+    'https://www.w3.org/ns/activitystreams#actor',
+    followerActor,
+    null
+  )
+
+  if (actorQuads.length === 0) {
+    return false
+  }
+
+  const entrySubject = actorQuads[0].subject.value
+  const entryQuads = store.getQuads(entrySubject, null, null, null)
+
+  if (entryQuads.length === 0) {
+    return false
+  }
+
+  const itemTurtle = entryQuads.map(q => {
+    const subject = `<${q.subject.value}>`
+    const predicate = `<${q.predicate.value}>`
+    const object = q.object.interfaceName === 'NamedNode'
+      ? `<${q.object.value}>`
+      : `"${q.object.value}"`
+    return `${subject} ${predicate} ${object}.`
+  }).join('\n')
+
+  const patchBody = buildDeletePatch(itemTurtle, entrySubject, pageUrl)
+
+  const deleteResponse = await fetch(pageUrl, {
+    method: 'PATCH',
+    headers: {
+      'content-type': 'text/n3',
+    },
+    body: patchBody,
+  })
+
+  return deleteResponse.ok
 }
 
 async function getNextPageUrl(
