@@ -89,4 +89,41 @@ describe('removeFromFollowers', () => {
     expect(followersCall).toBeDefined()
     expect((followersCall![0] as string)).toBe('https://example.com/followers/')
   })
+
+  it('should resolve relative URL in first page link', async () => {
+    const { removeFromFollowers } = await import('../../src/services/removeFromFollowers.js')
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve(`<> <https://www.w3.org/ns/activitystreams#first> <pages/1785063320555>.`)
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve(`<https://example.com/followers/pages/1785063320555> <https://www.w3.org/ns/activitystreams#items> <https://other.example/actor/follow/123>.
+<https://other.example/actor/follow/123> a <https://www.w3.org/ns/activitystreams#Follow>.
+<https://other.example/actor/follow/123> <https://www.w3.org/ns/activitystreams#actor> <https://other.example/actor>.`)
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve('')
+      })
+
+    await removeFromFollowers(
+      'https://other.example/actor',
+      mockFetch as SolidFetch,
+      'https://example.com/',
+      'https://example.com/actor'
+    )
+
+    const patchCall = mockFetch.mock.calls.find(call => call[1]?.method === 'PATCH')
+    expect(patchCall).toBeDefined()
+    expect(patchCall![0] as string).toBe('https://example.com/followers/pages/1785063320555')
+  })
 })

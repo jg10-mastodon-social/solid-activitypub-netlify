@@ -1,5 +1,6 @@
 import type { SolidFetch } from '../types.js'
 import { buildDeletePatch } from './buildPatch.js'
+import { parseCollectionTurtle } from './rdfUtils.js'
 
 export async function removeFromFollowers(
   followerActor: string,
@@ -21,9 +22,9 @@ export async function removeFromFollowers(
 
     if (response.ok) {
       const text = await response.text()
-      const firstPageMatch = text.match(/<[^>]*>\s+<https:\/\/www\.w3\.org\/ns\/activitystreams#first>\s+<([^>]+)>/)
-      if (firstPageMatch) {
-        currentPageUrl = firstPageMatch[1]
+      const collection = await parseCollectionTurtle(text, followersUrl)
+      if (collection && collection.first) {
+        currentPageUrl = collection.first
       }
     }
   } catch (error) {
