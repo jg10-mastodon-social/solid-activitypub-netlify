@@ -175,4 +175,67 @@ describe('removeFromFollowers', () => {
     expect(patchBody).toContain('solid:deletes')
     expect(patchBody).toContain('https://activitypub.academy/users/albilus_puhuss/follow/1785410321943')
   })
+
+  it('should find actor on second page when not on first page', async () => {
+    const { removeFromFollowers } = await import('../../src/services/removeFromFollowers.js')
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve(`<> <https://www.w3.org/ns/activitystreams#first> <https://example.com/followers/pages/1>.`)
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve(`@prefix as: <https://www.w3.org/ns/activitystreams#>.
+
+<> a as:OrderedCollectionPage;
+    as:partOf <../>;
+    as:next <https://example.com/followers/pages/2>;
+    as:items <https://other.example/actor/follow/456>.
+<https://other.example/actor/follow/456> a as:Follow;
+    as:actor <https://other.example/actor>;
+    as:object <https://example.com/actor>.`)
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve(`@prefix as: <https://www.w3.org/ns/activitystreams#>.
+
+<> a as:OrderedCollectionPage;
+    as:partOf <../>;
+    as:next <https://example.com/followers/pages/2>;
+    as:items <https://other.example/actor/follow/456>.
+<https://other.example/actor/follow/456> a as:Follow;
+    as:actor <https://other.example/actor>;
+    as:object <https://example.com/actor>.`)
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve(`@prefix as: <https://www.w3.org/ns/activitystreams#>.
+
+<> a as:OrderedCollectionPage;
+    as:partOf <../>;
+    as:items <https://activitypub.academy/users/albilus_puhuss/follow/789>.
+<https://activitypub.academy/users/albilus_puhuss/follow/789> a as:Follow;
+    as:actor <https://activitypub.academy/users/albilus_puhuss>;
+    as:object <https://example.com/actor>.`)
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200
+      })
+
+    await removeFromFollowers(
+      'https://activitypub.academy/users/albilus_puhuss',
+      mockFetch as SolidFetch,
+      'https://example.com/',
+      'https://example.com/actor'
+    )
+
+    const patchCall = mockFetch.mock.calls.find(call => call[1]?.method === 'PATCH')
+    expect(patchCall).toBeDefined()
+    expect(patchCall![0] as string).toBe('https://example.com/followers/pages/2')
+  })
 })

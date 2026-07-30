@@ -122,7 +122,7 @@ async function getNextPageUrl(
   const response = await fetch(pageUrl, {
     method: 'GET',
     headers: {
-      accept: 'text/timeline',
+      accept: 'text/turtle',
     },
   })
 
@@ -131,7 +131,19 @@ async function getNextPageUrl(
   }
 
   const text = await response.text()
-  const nextPageMatch = text.match(/<[^>]*>\s+<https:\/\/www\.w3\.org\/ns\/activitystreams#next>\s+<([^>]+)>/)
+  const parser = new Parser({ baseIRI: pageUrl })
+  const store = new Store()
+  const quads = parser.parse(text)
+  if (quads) {
+    store.addQuads(quads)
+  }
 
-  return nextPageMatch ? nextPageMatch[1] : null
+  const nextQuads = store.getQuads(
+    pageUrl,
+    'https://www.w3.org/ns/activitystreams#next',
+    null,
+    null
+  )
+
+  return nextQuads.length > 0 ? nextQuads[0].object.value : null
 }
