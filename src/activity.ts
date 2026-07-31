@@ -111,3 +111,18 @@ export function validateActivityActor(activity: Activity, expectedActor: string)
 
   return true
 }
+
+export function isActivityPublic(activity: Activity): boolean {
+  const fields: (keyof Activity)[] = ['to', 'cc', 'bto', 'bcc', 'audience']
+
+  for (const field of fields) {
+    const values = normalizeToArray(activity[field] as string | string[] | undefined)
+    for (const value of values) {
+      if (value === 'Public' || value === PUBLIC_IRI || value === 'as:Public') {
+        return true
+      }
+    }
+  }
+
+  return false
+}
