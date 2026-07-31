@@ -90,7 +90,7 @@ export default async (req: Request, context: Context) => {
 
   try {
     const fetchFn = await createSolidFetch(config.webId, config.issuer)
-    const result = await handleOutboxActivity(activity, fetchFn, config.outboxUrl, actorUrl, keyId)
+    const result = await handleOutboxActivity(activity, fetchFn, config.outboxUrl, actorUrl, keyId, config.solidStorageBaseUrl)
 
     console.log(`[outbox] Delivered to ${result.delivered}/${result.results.length} recipients`)
 

@@ -1,7 +1,8 @@
 import type { SolidFetch } from '../types.js'
 import type { Activity } from '../activity.js'
-import { extractRecipients, fetchActorInbox, validateActivityActor, validateContext, normalizeActivity } from '../activity.js'
+import { extractRecipients, fetchActorInbox, validateActivityActor, validateContext, normalizeActivity, isActivityPublic } from '../activity.js'
 import { derivePageUrl } from '../services/derivePageUrl.js'
+import { getFollowers } from '../services/getFollowers.js'
 import { persistActivityItem } from '../services/persistActivity.js'
 import { signActivityRequest } from '../signing.js'
 
@@ -48,7 +49,8 @@ export async function handleOutboxActivity(
   fetch: SolidFetch,
   outboxUrl: string,
   actorUrl: string,
-  keyId: string
+  keyId: string,
+  solidStorageBaseUrl?: string
 ): Promise<OutboxResult> {
   validateContext(activity as Activity)
   validateActivityActor(activity as Activity, actorUrl)
@@ -56,6 +58,31 @@ export async function handleOutboxActivity(
   const normalizedActivity = normalizeActivity(activity as Activity)
 
   const deliveryResults = await distributeActivity(normalizedActivity, fetch, actorUrl, keyId)
+
+  if (solidStorageBaseUrl && isActivityPublic(normalizedActivity)) {
+    try {
+      const followers = await getFollowers(solidStorageBaseUrl, fetch)
+      const explicitRecipients = new Set(extractRecipients(normalizedActivity))
+      const newRecipients = followers.filter(f => !explicitRecipients.has(f))
+
+      for (const follower of newRecipients) {
+        try {
+          const inboxUrl = await fetchActorInbox(follower, fetch)
+          const response = await signActivityRequest(
+            inboxUrl,
+            JSON.stringify(normalizedActivity),
+            keyId,
+            fetch
+          )
+          deliveryResults.push({ recipient: follower, status: response.status, ok: response.ok })
+        } catch (error) {
+          deliveryResults.push({ recipient: follower, status: 0, ok: false })
+        }
+      }
+    } catch (error) {
+      console.warn(`[outbox] Failed to broadcast to followers: ${error}`)
+    }
+  }
 
   const pageUrl = await derivePageUrl(outboxUrl, fetch)
   const skolemizeBase = `${new URL(pageUrl).origin}/.well-known/genid/`
