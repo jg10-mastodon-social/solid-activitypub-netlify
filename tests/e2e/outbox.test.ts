@@ -1,11 +1,14 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { devServerUrl, getMockSolidServer } from '../helpers/dev-server.js'
 
+const MOCK_SOLID_PORT = 9998
+
 describe('outbox e2e tests', () => {
   beforeEach(() => {
     const mockServer = getMockSolidServer()
     if (mockServer) {
       mockServer.setError(false)
+      mockServer.setFollowerActors([])
     }
   })
   it('returns 401 without authorization header', async () => {
@@ -153,5 +156,84 @@ describe('outbox e2e tests', () => {
     expect(patchedOutboxPages.length).toBe(1)
     expect(patchedOutboxPages[0].body).toContain('Create')
     expect(patchedOutboxPages[0].body).toContain('Hello from outbox')
+  })
+
+  it('delivers public activity to followers inbox', async () => {
+    const mockServer = getMockSolidServer()
+    expect(mockServer).not.toBeNull()
+
+    const followerActor = `http://localhost:${MOCK_SOLID_PORT}/actor`
+    mockServer!.setFollowerActors([followerActor])
+
+    const { importJWK, SignJWT, calculateJwkThumbprint, generateKeyPair, exportJWK } = await import('jose')
+    const { randomUUID, createHash } = await import('crypto')
+    // @ts-ignore
+    const { privateKey: identityKey } = await import('../../src/private-key.js')
+
+    const identityPrivateKey = await importJWK(identityKey, 'ES256')
+    const identityKid = identityKey.kid
+
+    const dpopKeyPair = await generateKeyPair('ES256', { crv: 'P-256' })
+    const dpopPublicJwk = await exportJWK(dpopKeyPair.publicKey)
+    dpopPublicJwk.kid = createHash('sha256')
+      .update(JSON.stringify(dpopPublicJwk))
+      .digest('base64url')
+    dpopPublicJwk.alg = 'ES256'
+    const jkt = await calculateJwkThumbprint(dpopPublicJwk, 'sha256')
+
+    const now = Math.floor(Date.now() / 1000)
+
+    const token = await new SignJWT({
+      webid: devServerUrl + '/webid',
+      sub: devServerUrl + '/webid',
+      cnf: { jkt },
+    })
+      .setProtectedHeader({ alg: 'ES256', typ: 'at+jwt', kid: identityKid })
+      .setIssuedAt(now)
+      .setExpirationTime(now + 3600)
+      .setAudience('solid')
+      .setIssuer(devServerUrl)
+      .setJti(randomUUID())
+      .sign(identityPrivateKey)
+
+    const dpopHeader = await new SignJWT({
+      htu: devServerUrl + '/outbox',
+      htm: 'POST',
+      jti: randomUUID(),
+    })
+      .setProtectedHeader({ alg: 'ES256', typ: 'dpop+jwt', jwk: dpopPublicJwk })
+      .setIssuedAt(now)
+      .sign(dpopKeyPair.privateKey)
+
+    const activity = {
+      type: 'Create',
+      '@context': 'https://www.w3.org/ns/activitystreams',
+      actor: `${devServerUrl}/actor`,
+      to: ['Public'],
+      object: { type: 'Note', content: 'Hello followers!' }
+    }
+
+    const res = await fetch(`${devServerUrl}/outbox`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'authorization': `DPoP ${token}`,
+        'dpop': dpopHeader
+      },
+      body: JSON.stringify(activity)
+    })
+
+    expect(res.status).toBe(200)
+
+    const receivedActivities = mockServer!.getReceivedActivities()
+    expect(receivedActivities.length).toBeGreaterThan(0)
+
+    const followerActivity = receivedActivities.find(
+      a => a.url === `http://localhost:${MOCK_SOLID_PORT}/inbox`
+    )
+    expect(followerActivity).toBeDefined()
+
+    const activityBody = JSON.parse(followerActivity!.body)
+    expect(activityBody.object.content).toBe('Hello followers!')
   })
 })

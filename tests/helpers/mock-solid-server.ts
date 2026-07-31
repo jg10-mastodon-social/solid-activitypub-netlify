@@ -19,6 +19,7 @@ export class MockSolidServer {
   private patchedOutboxPages: Array<{ url: string; body: string }> = []
   private receivedActivities: Array<{ url: string; body: string }> = []
   private followersFirst: string | null = null
+  private followerActors: string[] = []
   private patchedFollowersPages: Array<{ url: string; body: string }> = []
 
   constructor(options: MockSolidServerOptions) {
@@ -49,12 +50,21 @@ export class MockSolidServer {
     this.patchedOutboxPages = []
     this.receivedActivities = []
     this.followersFirst = null
+    this.followerActors = []
     this.patchedFollowersPages = []
   }
 
   setError(simulateError: boolean, errorType?: 'unreachable' | '404' | '500'): void {
     this.simulateError = simulateError
     if (errorType) this.errorType = errorType
+  }
+
+  setFollowerActors(actors: string[]): void {
+    this.followerActors = actors
+    if (actors.length > 0 && !this.followersFirst) {
+      this.followersFirst = `http://localhost:${this.port}/followers/pages/1`
+      this.createdPages.add(this.followersFirst)
+    }
   }
 
   getPatchedPages(): Array<{ url: string; body: string }> {
@@ -140,6 +150,8 @@ export class MockSolidServer {
       this.handlePutFollowersPage(req, res, pathname)
     } else if (req.method === 'PATCH' && pathname.startsWith('/followers/pages/')) {
       this.handlePatchFollowersPage(req, res, pathname)
+    } else if (req.method === 'GET' && pathname.startsWith('/followers/pages/')) {
+      this.handleGetFollowersPage(req, res, pathname)
     } else {
       res.writeHead(404)
       res.end('Not Found')
@@ -189,7 +201,7 @@ export class MockSolidServer {
 <http://localhost:${this.port}/inbox/> a as:OrderedCollection.`
 
     if (this.inboxFirst) {
-      body += `\n  as:first <${this.inboxFirst}>.`
+      body += `\n<http://localhost:${this.port}/inbox/> as:first <${this.inboxFirst}>.`
     }
 
     res.writeHead(200, { 'Content-Type': 'text/turtle' })
@@ -273,7 +285,7 @@ export class MockSolidServer {
 <http://localhost:${this.port}/outbox/> a as:OrderedCollection.`
 
     if (this.outboxFirst) {
-      body += `\n  as:first <${this.outboxFirst}>.`
+      body += `\n<http://localhost:${this.port}/outbox/> as:first <${this.outboxFirst}>.`
     }
 
     res.writeHead(200, { 'Content-Type': 'text/turtle' })
@@ -362,7 +374,7 @@ export class MockSolidServer {
 <http://localhost:${this.port}/followers/> a as:OrderedCollection.`
 
     if (this.followersFirst) {
-      body += `\n  as:first <${this.followersFirst}>.`
+      body += `\n<http://localhost:${this.port}/followers/> as:first <${this.followersFirst}>.`
     }
 
     res.writeHead(200, { 'Content-Type': 'text/turtle' })
@@ -402,6 +414,35 @@ export class MockSolidServer {
       res.writeHead(200)
       res.end('OK')
     })
+  }
+
+  private handleGetFollowersPage(req: http.IncomingMessage, res: http.ServerResponse, pathname: string): void {
+    const pageUrl = `http://localhost:${this.port}${pathname}`
+    const accept = req.headers.accept || ''
+
+    if (!accept.includes('text/turtle') && !accept.includes('*/*')) {
+      res.writeHead(406)
+      res.end('Not Acceptable')
+      return
+    }
+
+    if (!this.createdPages.has(pageUrl)) {
+      res.writeHead(404)
+      res.end('Not found')
+      return
+    }
+
+    let body = `@prefix as: <https://www.w3.org/ns/activitystreams#>.
+<${pageUrl}> a as:OrderedCollectionPage;
+  as:partOf <http://localhost:${this.port}/followers/>.`
+
+    if (this.followerActors.length > 0) {
+      const items = this.followerActors.map(actor => `<${actor}> <https://www.w3.org/ns/activitystreams#actor> <http://localhost:${this.port}/actor>.`).join('\n')
+      body += `\n\n${items}`
+    }
+
+    res.writeHead(200, { 'Content-Type': 'text/turtle' })
+    res.end(body)
   }
 }
 
