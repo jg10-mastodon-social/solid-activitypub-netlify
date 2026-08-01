@@ -172,4 +172,38 @@ describe('actor and webfinger', () => {
       expect(content).toContain('"kty":"RSA"')
     })
   })
+
+  describe('with ACTOR_NAME env var', () => {
+    it('sets actor id to baseUrl/actorName', async () => {
+      await runScript(undefined, 'production', 'myactor')
+      const actorPath = path.join(publicDir, 'actor')
+      const actor = JSON.parse(fs.readFileSync(actorPath, 'utf-8'))
+      expect(actor.id).toBe('https://example.com/myactor')
+    })
+
+    it('sets preferredUsername to actorName', async () => {
+      await runScript(undefined, 'production', 'myactor')
+      const actorPath = path.join(publicDir, 'actor')
+      const actor = JSON.parse(fs.readFileSync(actorPath, 'utf-8'))
+      expect(actor.preferredUsername).toBe('myactor')
+    })
+
+    it('sets publicKey id using actorName', async () => {
+      await runScript(undefined, 'production', 'myactor')
+      const actorPath = path.join(publicDir, 'actor')
+      const actor = JSON.parse(fs.readFileSync(actorPath, 'utf-8'))
+      expect(actor.publicKey.id).toBe('https://example.com/myactor#main-key')
+      expect(actor.publicKey.owner).toBe('https://example.com/myactor')
+    })
+
+    it('sets webfinger subject using actorName', async () => {
+      await runScript(undefined, 'production', 'myactor')
+      const webfingerPath = path.join(publicDir, '.well-known', 'webfinger')
+      const webfinger = JSON.parse(fs.readFileSync(webfingerPath, 'utf-8'))
+      expect(webfinger.subject).toBe('acct:myactor@example.com')
+      expect(webfinger.aliases).toContain('https://example.com/myactor')
+      const selfLink = webfinger.links.find((l: any) => l.rel === 'self')
+      expect(selfLink.href).toBe('https://example.com/myactor')
+    })
+  })
 })

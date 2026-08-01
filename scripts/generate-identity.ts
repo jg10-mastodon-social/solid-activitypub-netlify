@@ -135,22 +135,25 @@ async function generateIdentity() {
   const actorPublicKeyPem = await exportSPKI(actorPublicKey)
   const actorPrivateKeyPem = await exportPKCS8(actorPrivateKey)
 
+  const actorName = process.env.ACTOR_NAME || 'actor'
+  const actorUrl = `${baseUrl}/${actorName}`
+
   const actor = {
     '@context': [
       'https://www.w3.org/ns/activitystreams',
       'https://w3id.org/security/v1'
     ],
-    id: `${baseUrl}/actor`,
+    id: actorUrl,
     type: 'Service',
-    preferredUsername: 'actor',
+    preferredUsername: actorName,
     inbox: `${baseUrl}/inbox`,
     outbox: `${baseUrl}/outbox`,
     followers: `${baseUrl}/followers`,
     following: `${baseUrl}/following`,
     liked: `${baseUrl}/liked`,
     publicKey: {
-      id: `${baseUrl}/actor#main-key`,
-      owner: `${baseUrl}/actor`,
+      id: `${actorUrl}#main-key`,
+      owner: actorUrl,
       publicKeyPem: actorPublicKeyPem
     },
     manuallyApprovesFollowers: false
@@ -162,13 +165,13 @@ async function generateIdentity() {
 
   const domain = baseUrl.replace(/^https?:\/\//, '')
   const webfinger = {
-    subject: `acct:actor@${domain}`,
-    aliases: [`${baseUrl}/actor`],
+    subject: `acct:${actorName}@${domain}`,
+    aliases: [actorUrl],
     links: [
       {
         rel: 'self',
         type: 'application/activity+json',
-        href: `${baseUrl}/actor`
+        href: actorUrl
       }
     ]
   }
