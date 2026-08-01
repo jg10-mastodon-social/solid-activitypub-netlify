@@ -56,7 +56,7 @@ export default async (req: Request, context: Context) => {
   }
 
   const config = loadConfig()
-  const actorUrl = `${config.baseUrl}/actor`
+  const actorUrl = `${config.baseUrl}${config.actorPath}`
   const keyId = `${actorUrl}#main-key`
 
   const authHeader = req.headers.get('authorization')

@@ -19,7 +19,9 @@ vi.mock('../../src/config.js', () => ({
     handlerBaseUrl: 'https://example.com/handlers#',
     adminWebId: '',
     outboxEndpoint: '/outbox',
-    sendToUrl: 'http://example.com/outbox'
+    sendToUrl: 'http://example.com/outbox',
+    actorName: 'actor',
+    actorPath: '/actor'
   })
 }))
 
