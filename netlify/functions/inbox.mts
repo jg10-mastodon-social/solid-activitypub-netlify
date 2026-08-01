@@ -89,7 +89,7 @@ export default async (req: Request, context: Context) => {
   try {
     const config = loadConfig()
     const fetchFn = await createSolidFetch(config.webId, config.issuer)
-    const actorUrl = `${config.baseUrl}/actor`
+    const actorUrl = `${config.baseUrl}${config.actorPath}`
     const keyId = `${actorUrl}#main-key`
     const success = await handleInboxActivity(
       activity,
