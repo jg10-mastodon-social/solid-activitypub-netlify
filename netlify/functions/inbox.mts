@@ -37,7 +37,7 @@ export default async (req: Request, context: Context) => {
     const authResult = await verifyDpopToken(
       authHeader ?? undefined,
       dpopHeader ?? undefined,
-      targetUrl,
+      req.url,
       'GET',
       config.whitelistedIssuers
     )

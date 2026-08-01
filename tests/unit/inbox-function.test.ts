@@ -416,7 +416,7 @@ describe('inbox function', () => {
       expect(verifyDpopToken).toHaveBeenCalledWith(
         'DPoP token',
         'dpop-header',
-        'http://pod.example.com/inbox/',
+        'https://example.com/inbox/',
         'GET',
         ['https://example.com']
       )
@@ -446,7 +446,7 @@ describe('inbox function', () => {
       expect(verifyDpopToken).toHaveBeenCalledWith(
         'DPoP token',
         'dpop-header',
-        'http://pod.example.com/inbox/pages/123',
+        'https://example.com/inbox/pages/123',
         'GET',
         ['https://example.com']
       )
