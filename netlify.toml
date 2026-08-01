@@ -1,5 +1,5 @@
 [build]
-  command = "node scripts/generate-identity.ts"
+  command = "sed -i \"s|ACTOR_PATH|${ACTOR_NAME}|g\" netlify.toml && node scripts/generate-identity.ts"
   publish = "public"
 
 [functions]
@@ -17,7 +17,7 @@
   ACTOR_NAME = "actor"
 
 [[headers]]
-  for = "/actor"
+  for = "/ACTOR_PATH"
   [headers.values]
     Content-Type = "application/activity+json"
     Access-Control-Allow-Origin = "*"

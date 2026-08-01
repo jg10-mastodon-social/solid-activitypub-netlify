@@ -159,7 +159,7 @@ async function generateIdentity() {
     manuallyApprovesFollowers: false
   }
 
-  const actorPath = path.join(publicDir, 'actor')
+  const actorPath = path.join(publicDir, actorName)
   fs.writeFileSync(actorPath, JSON.stringify(actor, null, 2))
   console.log(`Written: ${actorPath}`)
 

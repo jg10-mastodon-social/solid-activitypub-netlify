@@ -176,21 +176,21 @@ describe('actor and webfinger', () => {
   describe('with ACTOR_NAME env var', () => {
     it('sets actor id to baseUrl/actorName', async () => {
       await runScript(undefined, 'production', 'myactor')
-      const actorPath = path.join(publicDir, 'actor')
+      const actorPath = path.join(publicDir, 'myactor')
       const actor = JSON.parse(fs.readFileSync(actorPath, 'utf-8'))
       expect(actor.id).toBe('https://example.com/myactor')
     })
 
     it('sets preferredUsername to actorName', async () => {
       await runScript(undefined, 'production', 'myactor')
-      const actorPath = path.join(publicDir, 'actor')
+      const actorPath = path.join(publicDir, 'myactor')
       const actor = JSON.parse(fs.readFileSync(actorPath, 'utf-8'))
       expect(actor.preferredUsername).toBe('myactor')
     })
 
     it('sets publicKey id using actorName', async () => {
       await runScript(undefined, 'production', 'myactor')
-      const actorPath = path.join(publicDir, 'actor')
+      const actorPath = path.join(publicDir, 'myactor')
       const actor = JSON.parse(fs.readFileSync(actorPath, 'utf-8'))
       expect(actor.publicKey.id).toBe('https://example.com/myactor#main-key')
       expect(actor.publicKey.owner).toBe('https://example.com/myactor')
