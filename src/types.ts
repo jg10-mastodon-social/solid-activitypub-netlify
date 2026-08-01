@@ -22,6 +22,8 @@ export interface Config {
   adminWebId: string
   inboxUrl: string
   outboxUrl: string
+  actorName: string
+  actorPath: string
 }
 
 export interface TokenPayload {

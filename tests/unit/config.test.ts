@@ -166,4 +166,30 @@ describe('loadConfig', () => {
 
     expect(() => loadConfig()).toThrow('SOLID_STORAGE_BASE_URL must end with /')
   })
+
+  it('defaults actorName to actor and actorPath to /actor when ACTOR_NAME is not set', async () => {
+    delete process.env.ACTOR_NAME
+    process.env.WHITELISTED_ISSUERS = 'https://mocked.example.com'
+    process.env.HANDLER_BASE_URL = 'https://mocked.example.com/handlers#'
+    process.env.SOLID_STORAGE_BASE_URL = 'https://pod.example.com/'
+
+    const { loadConfig } = await import('../../src/config.js')
+    const config = loadConfig()
+
+    expect(config.actorName).toBe('actor')
+    expect(config.actorPath).toBe('/actor')
+  })
+
+  it('sets actorName and actorPath from ACTOR_NAME env var', async () => {
+    process.env.ACTOR_NAME = 'myactor'
+    process.env.WHITELISTED_ISSUERS = 'https://mocked.example.com'
+    process.env.HANDLER_BASE_URL = 'https://mocked.example.com/handlers#'
+    process.env.SOLID_STORAGE_BASE_URL = 'https://pod.example.com/'
+
+    const { loadConfig } = await import('../../src/config.js')
+    const config = loadConfig()
+
+    expect(config.actorName).toBe('myactor')
+    expect(config.actorPath).toBe('/myactor')
+  })
 })

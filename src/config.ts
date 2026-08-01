@@ -36,6 +36,8 @@ export function loadConfig(): Config {
   const solidStorageBaseUrl = process.env.SOLID_STORAGE_BASE_URL
   const inboxUrl = `${solidStorageBaseUrl}inbox/`
   const outboxUrl = `${solidStorageBaseUrl}outbox/`
+  const actorName = process.env.ACTOR_NAME || 'actor'
+  const actorPath = `/${actorName}`
 
   return {
     webId,
@@ -49,5 +51,7 @@ export function loadConfig(): Config {
     adminWebId,
     inboxUrl,
     outboxUrl,
+    actorName,
+    actorPath,
   }
 }
