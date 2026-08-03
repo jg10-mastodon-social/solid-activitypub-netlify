@@ -4,6 +4,8 @@ import { persistActivityItem } from '../services/persistActivity.js'
 import { sendFollowAccept } from '../services/sendFollowAccept.js'
 import { addToFollowers } from '../services/addToFollowers.js'
 import { removeFromFollowers } from '../services/removeFromFollowers.js'
+import { validateContext } from '../activity.js'
+import { verifyActorBinding } from '../verifyHttpSignature.js'
 
 export function isFollowActivity(activity: Record<string, unknown>): boolean {
   const activityType = activity.type
@@ -30,8 +32,26 @@ export async function handleInboxActivity(
   inboxUrl: string,
   actorUrl?: string,
   keyId?: string,
-  solidStorageBaseUrl?: string
+  solidStorageBaseUrl?: string,
+  authenticatedKeyId?: string
 ): Promise<boolean> {
+  try {
+    validateContext(activity as Parameters<typeof validateContext>[0])
+  } catch {
+    console.log('[inbox] Activity missing @context')
+    return false
+  }
+
+  if (!activity.type) {
+    console.log('[inbox] Activity missing type')
+    return false
+  }
+
+  if (authenticatedKeyId && !verifyActorBinding(activity, authenticatedKeyId)) {
+    console.log('[inbox] Activity actor does not match authenticated keyId')
+    return false
+  }
+
   const activityType = activity.type
   const isDelete = activityType === 'Delete' || activityType === 'as:Delete'
     || (Array.isArray(activityType) && activityType.some(t => t === 'Delete' || t === 'as:Delete'))
