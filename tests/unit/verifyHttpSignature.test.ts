@@ -210,3 +210,68 @@ describe('fetchActorPublicKey', () => {
     await expect(fetchActorPublicKey('https://example.com/actor', mockFetch)).rejects.toThrow('publicKey')
   })
 })
+
+describe('buildSignatureBase', () => {
+  it('should build correct signature base string', async () => {
+    const { buildSignatureBase } = await import('../../src/verifyHttpSignature.js')
+    const headers = {
+      '(request-target)': 'post /inbox',
+      host: 'example.com',
+      date: 'Sat, 25 Oct 2014 07:24:34 GMT',
+      digest: 'SHA-256=X48E9Y9D4tnIzrmI04jXjNnk4N=',
+      'content-type': 'application/activity+json'
+    }
+    const result = buildSignatureBase(headers)
+    expect(result).toBe('(request-target): post /inbox\nhost: example.com\ndate: Sat, 25 Oct 2014 07:24:34 GMT\ndigest: SHA-256=X48E9Y9D4tnIzrmI04jXjNnk4N=\ncontent-type: application/activity+json')
+  })
+
+  it('should build signature base with minimal headers', async () => {
+    const { buildSignatureBase } = await import('../../src/verifyHttpSignature.js')
+    const headers = {
+      '(request-target)': 'get /outbox',
+      host: 'example.com',
+      date: 'Sat, 25 Oct 2014 07:24:34 GMT'
+    }
+    const result = buildSignatureBase(headers)
+    expect(result).toBe('(request-target): get /outbox\nhost: example.com\ndate: Sat, 25 Oct 2014 07:24:34 GMT')
+  })
+})
+
+describe('verifySignature', () => {
+  it('should verify valid RSA-SHA256 signature', async () => {
+    const { createSign, generateKeyPairSync } = await import('node:crypto')
+    const { verifySignature } = await import('../../src/verifyHttpSignature.js')
+
+    const { privateKey, publicKey } = generateKeyPairSync('rsa', {
+      modulusLength: 2048
+    })
+
+    const privateKeyPem = privateKey.export({ type: 'pkcs8', format: 'pem' }) as string
+    const publicKeyPem = publicKey.export({ type: 'spki', format: 'pem' }) as string
+
+    const signingString = '(request-target): post /inbox\nhost: example.com\ndate: Sat, 25 Oct 2014 07:24:34 GMT\ndigest: SHA-256=X48E9Y9D4tnIzrmI04jXjNnk4N=\ncontent-type: application/activity+json'
+
+    const sign = createSign('RSA-SHA256')
+    sign.update(signingString)
+    sign.end()
+    const signatureBase64 = sign.sign(privateKeyPem, 'base64')
+
+    const result = await verifySignature(publicKeyPem, 'rsa-sha256', signingString, signatureBase64)
+    expect(result).toBe(true)
+  })
+
+  it('should reject invalid signature', async () => {
+    const { generateKeyPairSync } = await import('node:crypto')
+    const { verifySignature } = await import('../../src/verifyHttpSignature.js')
+
+    const { publicKey } = generateKeyPairSync('rsa', {
+      modulusLength: 2048
+    })
+    const publicKeyPem = publicKey.export({ type: 'spki', format: 'pem' }) as string
+
+    const signingString = '(request-target): post /inbox\nhost: example.com'
+    const wrongSignature = 'Y2FiYWJjZGVmZw=='
+    const result = await verifySignature(publicKeyPem, 'rsa-sha256', signingString, wrongSignature)
+    expect(result).toBe(false)
+  })
+})

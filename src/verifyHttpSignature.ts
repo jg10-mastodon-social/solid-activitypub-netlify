@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto'
+import { createHash, createVerify } from 'node:crypto'
 
 import type { SolidFetch } from './types.js'
 import { isBlockedUrl } from './ssrf.js'
@@ -121,4 +121,35 @@ export async function fetchActorPublicKey(
   }
 
   return { actorUrl, keyId, publicKeyPem }
+}
+
+export function buildSignatureBase(headers: Record<string, string>): string {
+  const lines: string[] = []
+  for (const [key, value] of Object.entries(headers)) {
+    lines.push(`${key}: ${value}`)
+  }
+  return lines.join('\n')
+}
+
+export async function verifySignature(
+  publicKeyPem: string,
+  algorithm: string,
+  signingString: string,
+  signatureBase64: string
+): Promise<boolean> {
+  try {
+    const algorithmMap: Record<string, string> = {
+      'rsa-sha256': 'RSA-SHA256',
+      'rsa-v1_5-sha256': 'RSA-SHA256',
+      'hs2019': 'RSA-SHA256'
+    }
+
+    const verifyAlgorithm = algorithmMap[algorithm.toLowerCase()] || algorithm
+    const verify = createVerify(verifyAlgorithm)
+    verify.update(signingString)
+    verify.end()
+    return verify.verify(publicKeyPem, signatureBase64, 'base64')
+  } catch {
+    return false
+  }
 }
