@@ -275,3 +275,25 @@ describe('verifySignature', () => {
     expect(result).toBe(false)
   })
 })
+
+describe('verifyActorBinding', () => {
+  it('should accept when activity.actor matches keyId actor', async () => {
+    const { verifyActorBinding } = await import('../../src/verifyHttpSignature.js')
+    const activity = {
+      type: 'Create',
+      actor: 'https://example.com/actor'
+    }
+    const keyId = 'https://example.com/actor#main-key'
+    expect(verifyActorBinding(activity, keyId)).toBe(true)
+  })
+
+  it('should reject when activity.actor does not match keyId actor', async () => {
+    const { verifyActorBinding } = await import('../../src/verifyHttpSignature.js')
+    const activity = {
+      type: 'Create',
+      actor: 'https://attacker.com/actor'
+    }
+    const keyId = 'https://example.com/actor#main-key'
+    expect(verifyActorBinding(activity, keyId)).toBe(false)
+  })
+})

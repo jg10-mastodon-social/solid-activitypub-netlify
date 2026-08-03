@@ -153,3 +153,14 @@ export async function verifySignature(
     return false
   }
 }
+
+export function verifyActorBinding(
+  activity: Record<string, unknown>,
+  keyId: string
+): boolean {
+  const activityActor = activity.actor as string | undefined
+  if (!activityActor) return false
+
+  const keyIdActor = keyId.split('#')[0]
+  return activityActor === keyIdActor
+}
