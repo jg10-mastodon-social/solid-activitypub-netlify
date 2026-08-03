@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto'
+
 export interface ParsedSignature {
   keyId: string
   algorithm: string
@@ -65,4 +67,16 @@ export function validateTimestamp(dateHeader: string): boolean {
   if (age < -MAX_FUTURE_SECONDS) return false
 
   return true
+}
+
+export function verifyDigest(body: string, digestHeader: string): boolean {
+  if (!digestHeader) return false
+
+  const match = digestHeader.match(/^SHA-256=(.+)$/i)
+  if (!match) return false
+
+  const expectedHash = match[1]
+  const actualHash = createHash('sha256').update(body, 'utf8').digest('base64')
+
+  return actualHash === expectedHash
 }

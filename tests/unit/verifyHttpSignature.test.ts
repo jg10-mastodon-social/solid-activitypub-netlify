@@ -140,3 +140,28 @@ describe('validateTimestamp', () => {
     expect(validateTimestamp('')).toBe(false)
   })
 })
+
+describe('verifyDigest', () => {
+  it('should accept matching digest', async () => {
+    const { verifyDigest } = await import('../../src/verifyHttpSignature.js')
+    const { createHash } = await import('node:crypto')
+    const body = '{"type":"Create"}'
+    const expectedHash = createHash('sha256').update(body, 'utf8').digest('base64')
+    const hash = 'SHA-256=' + expectedHash
+    expect(verifyDigest(body, hash)).toBe(true)
+  })
+
+  it('should reject mismatched digest', async () => {
+    const { verifyDigest } = await import('../../src/verifyHttpSignature.js')
+    const body = '{"type":"Create"}'
+    const hash = 'SHA-256=WrongHashBase64=='
+    expect(verifyDigest(body, hash)).toBe(false)
+  })
+
+  it('should reject missing Digest header', async () => {
+    const { verifyDigest } = await import('../../src/verifyHttpSignature.js')
+    const body = '{"type":"Create"}'
+    expect(verifyDigest(body, '')).toBe(false)
+    expect(verifyDigest(body, undefined as unknown as string)).toBe(false)
+  })
+})
