@@ -34,3 +34,16 @@ export function parseSignatureHeader(header: string): ParsedSignature {
 
   return result as ParsedSignature
 }
+
+const ALLOWED_ALGORITHMS = [
+  'rsa-sha256',
+  'rsa-v1_5-sha256',
+  'hs2019',
+  'rsa-pss-sha512',
+  'ecdsa-p256-sha256',
+  'ed25519'
+]
+
+export function isAllowedAlgorithm(algorithm: string): boolean {
+  return ALLOWED_ALGORITHMS.includes(algorithm)
+}

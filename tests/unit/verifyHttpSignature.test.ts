@@ -59,3 +59,48 @@ describe('parseSignatureHeader', () => {
     expect(result.algorithm).toBe('ecdsa-p256-sha256')
   })
 })
+
+describe('isAllowedAlgorithm', () => {
+  it('should accept rsa-sha256', async () => {
+    const { isAllowedAlgorithm } = await import('../../src/verifyHttpSignature.js')
+    expect(isAllowedAlgorithm('rsa-sha256')).toBe(true)
+  })
+
+  it('should accept rsa-v1_5-sha256', async () => {
+    const { isAllowedAlgorithm } = await import('../../src/verifyHttpSignature.js')
+    expect(isAllowedAlgorithm('rsa-v1_5-sha256')).toBe(true)
+  })
+
+  it('should accept hs2019', async () => {
+    const { isAllowedAlgorithm } = await import('../../src/verifyHttpSignature.js')
+    expect(isAllowedAlgorithm('hs2019')).toBe(true)
+  })
+
+  it('should accept rsa-pss-sha512', async () => {
+    const { isAllowedAlgorithm } = await import('../../src/verifyHttpSignature.js')
+    expect(isAllowedAlgorithm('rsa-pss-sha512')).toBe(true)
+  })
+
+  it('should accept ecdsa-p256-sha256', async () => {
+    const { isAllowedAlgorithm } = await import('../../src/verifyHttpSignature.js')
+    expect(isAllowedAlgorithm('ecdsa-p256-sha256')).toBe(true)
+  })
+
+  it('should accept ed25519', async () => {
+    const { isAllowedAlgorithm } = await import('../../src/verifyHttpSignature.js')
+    expect(isAllowedAlgorithm('ed25519')).toBe(true)
+  })
+
+  it('should reject unknown algorithms', async () => {
+    const { isAllowedAlgorithm } = await import('../../src/verifyHttpSignature.js')
+    expect(isAllowedAlgorithm('hmac-sha256')).toBe(false)
+    expect(isAllowedAlgorithm('sha256')).toBe(false)
+    expect(isAllowedAlgorithm('md5')).toBe(false)
+  })
+
+  it('should reject algorithm with different case', async () => {
+    const { isAllowedAlgorithm } = await import('../../src/verifyHttpSignature.js')
+    expect(isAllowedAlgorithm('RSA-SHA256')).toBe(false)
+    expect(isAllowedAlgorithm('Ed25519')).toBe(false)
+  })
+})
