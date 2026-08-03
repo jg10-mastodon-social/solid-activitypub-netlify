@@ -47,3 +47,22 @@ const ALLOWED_ALGORITHMS = [
 export function isAllowedAlgorithm(algorithm: string): boolean {
   return ALLOWED_ALGORITHMS.includes(algorithm)
 }
+
+const MAX_AGE_SECONDS = 5 * 60
+const MAX_FUTURE_SECONDS = 1 * 60
+
+export function validateTimestamp(dateHeader: string): boolean {
+  if (!dateHeader) return false
+
+  const date = new Date(dateHeader)
+  if (isNaN(date.getTime())) return false
+
+  const now = Math.floor(Date.now() / 1000)
+  const dateTimestamp = Math.floor(date.getTime() / 1000)
+  const age = now - dateTimestamp
+
+  if (age > MAX_AGE_SECONDS) return false
+  if (age < -MAX_FUTURE_SECONDS) return false
+
+  return true
+}

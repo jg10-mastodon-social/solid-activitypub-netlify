@@ -104,3 +104,39 @@ describe('isAllowedAlgorithm', () => {
     expect(isAllowedAlgorithm('Ed25519')).toBe(false)
   })
 })
+
+describe('validateTimestamp', () => {
+  it('should accept Date within 5 minutes', async () => {
+    const { validateTimestamp } = await import('../../src/verifyHttpSignature.js')
+    const now = new Date()
+    const dateHeader = now.toUTCString()
+    expect(validateTimestamp(dateHeader)).toBe(true)
+  })
+
+  it('should accept Date within 1 minute past', async () => {
+    const { validateTimestamp } = await import('../../src/verifyHttpSignature.js')
+    const past = new Date(Date.now() - 30 * 1000)
+    const dateHeader = past.toUTCString()
+    expect(validateTimestamp(dateHeader)).toBe(true)
+  })
+
+  it('should reject Date older than 5 minutes', async () => {
+    const { validateTimestamp } = await import('../../src/verifyHttpSignature.js')
+    const old = new Date(Date.now() - 6 * 60 * 1000)
+    const dateHeader = old.toUTCString()
+    expect(validateTimestamp(dateHeader)).toBe(false)
+  })
+
+  it('should reject Date more than 1 minute in future', async () => {
+    const { validateTimestamp } = await import('../../src/verifyHttpSignature.js')
+    const future = new Date(Date.now() + 2 * 60 * 1000)
+    const dateHeader = future.toUTCString()
+    expect(validateTimestamp(dateHeader)).toBe(false)
+  })
+
+  it('should reject invalid Date format', async () => {
+    const { validateTimestamp } = await import('../../src/verifyHttpSignature.js')
+    expect(validateTimestamp('invalid-date')).toBe(false)
+    expect(validateTimestamp('')).toBe(false)
+  })
+})
