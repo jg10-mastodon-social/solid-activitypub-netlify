@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 
 describe('parseSignatureHeader', () => {
   it('should parse valid Signature header with all fields', async () => {
@@ -163,5 +163,50 @@ describe('verifyDigest', () => {
     const body = '{"type":"Create"}'
     expect(verifyDigest(body, '')).toBe(false)
     expect(verifyDigest(body, undefined as unknown as string)).toBe(false)
+  })
+})
+
+describe('fetchActorPublicKey', () => {
+  it('should fetch actor public key from valid actor URL', async () => {
+    const pem = '-----BEGIN PUBLIC KEY-----\nMIIBIjANBg...\n-----END PUBLIC KEY-----'
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        id: 'https://example.com/actor',
+        publicKey: {
+          id: 'https://example.com/actor#main-key',
+          owner: 'https://example.com/actor',
+          publicKeyPem: pem
+        }
+      })
+    })
+    const { fetchActorPublicKey } = await import('../../src/verifyHttpSignature.js')
+    const result = await fetchActorPublicKey('https://example.com/actor', mockFetch)
+    expect(result.actorUrl).toBe('https://example.com/actor')
+    expect(result.keyId).toBe('https://example.com/actor#main-key')
+    expect(result.publicKeyPem).toBe(pem)
+  })
+
+  it('should reject actor URL pointing to private network', async () => {
+    const mockFetch = vi.fn()
+    const { fetchActorPublicKey } = await import('../../src/verifyHttpSignature.js')
+    await expect(fetchActorPublicKey('http://127.0.0.1/actor', mockFetch)).rejects.toThrow('SSRF')
+    await expect(fetchActorPublicKey('http://localhost/actor', mockFetch)).rejects.toThrow('SSRF')
+    await expect(fetchActorPublicKey('http://10.0.0.1/actor', mockFetch)).rejects.toThrow('SSRF')
+  })
+
+  it('should throw when actor fetch fails', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({ ok: false, status: 500 })
+    const { fetchActorPublicKey } = await import('../../src/verifyHttpSignature.js')
+    await expect(fetchActorPublicKey('https://example.com/actor', mockFetch)).rejects.toThrow('Failed to fetch actor')
+  })
+
+  it('should throw when actor has no publicKey', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ id: 'https://example.com/actor' })
+    })
+    const { fetchActorPublicKey } = await import('../../src/verifyHttpSignature.js')
+    await expect(fetchActorPublicKey('https://example.com/actor', mockFetch)).rejects.toThrow('publicKey')
   })
 })

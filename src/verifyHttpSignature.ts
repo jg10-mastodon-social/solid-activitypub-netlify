@@ -1,5 +1,8 @@
 import { createHash } from 'node:crypto'
 
+import type { SolidFetch } from './types.js'
+import { isBlockedUrl } from './ssrf.js'
+
 export interface ParsedSignature {
   keyId: string
   algorithm: string
@@ -79,4 +82,43 @@ export function verifyDigest(body: string, digestHeader: string): boolean {
   const actualHash = createHash('sha256').update(body, 'utf8').digest('base64')
 
   return actualHash === expectedHash
+}
+
+export interface ActorKeyResult {
+  actorUrl: string
+  keyId: string
+  publicKeyPem: string
+}
+
+export async function fetchActorPublicKey(
+  actorUrl: string,
+  fetchFn: SolidFetch
+): Promise<ActorKeyResult> {
+  if (isBlockedUrl(actorUrl)) {
+    throw new Error('SSRF: Actor URL points to private network')
+  }
+
+  const response = await fetchFn(actorUrl, {
+    headers: { accept: 'application/activity+json, application/ld+json, application/json' }
+  })
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch actor: ${response.status}`)
+  }
+
+  const actor = await response.json() as Record<string, unknown>
+
+  if (!actor.publicKey || typeof actor.publicKey !== 'object') {
+    throw new Error('Actor document missing publicKey')
+  }
+
+  const publicKey = actor.publicKey as Record<string, unknown>
+  const keyId = publicKey.id as string
+  const publicKeyPem = publicKey.publicKeyPem as string
+
+  if (!keyId || !publicKeyPem) {
+    throw new Error('Actor publicKey missing id or publicKeyPem')
+  }
+
+  return { actorUrl, keyId, publicKeyPem }
 }
