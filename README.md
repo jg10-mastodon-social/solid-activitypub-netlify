@@ -26,8 +26,11 @@ netlify build --context=dev
 
 Build time generates:
 - `src/base-url.ts` - site URL (gitignored)
-- `src/private-key.ts` - private key for signing (gitignored)
-- `public/webid`, `public/jwks.json`, `public/.well-known/openid-configuration` - public identity files
+- `src/private-key.ts` - OIDC ES256 signing key (gitignored)
+- `src/actor-private-key.ts` - actor RS256 signing key (gitignored)
+- `public/webid`, `public/jwks.json`, `public/.well-known/openid-configuration` - OIDC identity files
+- `public/${ACTOR_NAME}` - AS2 actor document (public key, inbox, outbox, followers)
+- `public/.well-known/webfinger` - WebFinger discovery document
 
 ## Environment Variables
 
