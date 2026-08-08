@@ -101,9 +101,9 @@ DPoP-authenticated proxy of the paged inbox collection on the pod, with pod URLs
 ## Testing
 
 ```bash
-npm run test:unit          # Unit tests
-npm run test:integration   # Integration tests with mocked Netlify context
-npm run test:e2e	   # Runs against netlify dev server
+npm run test:unit          # Pure module tests (no HTTP, no pod)
+npm run test:integration   # Netlify function handler tests with mocked dependencies
+npm run test:e2e           # Real `netlify dev` + a mock Solid server (boots both in-process)
 ```
 
 
