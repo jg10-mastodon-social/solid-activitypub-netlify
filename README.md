@@ -111,26 +111,37 @@ npm run test:e2e	   # Runs against netlify dev server
 .
 ├── netlify/
 │   └── functions/
-│       └── outbox.ts     # Entry point
-├── netlify.toml          # Build config + function routing
-├── public/               # Generated identity files (auto-generated at build)
-│   ├── webid
-│   ├── jwks.json
-│   └── .well-known/
-│       └── openid-configuration
+│       ├── inbox.mts        # Inbox endpoint
+│       └── outbox.mts       # Outbox endpoint
+├── netlify.toml             # Build config + function routing
+├── public/                  # Auto-generated at build (gitignored)
+│   ├── ${ACTOR_NAME}        # AS2 actor document
+│   ├── webid                # WebID Turtle
+│   ├── jwks.json            # OIDC signing key (public)
+│   └── .well-known/         # openid-configuration, webfinger
 ├── scripts/
-│   └── generate-identity.ts  # Generates identity files from env vars
+│   └── generate-identity.ts # Generates identity, actor, webfinger
 ├── src/
-│   ├── auth.ts           # DPoP token verification
-│   ├── config.ts         # Config loading
-│   ├── solidFetch.ts     # Authenticated fetch
-│   ├── types.ts          # Shared types
-│   ├── base-url.ts       # Generated at build time (gitignored)
-│   └── private-key.ts    # Generated at build time (gitignored)
+│   ├── activity.ts          # Activity validation, normalization, recipient extraction
+│   ├── auth.ts              # DPoP token verification
+│   ├── config.ts            # Config loading
+│   ├── handlers/            # Inbox/outbox activity handlers
+│   ├── services/            # Solid-pod + RDF helpers (paging, patching, followers)
+│   ├── signing.ts           # Outgoing HTTP signature signing
+│   ├── solidFetch.ts        # DPoP-authenticated fetch to pod
+│   ├── ssrf.ts              # SSRF protection for remote actor key fetches
+│   ├── types.ts
+│   ├── verifyHttpSignature.ts # HTTP signature parsing + crypto verification primitives
+│   ├── verifyRequest.ts     # End-to-end HTTP signature verification (inbox POST)
+│   ├── base-url.ts          # Generated (gitignored)
+│   ├── private-key.ts       # Generated OIDC ES256 key (gitignored)
+│   └── actor-private-key.ts # Generated actor RS256 key (gitignored)
 └── tests/
-    ├── unit/
-    ├── integration/
-    └── e2e/
+    ├── helpers.ts
+    ├── helpers/             # dev-server + mock Solid server
+    ├── unit/                # Pure module tests
+    ├── integration/         # Netlify function handler tests with mocked deps
+    └── e2e/                 # Tests against `netlify dev` + mock Solid server
 ```
 
 ## Architecture
