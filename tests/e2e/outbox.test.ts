@@ -236,4 +236,92 @@ describe('outbox e2e tests', () => {
     const activityBody = JSON.parse(followerActivity!.body)
     expect(activityBody.object.content).toBe('Hello followers!')
   })
+
+  it('returns 200 for GET /outbox/pages/<id> after POST seeds a page', async () => {
+    const mockServer = getMockSolidServer()
+    expect(mockServer).not.toBeNull()
+
+    const { importJWK, SignJWT, calculateJwkThumbprint, generateKeyPair, exportJWK } = await import('jose')
+    const { randomUUID, createHash } = await import('crypto')
+    const { readFileSync } = await import('fs')
+    const { fileURLToPath } = await import('url')
+    const nodePath = await import('path')
+
+    const __filename = fileURLToPath(import.meta.url)
+    const privateKeyPath = nodePath.resolve(nodePath.dirname(__filename), '../../src/private-key.ts')
+    const identityKeyFile = readFileSync(privateKeyPath, 'utf8')
+    const identityKeyJson = identityKeyFile.replace(/^export const privateKey = /, '').replace(/\n$/, '')
+    const identityKey = JSON.parse(identityKeyJson) as { kid: string; kty: string; crv: string; x: string; y: string; d: string; alg: string }
+
+    const jwksRes = await fetch(`${devServerUrl}/jwks.json`)
+    const jwks = await jwksRes.json() as { keys: Array<{ kid: string }> }
+    expect(jwks.keys[0]?.kid).toBe(identityKey.kid)
+
+    const identityPrivateKey = await importJWK(identityKey, 'ES256')
+
+    const dpopKeyPair = await generateKeyPair('ES256', { crv: 'P-256' })
+    const dpopPublicJwk = await exportJWK(dpopKeyPair.publicKey)
+    dpopPublicJwk.kid = createHash('sha256')
+      .update(JSON.stringify(dpopPublicJwk))
+      .digest('base64url')
+    dpopPublicJwk.alg = 'ES256'
+    const jkt = await calculateJwkThumbprint(dpopPublicJwk, 'sha256')
+
+    const now = Math.floor(Date.now() / 1000)
+
+    const token = await new SignJWT({
+      webid: devServerUrl + '/webid',
+      sub: devServerUrl + '/webid',
+      cnf: { jkt },
+    })
+      .setProtectedHeader({ alg: 'ES256', typ: 'at+jwt', kid: identityKey.kid })
+      .setIssuedAt(now)
+      .setExpirationTime(now + 3600)
+      .setAudience('solid')
+      .setIssuer(devServerUrl)
+      .setJti(randomUUID())
+      .sign(identityPrivateKey)
+
+    const dpopHeader = await new SignJWT({
+      htu: devServerUrl + '/outbox',
+      htm: 'POST',
+      jti: randomUUID(),
+    })
+      .setProtectedHeader({ alg: 'ES256', typ: 'dpop+jwt', jwk: dpopPublicJwk })
+      .setIssuedAt(now)
+      .sign(dpopKeyPair.privateKey)
+
+    const postRes = await fetch(`${devServerUrl}/outbox`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'authorization': `DPoP ${token}`,
+        'dpop': dpopHeader
+      },
+      body: JSON.stringify({
+        type: 'Create',
+        '@context': 'https://www.w3.org/ns/activitystreams',
+        actor: `${devServerUrl}/actor`,
+        to: ['https://recipient.example/actor'],
+        object: { type: 'Note', content: 'Seeded for GET test' }
+      })
+    })
+    expect(postRes.status).toBe(200)
+
+    const pages = mockServer!.getPatchedOutboxPages().map(p => p.url)
+    expect(pages.length).toBeGreaterThan(0)
+    const pageUrl = pages[pages.length - 1]
+    const pagePath = pageUrl.replace(`http://localhost:${MOCK_SOLID_PORT}`, '')
+
+    const getRes = await fetch(`${devServerUrl}${pagePath}`, {
+      method: 'GET',
+      headers: { accept: 'text/turtle' }
+    })
+
+    expect(getRes.status).toBe(200)
+    expect(getRes.headers.get('content-type')).toMatch(/text\/turtle/)
+    const body = await getRes.text()
+    expect(body).toContain('OrderedCollectionPage')
+    expect(getRes.headers.get('Access-Control-Allow-Origin')).toBe('*')
+  })
 })

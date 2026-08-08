@@ -29,7 +29,11 @@ export default async (req: Request, context: Context) => {
     console.log('[inbox] Handling GET request')
     const config = loadConfig()
     const page = context.params.page
-    const targetUrl = page ? `${config.inboxUrl}${page}` : config.inboxUrl
+    const requestPath = new URL(req.url).pathname
+    const hasTrailingSlash = requestPath.endsWith('/')
+    const targetUrl = page
+      ? `${config.inboxUrl}${page}${hasTrailingSlash ? '/' : ''}`
+      : config.inboxUrl
 
     const authHeader = req.headers.get('authorization')
     const dpopHeader = req.headers.get('dpop')

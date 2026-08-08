@@ -118,7 +118,7 @@ describe('inbox function', () => {
     expect(callArgs[0]).toContain('/inbox/')
   })
 
-  it('does not create double slashes when proxying inbox subpaths', async () => {
+  it('forwards GET /inbox/pages/123 to pod without trailing slash on page id', async () => {
     const { default: handler } = await import('../../netlify/functions/inbox.mjs')
     const { createSolidFetch } = await import('../../src/solidFetch.js')
     const mockFetch = vi.fn().mockResolvedValue(new Response('turtle body', {
@@ -140,7 +140,52 @@ describe('inbox function', () => {
     const fetchedUrl = callArgs[0] as string
     expect(fetchedUrl).toBe('http://pod.example.com/inbox/pages/123')
     expect(fetchedUrl).not.toContain('inbox//pages')
-    expect(fetchedUrl).not.toContain('//pages')
+  })
+
+  it('preserves trailing slash when proxying GET /inbox/pages/123/', async () => {
+    const { default: handler } = await import('../../netlify/functions/inbox.mjs')
+    const { createSolidFetch } = await import('../../src/solidFetch.js')
+    const mockFetch = vi.fn().mockResolvedValue(new Response('turtle body', {
+      status: 200,
+      headers: { 'Content-Type': 'text/turtle' }
+    }))
+    ;(createSolidFetch as ReturnType<typeof vi.fn>).mockResolvedValue(mockFetch)
+
+    const req = new Request('https://example.com/inbox/pages/123/', {
+      method: 'GET',
+      headers: { Accept: 'text/turtle' }
+    })
+    const context = { params: { page: 'pages/123' } }
+
+    await handler(req, context as any)
+
+    expect(mockFetch).toHaveBeenCalled()
+    const callArgs = mockFetch.mock.calls[0]
+    const fetchedUrl = callArgs[0] as string
+    expect(fetchedUrl).toBe('http://pod.example.com/inbox/pages/123/')
+  })
+
+  it('preserves trailing slash when proxying GET /inbox/pages/ (the 404 case)', async () => {
+    const { default: handler } = await import('../../netlify/functions/inbox.mjs')
+    const { createSolidFetch } = await import('../../src/solidFetch.js')
+    const mockFetch = vi.fn().mockResolvedValue(new Response('turtle body', {
+      status: 200,
+      headers: { 'Content-Type': 'text/turtle' }
+    }))
+    ;(createSolidFetch as ReturnType<typeof vi.fn>).mockResolvedValue(mockFetch)
+
+    const req = new Request('https://example.com/inbox/pages/', {
+      method: 'GET',
+      headers: { Accept: 'text/turtle' }
+    })
+    const context = { params: { page: 'pages' } }
+
+    await handler(req, context as any)
+
+    expect(mockFetch).toHaveBeenCalled()
+    const callArgs = mockFetch.mock.calls[0]
+    const fetchedUrl = callArgs[0] as string
+    expect(fetchedUrl).toBe('http://pod.example.com/inbox/pages/')
   })
 
   it('forwards Accept header to pod', async () => {

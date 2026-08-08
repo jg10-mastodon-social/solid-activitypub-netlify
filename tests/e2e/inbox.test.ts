@@ -81,21 +81,61 @@ describe('inbox e2e tests', () => {
     expect(res.status).toBe(500)
   })
 
-  it.skip('returns 200 for GET /inbox/pages/:id (routing test)', async () => {
+  it('returns 200 for GET /inbox/pages/:id after POST seeds a page', async () => {
     const mockServer = getMockSolidServer()
     expect(mockServer).not.toBeNull()
 
-    const activity = {
-      type: 'Create',
-      '@context': 'https://www.w3.org/ns/activitystreams',
-      actor: 'https://other.example/actor',
-      object: { type: 'Note', content: 'Test page content' }
-    }
+    const { importJWK, SignJWT, calculateJwkThumbprint, generateKeyPair, exportJWK } = await import('jose')
+    const { randomUUID, createHash } = await import('crypto')
+    const { readFileSync } = await import('fs')
+    const { fileURLToPath } = await import('url')
+    const nodePath = await import('path')
+
+    const __filename = fileURLToPath(import.meta.url)
+    const privateKeyPath = nodePath.resolve(nodePath.dirname(__filename), '../../src/private-key.ts')
+    const identityKeyFile = readFileSync(privateKeyPath, 'utf8')
+    const identityKeyJson = identityKeyFile.replace(/^export const privateKey = /, '').replace(/\n$/, '')
+    const identityKey = JSON.parse(identityKeyJson) as { kid: string; kty: string; crv: string; x: string; y: string; d: string; alg: string }
+
+    const jwksRes = await fetch(`${devServerUrl}/jwks.json`)
+    const jwks = await jwksRes.json() as { keys: Array<{ kid: string }> }
+    const jwksKid = jwks.keys[0]?.kid
+    expect(jwksKid).toBe(identityKey.kid)
+
+    const identityPrivateKey = await importJWK(identityKey, 'ES256')
+
+    const dpopKeyPair = await generateKeyPair('ES256', { crv: 'P-256' })
+    const dpopPublicJwk = await exportJWK(dpopKeyPair.publicKey)
+    dpopPublicJwk.kid = createHash('sha256')
+      .update(JSON.stringify(dpopPublicJwk))
+      .digest('base64url')
+    dpopPublicJwk.alg = 'ES256'
+    const jkt = await calculateJwkThumbprint(dpopPublicJwk, 'sha256')
+
+    const now = Math.floor(Date.now() / 1000)
+
+    const token = await new SignJWT({
+      webid: devServerUrl + '/webid',
+      sub: devServerUrl + '/webid',
+      cnf: { jkt },
+    })
+      .setProtectedHeader({ alg: 'ES256', typ: 'at+jwt', kid: identityKey.kid })
+      .setIssuedAt(now)
+      .setExpirationTime(now + 3600)
+      .setAudience('solid')
+      .setIssuer(devServerUrl)
+      .setJti(randomUUID())
+      .sign(identityPrivateKey)
 
     const postRes = await fetch(`${devServerUrl}/inbox`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(activity)
+      body: JSON.stringify({
+        type: 'Create',
+        '@context': 'https://www.w3.org/ns/activitystreams',
+        actor: 'https://other.example/actor',
+        object: { type: 'Note', content: 'Seeded for inbox GET test' }
+      })
     })
     expect(postRes.status).toBe(200)
 
@@ -104,15 +144,29 @@ describe('inbox e2e tests', () => {
     const pageUrl = pages[pages.length - 1]
     const pagePath = pageUrl.replace('http://localhost:9998', '')
 
+    const dpopHeader = await new SignJWT({
+      htu: devServerUrl + pagePath,
+      htm: 'GET',
+      jti: randomUUID(),
+    })
+      .setProtectedHeader({ alg: 'ES256', typ: 'dpop+jwt', jwk: dpopPublicJwk })
+      .setIssuedAt(now)
+      .sign(dpopKeyPair.privateKey)
+
     const res = await fetch(`${devServerUrl}${pagePath}`, {
       method: 'GET',
-      headers: { accept: 'text/turtle' }
+      headers: {
+        accept: 'text/turtle',
+        authorization: `DPoP ${token}`,
+        dpop: dpopHeader
+      }
     })
 
     expect(res.status).toBe(200)
     expect(res.headers.get('content-type')).toMatch(/text\/turtle/)
     const body = await res.text()
     expect(body).toContain('OrderedCollectionPage')
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('*')
   })
 
   it('returns 200 for Follow activity and sends Accept to follower', async () => {

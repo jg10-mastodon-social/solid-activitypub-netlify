@@ -32,7 +32,11 @@ export default async (req: Request, context: Context) => {
       const config = loadConfig()
       const fetchFn = await createSolidFetch(config.webId, config.issuer)
       const page = context.params.page
-      const targetUrl = page ? `${config.outboxUrl}${page}` : config.outboxUrl
+      const requestPath = new URL(req.url).pathname
+      const hasTrailingSlash = requestPath.endsWith('/')
+      const targetUrl = page
+        ? `${config.outboxUrl}${page}${hasTrailingSlash ? '/' : ''}`
+        : config.outboxUrl
       const acceptHeader = req.headers.get('Accept') || 'text/turtle'
       const podResponse = await fetchFn(targetUrl, {
         headers: { accept: acceptHeader }
