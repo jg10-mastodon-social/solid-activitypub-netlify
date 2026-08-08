@@ -37,10 +37,14 @@ Build time generates:
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `WHITELISTED_ISSUERS` | Yes | Comma-separated list of trusted OIDC issuers |
+| `SOLID_STORAGE_BASE_URL` | Yes | Base URL of the Solid pod (must end with `/`) |
 | `HANDLER_BASE_URL` | Yes | Namespace prefix for handlers |
 | `WEBID` | No | Solid WebID (default: `${BASE_URL}/webid`) |
 | `ISSUER` | No | OIDC issuer (default: `${BASE_URL}`) |
-| `SEND_TO_URL` | No | Outbox callback URL (default: `${BASE_URL}/outbox`) |
+| `SEND_TO_URL` | No | URL the outbox DPoP token is bound to (default: `${BASE_URL}/outbox`) |
+| `ACTOR_NAME` | No | Path segment for the actor document (default: `actor`) |
+| `ADMIN_WEBID` | No | Admin WebID |
+| `JWKS` | No | Existing OIDC JWK (JSON) to reuse instead of generating a new keypair |
 
 ## How it works
 
