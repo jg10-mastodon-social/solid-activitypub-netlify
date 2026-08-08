@@ -4,10 +4,12 @@
 
 [![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/jg10-mastodon-social/solid-activitypub-netlify#WHITELISTED_ISSUERS=&SOLID_STORAGE_BASE_URL=&HANDLER_BASE_URL=https://example.com/handlers%23)
 
-ActivityPub server using Netlify Functions. 
+ActivityPub server using Netlify Functions, with collections stored on a Solid pod.
 
-- Posts to outbox are authenticated with Solid-OIDC
-- Collections are stored on Solid pod with authenticated fetches to a Solid pod.
+- **Outbox** (POST): Solid-OIDC-authenticated. Normalizes the activity, distributes it to explicit recipients via HTTP-signed POSTs, fans out to followers for public posts, and persists to a paged outbox on the pod.
+- **Inbox** (POST): Validates `@context` and binds the authenticated key to `actor`. Sends a signed `Accept` for `Follow` and adds the follower; handles `Undo` `Follow`; persists other activities to a paged inbox.
+- **GET**: DPoP-authenticated proxy of the paged inbox/outbox collection.
+- **Signatures**: a separate RSA actor key signs outgoing requests and is published in the AS2 actor document for recipients to verify.
 
 ## Prerequisites
 
