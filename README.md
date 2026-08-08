@@ -146,8 +146,19 @@ npm run test:e2e	   # Runs against netlify dev server
 
 ## Architecture
 
-- **DPoP authentication**: Tokens verified using `@solid/access-token-verifier`. Server identity keys generated at build time.
-- **Private key**: Stored in `src/private-key.ts` (bundled into Lambda function, not publicly accessible).
-- **Public identity**: Stored in `public/` (jwks.json, webid, openid-configuration) for client verification.
-- **Outbox configuration**: RDF file loaded from `OUTBOX_CONFIG_URL`, parsed using `n3`.
-- **Identity endpoints**: Server provides OIDC identity via static files in `public/` (`.well-known/openid-configuration`, `webid`, `jwks.json`).
+### Components and trust boundaries
+
+- **Netlify function** (`netlify/functions/{inbox,outbox}.mts`): the only externally reachable surface. Stateless across invocations; reconstructed on every cold start by the build.
+- **Solid pod** at `${SOLID_STORAGE_BASE_URL}`: durable storage for `inbox/`, `outbox/`, and `followers/` as paged AS2 collections. The function is the only writer; reads happen via a DPoP-authenticated fetch (`src/solidFetch.ts`).
+- **OIDC issuer**: any issuer in `WHITELISTED_ISSUERS` is trusted to authenticate users who may access the private collections (outbox write + inbox read). The function verifies each request's DPoP-bound access token via `@solid/access-token-verifier` — confirming the client controls the bound key and the token's issuer is in the allowlist.
+- **Remote ActivityPub servers**: discovered via WebFinger and actor-document fetches (`src/activity.ts`, `src/verifyRequest.ts`).
+- **Static identity** in `public/`: OIDC discovery, WebID, JWKS, WebFinger, and the AS2 actor document. Served by Netlify's CDN, regenerated on every build.
+
+### Two keypairs
+
+- **OIDC ES256**: private in `src/private-key.ts`, public in `public/jwks.json`. Verifies incoming DPoP tokens (`auth.ts`) and mints the DPoP token for the function's own pod traffic (`solidFetch.ts`). The public JWK can be supplied via `JWKS` to reuse a keypair across deploys.
+- **Actor RS256**: private in `src/actor-private-key.ts`, public PEM in `public/${ACTOR_NAME}` as `publicKey.publicKeyPem`. Signs outgoing requests (`signing.ts`); remote servers verify against the published PEM.
+
+### Data on the pod
+
+All three collections (`inbox/`, `outbox/`, `followers/`) are stored as paged `as:Collection` + `as:OrderedCollectionPage` resources. Each page is a Turtle document with `as:items` quads pointing at its entries; pages are linked via `as:next` and the collection holds a single `as:first` pointing at the head page. Writes are PATCHes of a `solid:InsertDeletePatch` (see `src/services/buildPatch.ts`) — never full-document overwrites — so a single PATCH is the unit of consistency.
