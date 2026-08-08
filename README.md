@@ -2,7 +2,7 @@
 
 ![No maintenance intended](https://img.shields.io/badge/no_maintenance_intended-orange) ![Code quality: TDD vibe coded](https://img.shields.io/badge/code_quality-TDD_vibe_coded-orange)
 
-[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/jg10-mastodon-social/solid-activitypub-netlify#WHITELISTED_ISSUERS=&OUTBOX_CONFIG_URL=&HANDLER_BASE_URL=https://example.com/handlers%23)
+[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/jg10-mastodon-social/solid-activitypub-netlify#WHITELISTED_ISSUERS=&SOLID_STORAGE_BASE_URL=&HANDLER_BASE_URL=https://example.com/handlers%23)
 
 ActivityPub server using Netlify Functions. 
 
@@ -32,7 +32,6 @@ Build time generates:
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `WHITELISTED_ISSUERS` | Yes | Comma-separated list of trusted OIDC issuers |
-| `OUTBOX_CONFIG_URL` | Yes | URL to your outbox RDF configuration |
 | `HANDLER_BASE_URL` | Yes | Namespace prefix for handlers |
 | `WEBID` | No | Solid WebID (default: `${BASE_URL}/webid`) |
 | `ISSUER` | No | OIDC issuer (default: `${BASE_URL}`) |
