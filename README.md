@@ -48,11 +48,55 @@ Build time generates:
 
 ## How it works
 
-1. Receives POST requests at `/outbox`
-2. Verifies DPoP token using `@solid/access-token-verifier`
-3. Checks issuer is in `WHITELISTED_ISSUERS`
-4. If valid: fetches `OUTBOX_CONFIG_URL` with authenticated fetch
-5. Returns success or appropriate error code
+### Outbox POST `/outbox`
+
+Solid-OIDC-authenticated. The handler ignores any sub-path — paging is managed internally.
+
+1. Verify the DPoP token via `verifyDpopToken` (using `@solid/access-token-verifier`); reject with 401/403 on failure or if the token's issuer is not in `WHITELISTED_ISSUERS`.
+2. Parse the body as JSON; reject 400 on parse error.
+3. Validate `@context` and that `activity.actor` matches the server actor; reject 400/403 on failure.
+4. Normalize the activity: assign `id` and `published` if missing.
+5. Resolve explicit recipients from `to`/`cc`/`bto`/`bcc`/`audience`, look up each recipient's `inbox` via their actor document, and POST the activity there with an HTTP signature (`RSA-SHA256`, signed with the actor key in `src/actor-private-key.ts`).
+6. If the activity is public, load the followers collection from the pod and POST the activity to every follower not already in the explicit-recipient set.
+7. Derive the next paged-outbox slot on the pod (creating a new page when the current one is full, and patching the collection's `first`/`next` links).
+8. Persist the activity to that page by PATCHing a `solid:InsertDeletePatch` against the pod.
+
+Response: `200` with `{status, delivered, failed, results}`. Partial delivery is reported, not retried.
+
+### Outbox GET `/outbox`, `/outbox/{page}`
+
+Proxies the paged outbox collection from the pod. No DPoP token is required on the incoming request; only the outgoing fetch to the pod is DPoP-authenticated. The `{page}` is the path of a specific page on the pod (e.g. `pages/12345`); omitting it proxies the collection root.
+
+1. Load config; resolve the `{page}` from the request path (preserving trailing slash).
+2. Compute the pod target as `${SOLID_STORAGE_BASE_URL}outbox/{page}`.
+3. Create a DPoP-authenticated fetch to the pod and GET the target with the request's `Accept` header (default `text/turtle`).
+4. Read the pod response body.
+5. Rewrite the pod URL prefix to the public base URL in the body so consumers see `${BASE_URL}/outbox/...`.
+6. Return the body to the caller with CORS headers.
+
+### Inbox POST `/inbox`
+
+HTTP-signature-authenticated. The handler ignores any sub-path — paging is managed internally.
+
+1. Parse the body as JSON; reject 400 on parse error.
+2. Verify the HTTP signature on the request via `verifyIncomingActivity`: require `Signature`/`Date`/`Digest` headers, verify the `Digest` against a SHA-256 of the JSON body, fetch the actor's `publicKeyPem` (with SSRF protection), and cryptographically verify the signature. Also bind the actor: `activity.actor` must equal the URL the signing keyId belongs to, else 400.
+3. Switch on activity type:
+   - `Delete` → ack and return (no persistence).
+   - `Follow` → send a signed `Accept` to the follower's inbox and add the follower to the followers collection on the pod.
+   - `Undo` of `Follow` → remove the follower from the collection.
+   - Anything else → derive the next paged-inbox slot and persist via `solid:InsertDeletePatch`.
+
+### Inbox GET `/inbox`, `/inbox/{page}`
+
+DPoP-authenticated proxy of the paged inbox collection on the pod, with pod URLs rewritten to the public base URL. The `{page}` is the path of a specific page on the pod (e.g. `pages/12345`); omitting it proxies the collection root.
+
+1. Load config; resolve the `{page}` from the request path (preserving trailing slash).
+2. Verify the DPoP token via `verifyDpopToken` (with the request URL and `GET` method); reject 401/403 on failure or if the issuer is not in `WHITELISTED_ISSUERS`.
+3. Compute the pod target as `${SOLID_STORAGE_BASE_URL}inbox/{page}`.
+4. Create a DPoP-authenticated fetch to the pod and GET the target with the request's `Accept` header (default `text/turtle`).
+5. Read the pod response body.
+6. Rewrite the pod URL prefix to the public base URL in the body so consumers see `${BASE_URL}/inbox/...`.
+7. Return the body to the caller with CORS headers.
 
 ## Testing
 
