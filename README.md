@@ -8,7 +8,7 @@ ActivityPub server using Netlify Functions, with collections stored on a Solid p
 
 - **Outbox** (POST): Solid-OIDC-authenticated. Normalizes the activity, distributes it to explicit recipients via HTTP-signed POSTs, fans out to followers for public posts, and persists to a paged outbox on the pod.
 - **Inbox** (POST): Validates `@context` and binds the authenticated key to `actor`. Sends a signed `Accept` for `Follow` and adds the follower; handles `Undo` `Follow`; persists other activities to a paged inbox.
-- **GET**: DPoP-authenticated proxy of the paged inbox/outbox collection.
+- **GET**: proxies the paged collection (DPoP-authenticated for the Inbox; unauthenticated for the Outbox — both rewrite pod URLs to the public base URL).
 - **Signatures**: a separate RSA actor key signs outgoing requests and is published in the AS2 actor document for recipients to verify.
 
 ## Prerequisites
