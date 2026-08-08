@@ -3,11 +3,12 @@ import { createSolidFetch } from '../../src/solidFetch.js'
 import { verifyDpopToken } from '../../src/auth.js'
 import { loadConfig } from '../../src/config.js'
 import { handleInboxActivity } from '../../src/handlers/inbox.js'
+import { verifyIncomingActivity, HttpSignatureError } from '../../src/verifyRequest.js'
 
 const getCorsHeaders = (origin: string | null) => ({
   'Access-Control-Allow-Origin': origin ?? '*',
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
-  'Access-Control-Allow-Headers': 'Authorization, DPoP, Content-Type, Accept',
+  'Access-Control-Allow-Headers': 'Authorization, DPoP, Content-Type, Accept, Date, Digest, Signature',
   'Vary': 'Origin',
 })
 
@@ -90,9 +91,22 @@ export default async (req: Request, context: Context) => {
 
   console.log('[inbox] Incoming message:', JSON.stringify(activity, null, 2))
 
+  const config = loadConfig()
+  const fetchFn = await createSolidFetch(config.webId, config.issuer)
+
   try {
-    const config = loadConfig()
-    const fetchFn = await createSolidFetch(config.webId, config.issuer)
+    await verifyIncomingActivity(req, activity, fetchFn)
+  } catch (error) {
+    if (error instanceof HttpSignatureError) {
+      return new Response(error.message, {
+        status: error.statusCode,
+        headers: corsHeaders
+      })
+    }
+    throw error
+  }
+
+  try {
     const actorUrl = `${config.baseUrl}${config.actorPath}`
     const keyId = `${actorUrl}#main-key`
     const success = await handleInboxActivity(
