@@ -53,8 +53,6 @@ export async function verifyDpopToken(
   whitelistedIssuers: string[]
 ): Promise<AuthResponse> {
   console.log(`[auth] ${expectedMethod} ${expectedUrl}`)
-  console.log(`[auth] Authorization header: ${authHeader ? 'present' : 'missing'}`)
-  console.log(`[auth] DPoP header: ${dpopHeader ? 'present' : 'missing'}`)
 
   if (!authHeader) {
     console.log(`[auth] DENIED: No Authorization header`)
@@ -69,7 +67,6 @@ export async function verifyDpopToken(
   const dpopValue = Array.isArray(dpopHeader) ? dpopHeader[0] : dpopHeader
 
   try {
-    console.log(`[auth] Verifying token...`)
     const payload = await verifier.createSolidTokenVerifier()(
       authHeader,
       { header: dpopValue, method: expectedMethod as 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'OPTIONS' | 'HEAD', url: expectedUrl }
