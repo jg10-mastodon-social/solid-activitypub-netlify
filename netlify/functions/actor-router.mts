@@ -2,7 +2,7 @@ import type { Config, Context } from '@netlify/functions'
 import { createSolidFetch } from '../../src/solidFetch.js'
 import { verifyDpopToken } from '../../src/auth.js'
 import { loadConfig } from '../../src/config.js'
-import { handleInboxActivity } from '../../src/handlers/inbox.js'
+import { handleInboxActivity, isActorDeleteActivity } from '../../src/handlers/inbox.js'
 import { handleOutboxActivity } from '../../src/handlers/outbox.js'
 import { verifyIncomingActivity, HttpSignatureError, formatHttpSignatureError } from '../../src/verifyRequest.js'
 import type { Activity } from '../../src/activity.js'
@@ -237,6 +237,12 @@ async function handlePostInbox(
       status: 400,
       headers: corsHeaders
     })
+  }
+
+  if (isActorDeleteActivity(activity)) {
+    const actorUrl = typeof activity.actor === 'string' ? activity.actor : 'unknown'
+    console.log(`[router] inbox short-circuit: actor Delete for ${actorUrl}, skipping signature verification`)
+    return new Response('ok', { status: 200, headers: corsHeaders })
   }
 
   try {

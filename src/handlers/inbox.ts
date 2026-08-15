@@ -25,6 +25,43 @@ export function isUndoFollow(activity: Record<string, unknown>): boolean {
   return isFollowActivity(object as Record<string, unknown>)
 }
 
+const ACTOR_OBJECT_TYPES = new Set([
+  'Person',
+  'Group',
+  'Service',
+  'Application',
+  'Organization',
+  'Tombstone'
+])
+
+export function isActorDeleteActivity(activity: Record<string, unknown>): boolean {
+  const activityType = activity.type
+  const isDelete = activityType === 'Delete' || activityType === 'as:Delete'
+    || (Array.isArray(activityType) && activityType.some(t => t === 'Delete' || t === 'as:Delete'))
+  if (!isDelete) return false
+
+  const actor = activity.actor
+  if (typeof actor !== 'string' || actor.length === 0) return false
+
+  const object = activity.object
+  if (typeof object === 'string') {
+    return object === actor
+  }
+
+  if (object && typeof object === 'object' && !Array.isArray(object)) {
+    const inline = object as Record<string, unknown>
+    const inlineType = inline.type
+    const inlineId = inline.id
+    if (typeof inlineId !== 'string') return false
+    if (typeof inlineType !== 'string') return false
+    const normalizedType = inlineType.startsWith('as:') ? inlineType.slice(3) : inlineType
+    if (!ACTOR_OBJECT_TYPES.has(normalizedType)) return false
+    return inlineId === actor
+  }
+
+  return false
+}
+
 export async function handleInboxActivity(
   activity: Record<string, unknown>,
   fetch: SolidFetch,
