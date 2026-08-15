@@ -88,7 +88,7 @@ One route per configured actor, e.g. `/alice/inbox`. HTTP-signature-authenticate
 - For any other activity: trust the URL and persist to `${actorName}/inbox/`. No content-addressing check.
 
 1. Resolve `actorName` from the path; reject 404 if not a configured actor.
-2. Parse the body as JSON; reject 400 on parse error.
+2. Parse the body as JSON; reject 400 on parse error. **Debugging:** on signature-verification failure (step 3) or handler rejection (step 4 — 422), the inbox logs `[router] inbox reject: type=… actor=… [object=…]` so the rejected activity is identifiable in function logs. Successful processing is intentionally not logged.
 3. Verify the HTTP signature on the request via `verifyIncomingActivity`: require `Signature`/`Date`/`Digest` headers, verify the `Digest` against a SHA-256 of the JSON body, fetch the actor's `publicKeyPem` (with SSRF protection), and cryptographically verify the signature. Also bind the actor: `activity.actor` must equal the URL the signing keyId belongs to, else 400. **Debugging:** a failure logs `[router] POST /${actorName}/inbox HTTP signature auth failed: <reason>`. Common cases: missing `Signature`/`Date`/`Digest` headers, the remote actor's published key doesn't match the signing key, or the actor URL in the keyId isn't under this deployment's `BASE_URL` (the message contains `is not under base URL …` — check that `WEBID`/`BASE_URL` env vars match what the remote server expects).
 4. Switch on activity type:
    - `Delete` → ack and return (no persistence).

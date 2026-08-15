@@ -25,6 +25,16 @@ export const config: Config = {
 
 type Collection = 'inbox' | 'outbox' | 'followers'
 
+function activitySummary(activity: Record<string, unknown>): string {
+  const type = typeof activity.type === 'string' ? activity.type : 'unknown'
+  const actor = typeof activity.actor === 'string' ? activity.actor : 'unknown'
+  const obj = activity.object
+  const objId = typeof obj === 'object' && obj !== null && !Array.isArray(obj) && typeof (obj as Record<string, unknown>).id === 'string'
+    ? (obj as Record<string, unknown>).id
+    : typeof obj === 'string' ? obj : undefined
+  return objId ? `type=${type} actor=${actor} object=${objId}` : `type=${type} actor=${actor}`
+}
+
 function resolveActor(config: ReturnType<typeof loadConfig>, actorParam: string | undefined) {
   if (!actorParam) return null
   return config.actorByPath[`/${actorParam}`] ?? null
@@ -222,6 +232,7 @@ async function handlePostInbox(
   } catch (error) {
     if (error instanceof HttpSignatureError) {
       console.log(`[router] POST /${actor.name}/inbox HTTP signature auth failed: ${error.message}`)
+      console.log(`[router] inbox reject: ${activitySummary(activity)}`)
       return new Response(error.message, {
         status: error.statusCode,
         headers: corsHeaders
@@ -242,6 +253,7 @@ async function handlePostInbox(
       config.solidStorageBaseUrl
     )
     if (!success) {
+      console.log(`[router] inbox reject: ${activitySummary(activity)}`)
       return new Response('Failed to process activity', {
         status: 422,
         headers: corsHeaders
