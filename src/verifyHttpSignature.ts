@@ -72,17 +72,33 @@ export function validateTimestamp(dateHeader: string): boolean {
   return true
 }
 
-export function verifyDigest(rawBody: ArrayBuffer | Uint8Array, digestHeader: string): boolean {
-  if (!digestHeader) return false
+export type DigestResult =
+  | { match: true }
+  | { match: false; expected: string; actual: string; bodyLength: number }
+
+export function verifyDigest(rawBody: ArrayBuffer | Uint8Array, digestHeader: string): DigestResult {
+  if (!digestHeader) {
+    return { match: false, expected: '', actual: '', bodyLength: bodyByteLength(rawBody) }
+  }
 
   const match = digestHeader.match(/^SHA-256=(.+)$/i)
-  if (!match) return false
+  if (!match) {
+    return { match: false, expected: '', actual: '', bodyLength: bodyByteLength(rawBody) }
+  }
 
   const expectedHash = match[1]
   const bytes = rawBody instanceof ArrayBuffer ? Buffer.from(rawBody) : Buffer.from(rawBody.buffer, rawBody.byteOffset, rawBody.byteLength)
   const actualHash = createHash('sha256').update(bytes).digest('base64')
 
-  return actualHash === expectedHash
+  if (actualHash === expectedHash) {
+    return { match: true }
+  }
+  return { match: false, expected: expectedHash, actual: actualHash, bodyLength: bytes.byteLength }
+}
+
+function bodyByteLength(rawBody: ArrayBuffer | Uint8Array): number {
+  if (rawBody instanceof ArrayBuffer) return rawBody.byteLength
+  return rawBody.byteLength
 }
 
 export interface ActorKeyResult {
@@ -104,7 +120,9 @@ export async function fetchActorPublicKey(
   })
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch actor: ${response.status}`)
+    const err = new Error(`Failed to fetch actor: ${response.status}`)
+    ;(err as Error & { actorFetchStatus?: number }).actorFetchStatus = response.status
+    throw err
   }
 
   const actor = await response.json() as Record<string, unknown>

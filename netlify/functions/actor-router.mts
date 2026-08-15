@@ -4,7 +4,7 @@ import { verifyDpopToken } from '../../src/auth.js'
 import { loadConfig } from '../../src/config.js'
 import { handleInboxActivity } from '../../src/handlers/inbox.js'
 import { handleOutboxActivity } from '../../src/handlers/outbox.js'
-import { verifyIncomingActivity, HttpSignatureError } from '../../src/verifyRequest.js'
+import { verifyIncomingActivity, HttpSignatureError, formatHttpSignatureError } from '../../src/verifyRequest.js'
 import type { Activity } from '../../src/activity.js'
 
 const getCorsHeaders = (origin: string | null) => ({
@@ -243,7 +243,7 @@ async function handlePostInbox(
     await verifyIncomingActivity(req, activity, rawBytes, fetchFn)
   } catch (error) {
     if (error instanceof HttpSignatureError) {
-      console.log(`[router] POST /${actor.name}/inbox HTTP signature auth failed: ${error.message}`)
+      console.error(formatHttpSignatureError(error))
       console.log(`[router] inbox reject: ${activitySummary(activity)}`)
       return new Response(error.message, {
         status: error.statusCode,
