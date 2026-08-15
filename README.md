@@ -54,7 +54,7 @@ Each configured actor (named in `ACTOR_NAME`) gets its own AS2 document, its own
 One route per configured actor, e.g. `/alice/outbox`. Solid-OIDC-authenticated. The handler ignores any sub-path — paging is managed internally.
 
 1. Resolve `actorName` from the path; reject 404 if not a configured actor.
-2. Verify the DPoP token via `verifyDpopToken` (using `@solid/access-token-verifier`); reject with 401/403 on failure or if the token's issuer is not in `WHITELISTED_ISSUERS`.
+2. Verify the DPoP token via `verifyDpopToken` (using `@solid/access-token-verifier`); reject with 401/403 on failure or if the token's issuer is not in `WHITELISTED_ISSUERS`. **Debugging:** a DPoP failure logs `[router] POST /${actorName}/outbox auth failed: <reason>` — grep this to distinguish a missing header, an issuer not in `WHITELISTED_ISSUERS`, or a token-verification failure (bad signature, expired token, clock skew).
 3. Parse the body as JSON; reject 400 on parse error.
 4. Validate `@context` and that `activity.actor` equals `${BASE_URL}/${actorName}`; reject 400/403 on failure.
 5. Normalize the activity: assign `id` and `published` if missing.
@@ -87,7 +87,7 @@ One route per configured actor, e.g. `/alice/inbox`. HTTP-signature-authenticate
 
 1. Resolve `actorName` from the path; reject 404 if not a configured actor.
 2. Parse the body as JSON; reject 400 on parse error.
-3. Verify the HTTP signature on the request via `verifyIncomingActivity`: require `Signature`/`Date`/`Digest` headers, verify the `Digest` against a SHA-256 of the JSON body, fetch the actor's `publicKeyPem` (with SSRF protection), and cryptographically verify the signature. Also bind the actor: `activity.actor` must equal the URL the signing keyId belongs to, else 400.
+3. Verify the HTTP signature on the request via `verifyIncomingActivity`: require `Signature`/`Date`/`Digest` headers, verify the `Digest` against a SHA-256 of the JSON body, fetch the actor's `publicKeyPem` (with SSRF protection), and cryptographically verify the signature. Also bind the actor: `activity.actor` must equal the URL the signing keyId belongs to, else 400. **Debugging:** a failure logs `[router] POST /${actorName}/inbox HTTP signature auth failed: <reason>`. Common cases: missing `Signature`/`Date`/`Digest` headers, the remote actor's published key doesn't match the signing key, or the actor URL in the keyId isn't under this deployment's `BASE_URL` (the message contains `is not under base URL …` — check that `WEBID`/`BASE_URL` env vars match what the remote server expects).
 4. Switch on activity type:
    - `Delete` → ack and return (no persistence).
    - `Follow` → send a signed `Accept` (signed with the matched local actor's key) to the follower's inbox, and add the follower to the followers collection at `${SOLID_STORAGE_BASE_URL}${actorName}/followers/`.
@@ -100,7 +100,7 @@ Per-actor DPoP-authenticated proxy of the paged inbox collection on the pod, wit
 
 1. Load config; resolve `actorName` from the path; reject 404 if not configured.
 2. Resolve the `{page}` from the request path (preserving trailing slash).
-3. Verify the DPoP token via `verifyDpopToken` (with the request URL and `GET` method); reject 401/403 on failure or if the issuer is not in `WHITELISTED_ISSUERS`.
+3. Verify the DPoP token via `verifyDpopToken` (with the request URL and `GET` method); reject 401/403 on failure or if the issuer is not in `WHITELISTED_ISSUERS`. **Debugging:** a failure logs `[router] GET /${actorName}/inbox auth failed: <reason>` — grep this to distinguish a missing header, an issuer not in `WHITELISTED_ISSUERS`, or a token-verification failure (bad signature, expired token, clock skew).
 4. Compute the pod target as `${SOLID_STORAGE_BASE_URL}${actorName}/inbox/{page}`.
 5. Create a DPoP-authenticated fetch to the pod and GET the target with the request's `Accept` header (default `text/turtle`).
 6. Read the pod response body.
@@ -113,7 +113,7 @@ Per-actor DPoP-authenticated proxy of the followers collection on the pod, with 
 
 1. Load config; resolve `actorName` from the path; reject 404 if not configured.
 2. Resolve the `{page}` from the request path (preserving trailing slash).
-3. Verify the DPoP token via `verifyDpopToken` (with the request URL and `GET` method); reject 401/403 on failure or if the issuer is not in `WHITELISTED_ISSUERS`.
+3. Verify the DPoP token via `verifyDpopToken` (with the request URL and `GET` method); reject 401/403 on failure or if the issuer is not in `WHITELISTED_ISSUERS`. **Debugging:** a failure logs `[router] GET /${actorName}/followers auth failed: <reason>` — grep this to distinguish a missing header, an issuer not in `WHITELISTED_ISSUERS`, or a token-verification failure (bad signature, expired token, clock skew).
 4. Compute the pod target as `${SOLID_STORAGE_BASE_URL}${actorName}/followers/{page}`.
 5. Create a DPoP-authenticated fetch to the pod and GET the target with the request's `Accept` header (default `text/turtle`).
 6. Read the pod response body.

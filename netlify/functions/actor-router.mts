@@ -85,6 +85,7 @@ async function handleGet(
     )
 
     if (!authResult.success) {
+      console.log(`[router] GET /${actorName}/${collection} auth failed: ${authResult.message}`)
       return new Response(authResult.message, {
         status: authResult.statusCode,
         headers: corsHeaders
@@ -138,6 +139,7 @@ async function handlePostOutbox(
   )
 
   if (!authResult.success) {
+    console.log(`[router] POST /${actor.name}/outbox auth failed: ${authResult.message}`)
     return new Response(authResult.message, {
       status: authResult.statusCode,
       headers: corsHeaders
@@ -217,6 +219,7 @@ async function handlePostInbox(
     await verifyIncomingActivity(req, activity, fetchFn)
   } catch (error) {
     if (error instanceof HttpSignatureError) {
+      console.log(`[router] POST /${actor.name}/inbox HTTP signature auth failed: ${error.message}`)
       return new Response(error.message, {
         status: error.statusCode,
         headers: corsHeaders
