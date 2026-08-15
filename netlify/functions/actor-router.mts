@@ -259,6 +259,7 @@ async function handlePostInbox(
 
 export default async (req: Request, context: Context) => {
   const corsHeaders = getCorsHeaders(req.headers.get('Origin'))
+  console.log(`[router] ${req.method} ${new URL(req.url).pathname}`)
 
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders })

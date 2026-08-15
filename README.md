@@ -49,6 +49,8 @@ Build time generates:
 
 Each configured actor (named in `ACTOR_NAME`) gets its own AS2 document, its own RSA signing key, its own outbox/inbox/followers collection on the pod, and its own per-actor endpoints.
 
+Every request handled by the actor-router function logs a single `[router] METHOD /path` entry line at the start (e.g. `[router] POST /alice/outbox`), followed by any of the auth-failure / delivery-summary logs documented on each endpoint below. Grepping for `[router]` is the fastest way to follow a single request through the function.
+
 ### Outbox POST `/${actorName}/outbox`
 
 One route per configured actor, e.g. `/alice/outbox`. Solid-OIDC-authenticated. The handler ignores any sub-path — paging is managed internally.
