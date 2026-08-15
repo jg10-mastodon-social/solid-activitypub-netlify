@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { SolidFetch } from '../../src/types.js'
 
+vi.mock('../../src/base-url.js', () => ({
+  baseUrl: 'https://example.com'
+}))
+
 const mockFetch = vi.fn()
 
 describe('sendFollowAccept', () => {

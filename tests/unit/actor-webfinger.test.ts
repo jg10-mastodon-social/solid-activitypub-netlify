@@ -1,53 +1,62 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import fs from 'fs'
 import path from 'path'
-import { publicDir, actorPrivateKeyPath, baseUrlPath, runScript, rootDir } from '../helpers.js'
+import { publicDir, baseUrlPath, actorKeysPath, webfingerDataPath, runScript } from '../helpers.js'
 
 describe('actor and webfinger', () => {
   let originalBaseUrlContent: string | null = null
-  let originalActorPrivateKeyContent: string | null = null
+  let originalActorKeysContent: string | null = null
+  let originalWebfingerDataContent: string | null = null
 
   beforeEach(() => {
-    // Save original content
     if (fs.existsSync(baseUrlPath)) {
       originalBaseUrlContent = fs.readFileSync(baseUrlPath, 'utf-8')
     } else {
       originalBaseUrlContent = null
     }
-    if (fs.existsSync(actorPrivateKeyPath)) {
-      originalActorPrivateKeyContent = fs.readFileSync(actorPrivateKeyPath, 'utf-8')
+    if (fs.existsSync(actorKeysPath)) {
+      originalActorKeysContent = fs.readFileSync(actorKeysPath, 'utf-8')
     } else {
-      originalActorPrivateKeyContent = null
+      originalActorKeysContent = null
+    }
+    if (fs.existsSync(webfingerDataPath)) {
+      originalWebfingerDataContent = fs.readFileSync(webfingerDataPath, 'utf-8')
+    } else {
+      originalWebfingerDataContent = null
     }
 
-    // Delete for clean state
     if (fs.existsSync(publicDir)) {
       fs.rmSync(publicDir, { recursive: true, force: true })
     }
     if (fs.existsSync(baseUrlPath)) {
       fs.unlinkSync(baseUrlPath)
     }
-    if (fs.existsSync(actorPrivateKeyPath)) {
-      fs.unlinkSync(actorPrivateKeyPath)
+    if (fs.existsSync(actorKeysPath)) {
+      fs.unlinkSync(actorKeysPath)
+    }
+    if (fs.existsSync(webfingerDataPath)) {
+      fs.unlinkSync(webfingerDataPath)
     }
   })
 
   afterEach(() => {
-    // Clean up generated files
     if (fs.existsSync(publicDir)) {
       fs.rmSync(publicDir, { recursive: true, force: true })
     }
-
-    // Restore original content
     if (originalBaseUrlContent !== null) {
       fs.writeFileSync(baseUrlPath, originalBaseUrlContent)
     } else if (fs.existsSync(baseUrlPath)) {
       fs.unlinkSync(baseUrlPath)
     }
-    if (originalActorPrivateKeyContent !== null) {
-      fs.writeFileSync(actorPrivateKeyPath, originalActorPrivateKeyContent)
-    } else if (fs.existsSync(actorPrivateKeyPath)) {
-      fs.unlinkSync(actorPrivateKeyPath)
+    if (originalActorKeysContent !== null) {
+      fs.writeFileSync(actorKeysPath, originalActorKeysContent)
+    } else if (fs.existsSync(actorKeysPath)) {
+      fs.unlinkSync(actorKeysPath)
+    }
+    if (originalWebfingerDataContent !== null) {
+      fs.writeFileSync(webfingerDataPath, originalWebfingerDataContent)
+    } else if (fs.existsSync(webfingerDataPath)) {
+      fs.unlinkSync(webfingerDataPath)
     }
   })
 
@@ -91,17 +100,17 @@ describe('actor and webfinger', () => {
       await runScript(undefined, 'production')
       const actorPath = path.join(publicDir, 'actor')
       const actor = JSON.parse(fs.readFileSync(actorPath, 'utf-8'))
-      expect(actor.inbox).toBe('https://example.com/inbox')
-      expect(actor.outbox).toBe('https://example.com/outbox')
+      expect(actor.inbox).toBe('https://example.com/actor/inbox')
+      expect(actor.outbox).toBe('https://example.com/actor/outbox')
     })
 
     it('sets followers, following, liked collections', async () => {
       await runScript(undefined, 'production')
       const actorPath = path.join(publicDir, 'actor')
       const actor = JSON.parse(fs.readFileSync(actorPath, 'utf-8'))
-      expect(actor.followers).toBe('https://example.com/followers')
-      expect(actor.following).toBe('https://example.com/following')
-      expect(actor.liked).toBe('https://example.com/liked')
+      expect(actor.followers).toBe('https://example.com/actor/followers')
+      expect(actor.following).toBe('https://example.com/actor/following')
+      expect(actor.liked).toBe('https://example.com/actor/liked')
     })
 
     it('includes publicKey with PEM format', async () => {
@@ -122,54 +131,56 @@ describe('actor and webfinger', () => {
     })
   })
 
-  describe('webfinger file', () => {
-    it('creates webfinger file', async () => {
+  describe('actor keys', () => {
+    it('creates actor keys file', async () => {
       await runScript(undefined, 'production')
-      const webfingerPath = path.join(publicDir, '.well-known', 'webfinger')
-      expect(fs.existsSync(webfingerPath)).toBe(true)
+      expect(fs.existsSync(actorKeysPath)).toBe(true)
     })
 
-    it('sets subject to acct:actor@domain', async () => {
+    it('exports actorKeys const', async () => {
       await runScript(undefined, 'production')
-      const webfingerPath = path.join(publicDir, '.well-known', 'webfinger')
-      const webfinger = JSON.parse(fs.readFileSync(webfingerPath, 'utf-8'))
-      expect(webfinger.subject).toBe('acct:actor@example.com')
-    })
-
-    it('includes alias to actor URL', async () => {
-      await runScript(undefined, 'production')
-      const webfingerPath = path.join(publicDir, '.well-known', 'webfinger')
-      const webfinger = JSON.parse(fs.readFileSync(webfingerPath, 'utf-8'))
-      expect(webfinger.aliases).toContain('https://example.com/actor')
-    })
-
-    it('has self link with application/activity+json type', async () => {
-      await runScript(undefined, 'production')
-      const webfingerPath = path.join(publicDir, '.well-known', 'webfinger')
-      const webfinger = JSON.parse(fs.readFileSync(webfingerPath, 'utf-8'))
-      const selfLink = webfinger.links.find((l: any) => l.rel === 'self')
-      expect(selfLink).toBeDefined()
-      expect(selfLink.type).toBe('application/activity+json')
-      expect(selfLink.href).toBe('https://example.com/actor')
-    })
-  })
-
-  describe('actor private key', () => {
-    it('creates actor private key file', async () => {
-      await runScript(undefined, 'production')
-      expect(fs.existsSync(actorPrivateKeyPath)).toBe(true)
-    })
-
-    it('exports actorPrivateKey const', async () => {
-      await runScript(undefined, 'production')
-      const content = fs.readFileSync(actorPrivateKeyPath, 'utf-8')
-      expect(content).toContain('export const actorPrivateKey')
+      const content = fs.readFileSync(actorKeysPath, 'utf-8')
+      expect(content).toContain('export const actorKeys')
     })
 
     it('generates RSA key type', async () => {
       await runScript(undefined, 'production')
-      const content = fs.readFileSync(actorPrivateKeyPath, 'utf-8')
-      expect(content).toContain('"kty":"RSA"')
+      const content = fs.readFileSync(actorKeysPath, 'utf-8')
+      expect(content).toContain('"kty": "RSA"')
+    })
+
+    it('contains an entry per configured actor', async () => {
+      await runScript(undefined, 'production', 'alice,bob')
+      const content = fs.readFileSync(actorKeysPath, 'utf-8')
+      expect(content).toContain('"alice"')
+      expect(content).toContain('"bob"')
+    })
+  })
+
+  describe('webfinger data', () => {
+    it('creates webfinger data file', async () => {
+      await runScript(undefined, 'production')
+      expect(fs.existsSync(webfingerDataPath)).toBe(true)
+    })
+
+    it('exports webfingerEntries const', async () => {
+      await runScript(undefined, 'production')
+      const content = fs.readFileSync(webfingerDataPath, 'utf-8')
+      expect(content).toContain('export const webfingerEntries')
+    })
+
+    it('contains an entry per configured actor', async () => {
+      await runScript(undefined, 'production', 'alice,bob')
+      const content = fs.readFileSync(webfingerDataPath, 'utf-8')
+      expect(content).toContain('acct:alice@example.com')
+      expect(content).toContain('acct:bob@example.com')
+    })
+
+    it('contains self link with application/activity+json type', async () => {
+      await runScript(undefined, 'production', 'myactor')
+      const content = fs.readFileSync(webfingerDataPath, 'utf-8')
+      expect(content).toContain('https://example.com/myactor')
+      expect(content).toContain('application/activity+json')
     })
   })
 
@@ -196,14 +207,21 @@ describe('actor and webfinger', () => {
       expect(actor.publicKey.owner).toBe('https://example.com/myactor')
     })
 
-    it('sets webfinger subject using actorName', async () => {
+    it('records webfinger entry using actorName', async () => {
       await runScript(undefined, 'production', 'myactor')
-      const webfingerPath = path.join(publicDir, '.well-known', 'webfinger')
-      const webfinger = JSON.parse(fs.readFileSync(webfingerPath, 'utf-8'))
-      expect(webfinger.subject).toBe('acct:myactor@example.com')
-      expect(webfinger.aliases).toContain('https://example.com/myactor')
-      const selfLink = webfinger.links.find((l: any) => l.rel === 'self')
-      expect(selfLink.href).toBe('https://example.com/myactor')
+      const content = fs.readFileSync(webfingerDataPath, 'utf-8')
+      expect(content).toContain('acct:myactor@example.com')
+      expect(content).toContain('https://example.com/myactor')
+    })
+
+    it('emits one public/<name> file per actor when ACTOR_NAME lists multiple', async () => {
+      await runScript(undefined, 'production', 'alice,bob')
+      expect(fs.existsSync(path.join(publicDir, 'alice'))).toBe(true)
+      expect(fs.existsSync(path.join(publicDir, 'bob'))).toBe(true)
+      const alice = JSON.parse(fs.readFileSync(path.join(publicDir, 'alice'), 'utf-8'))
+      const bob = JSON.parse(fs.readFileSync(path.join(publicDir, 'bob'), 'utf-8'))
+      expect(alice.id).toBe('https://example.com/alice')
+      expect(bob.id).toBe('https://example.com/bob')
     })
   })
 })

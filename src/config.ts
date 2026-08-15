@@ -1,4 +1,4 @@
-import type { Config } from './types.js'
+import type { ActorConfig, Config } from './types.js'
 // @ts-ignore
 import { baseUrl } from './base-url.js'
 
@@ -10,6 +10,38 @@ export interface EnvConfig {
   HANDLER_BASE_URL: string
   SEND_TO_URL: string
   ADMIN_WEBID?: string
+}
+
+export function parseActorNames(raw: string | undefined): string[] {
+  if (!raw) return ['actor']
+  const names = raw.split(',').map((s) => s.trim()).filter((s) => s.length > 0)
+  if (names.length === 0) {
+    throw new Error('ACTOR_NAME must contain at least one non-empty actor name')
+  }
+  return names
+}
+
+function buildActorConfigs(
+  baseUrlValue: string,
+  solidStorageBaseUrl: string,
+  names: string[]
+): Record<string, ActorConfig> {
+  const domain = baseUrlValue.replace(/^https?:\/\//, '')
+  const byPath: Record<string, ActorConfig> = {}
+  for (const name of names) {
+    const url = `${baseUrlValue}/${name}`
+    byPath[`/${name}`] = {
+      name,
+      path: `/${name}`,
+      url,
+      keyId: `${url}#main-key`,
+      inboxUrl: `${baseUrlValue}/${name}/inbox`,
+      outboxUrl: `${baseUrlValue}/${name}/outbox`,
+      followersUrl: `${baseUrlValue}/${name}/followers`,
+      webfingerResource: `acct:${name}@${domain}`,
+    }
+  }
+  return byPath
 }
 
 export function loadConfig(): Config {
@@ -36,8 +68,8 @@ export function loadConfig(): Config {
   const solidStorageBaseUrl = process.env.SOLID_STORAGE_BASE_URL
   const inboxUrl = `${solidStorageBaseUrl}inbox/`
   const outboxUrl = `${solidStorageBaseUrl}outbox/`
-  const actorName = process.env.ACTOR_NAME || 'actor'
-  const actorPath = `/${actorName}`
+  const actorNames = parseActorNames(process.env.ACTOR_NAME)
+  const actorByPath = buildActorConfigs(baseUrl, solidStorageBaseUrl, actorNames)
 
   return {
     webId,
@@ -51,7 +83,7 @@ export function loadConfig(): Config {
     adminWebId,
     inboxUrl,
     outboxUrl,
-    actorName,
-    actorPath,
+    actorNames,
+    actorByPath,
   }
 }

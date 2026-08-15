@@ -8,7 +8,7 @@
     "build": "npm run generate:identity",
     "test": "vitest run",
     "test:unit": "vitest run unit",
-    "test:integration": "vitest run tests/integration",
+    "test:integration": "vitest run integration",
     "test:e2e": "vitest run e2e",
     "dev": "netlify dev --context dev",
     "typecheck": "tsc --noEmit"

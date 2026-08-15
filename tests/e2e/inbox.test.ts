@@ -10,7 +10,7 @@ describe('inbox e2e tests', () => {
   })
 
   it('returns 204 for OPTIONS preflight with CORS headers', async () => {
-    const res = await fetch(`${devServerUrl}/inbox`, {
+    const res = await fetch(`${devServerUrl}/actor/inbox`, {
       method: 'OPTIONS',
       headers: {
         'Access-Control-Request-Method': 'POST',
@@ -24,7 +24,7 @@ describe('inbox e2e tests', () => {
   })
 
   it('returns 400 for invalid JSON body', async () => {
-    const res = await fetch(`${devServerUrl}/inbox`, {
+    const res = await fetch(`${devServerUrl}/actor/inbox`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: 'not json'
@@ -45,7 +45,7 @@ describe('inbox e2e tests', () => {
       object: { type: 'Note', content: 'Hello world' }
     }
 
-    const res = await fetch(`${devServerUrl}/inbox`, {
+    const res = await fetch(`${devServerUrl}/actor/inbox`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(activity)
@@ -72,7 +72,7 @@ describe('inbox e2e tests', () => {
       actor: 'https://other.example/actor'
     }
 
-    const res = await fetch(`${devServerUrl}/inbox`, {
+    const res = await fetch(`${devServerUrl}/actor/inbox`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(activity)
@@ -127,7 +127,7 @@ describe('inbox e2e tests', () => {
       .setJti(randomUUID())
       .sign(identityPrivateKey)
 
-    const postRes = await fetch(`${devServerUrl}/inbox`, {
+    const postRes = await fetch(`${devServerUrl}/actor/inbox`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -180,7 +180,7 @@ describe('inbox e2e tests', () => {
       object: 'http://localhost:9999/actor'
     }
 
-    const res = await fetch(`${devServerUrl}/inbox`, {
+    const res = await fetch(`${devServerUrl}/actor/inbox`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(activity)

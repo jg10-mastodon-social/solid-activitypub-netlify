@@ -1,7 +1,7 @@
 import { createHash, createSign, createPrivateKey } from 'node:crypto'
 import type { SolidFetch } from './types.js'
 // @ts-ignore
-import { actorPrivateKey } from './actor-private-key.js'
+import { actorKeys } from './actor-keys.js'
 
 export function buildSigningString(
   method: string,
@@ -41,12 +41,33 @@ function importPrivateKey(jwk: Record<string, unknown>): ReturnType<typeof creat
   })
 }
 
+function actorNameFromActorUrl(actorUrl: string, baseUrl: string): string {
+  const prefix = `${baseUrl}/`
+  if (!actorUrl.startsWith(prefix)) {
+    throw new Error(`Actor URL ${actorUrl} is not under base URL ${baseUrl}`)
+  }
+  return actorUrl.slice(prefix.length)
+}
+
+export function getActorPrivateKey(actorName: string): Record<string, unknown> {
+  const key = actorKeys[actorName]
+  if (!key) {
+    throw new Error(`No signing key configured for actor "${actorName}"`)
+  }
+  return key
+}
+
 export async function signActivityRequest(
   inboxUrl: string,
   activityBody: string,
   keyId: string,
+  actorUrl: string,
+  baseUrl: string,
   fetchFn: SolidFetch
 ): Promise<Response> {
+  const actorName = actorNameFromActorUrl(actorUrl, baseUrl)
+  const privateKey = getActorPrivateKey(actorName)
+
   const url = new URL(inboxUrl)
   const method = 'POST'
   const path = url.pathname + url.search
@@ -57,11 +78,11 @@ export async function signActivityRequest(
 
   const signingString = buildSigningString(method, path, host, date, digest, contentType)
 
-  const privateKey = importPrivateKey(actorPrivateKey)
+  const privateKeyObject = importPrivateKey(privateKey)
   const sign = createSign('RSA-SHA256')
   sign.update(signingString)
   sign.end()
-  const signatureBase64 = sign.sign(privateKey, 'base64')
+  const signatureBase64 = sign.sign(privateKeyObject, 'base64')
 
   const signatureHeader = createSignatureHeader(keyId, signatureBase64)
 

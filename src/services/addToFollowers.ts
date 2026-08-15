@@ -6,9 +6,9 @@ export async function addToFollowers(
   followerActor: string,
   fetch: SolidFetch,
   solidStorageBaseUrl: string,
-  actorUrl: string
+  actorName: string
 ): Promise<void> {
-  const followersUrl = `${solidStorageBaseUrl}followers/`
+  const followersUrl = `${solidStorageBaseUrl}${actorName}/followers/`
 
   const pageUrl = await derivePageUrl(followersUrl, fetch)
   const url = new URL(pageUrl)
@@ -17,10 +17,10 @@ export async function addToFollowers(
   const followerEntry = {
     type: 'Follow',
     actor: followerActor,
-    object: actorUrl,
+    object: `${solidStorageBaseUrl.replace(/\/$/, '')}/${actorName}`,
     id: `${followerActor}/follow/${Date.now()}`
   }
 
   await persistActivityItem(followerEntry, pageUrl, fetch, { skolemizeBase })
-  console.log(`[inbox] Added ${followerActor} to followers collection`)
+  console.log(`[inbox] Added ${followerActor} to ${actorName} followers collection`)
 }

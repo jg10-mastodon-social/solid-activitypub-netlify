@@ -12,27 +12,27 @@ describe('getFollowers', () => {
     const { getFollowers } = await import('../../src/services/getFollowers.js')
 
     mockFetch.mockImplementation(async (url: string) => {
-      if (url === 'https://example.com/storage/followers/') {
+      if (url === 'https://example.com/storage/actor/followers/') {
         return {
           ok: true,
           status: 200,
           text: () => Promise.resolve(`
 @prefix as: <https://www.w3.org/ns/activitystreams#> .
 
-<https://example.com/storage/followers/>
+<https://example.com/storage/actor/followers/>
   a as:OrderedCollection ;
-  as:first <https://example.com/storage/followers/pages/1> .
+  as:first <https://example.com/storage/actor/followers/pages/1> .
 `)
         }
       }
-      if (url === 'https://example.com/storage/followers/pages/1') {
+      if (url === 'https://example.com/storage/actor/followers/pages/1') {
         return {
           ok: true,
           status: 200,
           text: () => Promise.resolve(`
 @prefix as: <https://www.w3.org/ns/activitystreams#> .
 
-<https://example.com/storage/followers/pages/1>
+<https://example.com/storage/actor/followers/pages/1>
   a as:OrderedCollectionPage ;
   as:items [
     a as:Follow ;
@@ -45,7 +45,7 @@ describe('getFollowers', () => {
       throw new Error('Unexpected URL: ' + url)
     })
 
-    const followers = await getFollowers('https://example.com/storage/', mockFetch as SolidFetch)
+    const followers = await getFollowers('https://example.com/storage/', 'actor', mockFetch as SolidFetch)
     expect(followers).toContain('https://follower1.example/actor')
   })
 
@@ -53,20 +53,20 @@ describe('getFollowers', () => {
     const { getFollowers } = await import('../../src/services/getFollowers.js')
 
     mockFetch.mockImplementation(async (url: string) => {
-      if (url === 'https://example.com/storage/followers/') {
+      if (url === 'https://example.com/storage/actor/followers/') {
         return {
           ok: true,
           status: 200,
           text: () => Promise.resolve(`
 @prefix as: <https://www.w3.org/ns/activitystreams#> .
 
-<https://example.com/storage/followers/>
+<https://example.com/storage/actor/followers/>
   a as:OrderedCollection ;
-  as:first <https://example.com/storage/followers/pages/1> .
+  as:first <https://example.com/storage/actor/followers/pages/1> .
 `)
         }
       }
-      if (url === 'https://example.com/storage/followers/pages/1') {
+      if (url === 'https://example.com/storage/actor/followers/pages/1') {
         return {
           ok: true,
           status: 200,
@@ -74,9 +74,9 @@ describe('getFollowers', () => {
 @prefix as: <https://www.w3.org/ns/activitystreams#> .
 @prefix asx: <https://example.com/ns/example#> .
 
-<https://example.com/storage/followers/pages/1>
+<https://example.com/storage/actor/followers/pages/1>
   a as:OrderedCollectionPage ;
-  as:next <https://example.com/storage/followers/pages/2> ;
+  as:next <https://example.com/storage/actor/followers/pages/2> ;
   as:items [
     a as:Follow ;
     as:actor <https://follower1.example/actor> ;
@@ -85,14 +85,14 @@ describe('getFollowers', () => {
 `)
         }
       }
-      if (url === 'https://example.com/storage/followers/pages/2') {
+      if (url === 'https://example.com/storage/actor/followers/pages/2') {
         return {
           ok: true,
           status: 200,
           text: () => Promise.resolve(`
 @prefix as: <https://www.w3.org/ns/activitystreams#> .
 
-<https://example.com/storage/followers/pages/2>
+<https://example.com/storage/actor/followers/pages/2>
   a as:OrderedCollectionPage ;
   as:items [
     a as:Follow ;
@@ -105,7 +105,7 @@ describe('getFollowers', () => {
       throw new Error('Unexpected URL')
     })
 
-    const followers = await getFollowers('https://example.com/storage/', mockFetch as SolidFetch)
+    const followers = await getFollowers('https://example.com/storage/', 'actor', mockFetch as SolidFetch)
     expect(followers).toContain('https://follower1.example/actor')
     expect(followers).toContain('https://follower2.example/actor')
     expect(followers.length).toBe(2)
@@ -120,13 +120,13 @@ describe('getFollowers', () => {
       text: () => Promise.resolve(`
 @prefix as: <https://www.w3.org/ns/activitystreams#> .
 
-<https://example.com/followers/>
+<https://example.com/actor/followers/>
   a as:OrderedCollection ;
-  as:first <https://example.com/followers/pages/1> .
+  as:first <https://example.com/actor/followers/pages/1> .
 `)
     })
 
-    const followers = await getFollowers('https://example.com/storage/', mockFetch as SolidFetch)
+    const followers = await getFollowers('https://example.com/storage/', 'actor', mockFetch as SolidFetch)
     expect(followers).toEqual([])
   })
 
@@ -139,11 +139,11 @@ describe('getFollowers', () => {
       text: () => Promise.resolve(`
 @prefix as: <https://www.w3.org/ns/activitystreams#> .
 
-<https://example.com/storage/followers/>
+<https://example.com/storage/actor/followers/>
   a as:OrderedCollection ;
-  as:first <https://example.com/storage/followers/pages/1> .
+  as:first <https://example.com/storage/actor/followers/pages/1> .
 
-<https://example.com/storage/followers/pages/1>
+<https://example.com/storage/actor/followers/pages/1>
   a as:OrderedCollectionPage ;
   as:items (
     [
@@ -160,7 +160,7 @@ describe('getFollowers', () => {
 `)
     })
 
-    const followers = await getFollowers('https://example.com/storage/', mockFetch as SolidFetch)
+    const followers = await getFollowers('https://example.com/storage/', 'actor', mockFetch as SolidFetch)
     expect(followers.length).toBe(2)
     expect(followers).toContain('https://follower1.example/actor')
     expect(followers).toContain('https://follower2.example/actor')
@@ -174,7 +174,7 @@ describe('getFollowers', () => {
       status: 500
     })
 
-    const followers = await getFollowers('https://example.com/storage/', mockFetch as SolidFetch)
+    const followers = await getFollowers('https://example.com/storage/', 'actor', mockFetch as SolidFetch)
     expect(followers).toEqual([])
   })
 })

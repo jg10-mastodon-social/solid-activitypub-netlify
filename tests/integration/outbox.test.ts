@@ -23,7 +23,8 @@ vi.mock('../../src/activity.js', () => ({
     ...activity,
     id: 'http://localhost:9999/activities/normalized-id',
     published: '2025-12-19T11:34:14.000Z'
-  }))
+  })),
+  isActivityPublic: vi.fn().mockReturnValue(false)
 }))
 
 vi.mock('../../src/signing.js', () => ({
@@ -31,7 +32,12 @@ vi.mock('../../src/signing.js', () => ({
 }))
 
 vi.mock('../../src/solidFetch.js', () => ({
-  createSolidFetch: vi.fn().mockResolvedValue(vi.fn())
+  createSolidFetch: vi.fn().mockResolvedValue(vi.fn().mockResolvedValue({
+    ok: true,
+    status: 200,
+    text: () => Promise.resolve(''),
+    json: () => Promise.resolve({})
+  }))
 }))
 
 beforeAll(() => {
@@ -41,6 +47,7 @@ beforeAll(() => {
   process.env.ISSUER = 'http://localhost:9999'
   process.env.HANDLER_BASE_URL = 'https://example.com/handlers#'
   process.env.SEND_TO_URL = 'http://localhost:9999/outbox'
+  process.env.ACTOR_NAME = 'actor'
 })
 
 vi.mock('@soid/core', () => ({
@@ -58,17 +65,24 @@ function makeContext(overrides: Partial<Context> = {}): Context {
     site: {},
     deploy: {},
     account: {},
-    params: {},
-    url: new URL('http://localhost/outbox'),
+    params: { actor: 'actor' },
+    url: new URL('http://localhost/actor/outbox'),
     next: vi.fn(),
     ...overrides
   } as Context
 }
 
-describe('outbox integration tests', () => {
+describe('actor-router outbox integration tests', () => {
   it('returns 401 without authorization header', async () => {
-    const { default: handler } = await import('../../netlify/functions/outbox.mts')
-    const req = new Request('http://localhost/outbox', {
+    const { verifyDpopToken } = await import('../../src/auth.js')
+    ;(verifyDpopToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      success: false,
+      statusCode: 401,
+      message: 'Authorization required'
+    })
+
+    const { default: handler } = await import('../../netlify/functions/actor-router.mts')
+    const req = new Request('http://localhost/actor/outbox', {
       method: 'POST',
       headers: { 'content-type': 'application/json' }
     })
@@ -79,8 +93,15 @@ describe('outbox integration tests', () => {
   })
 
   it('returns 401 without DPoP header', async () => {
-    const { default: handler } = await import('../../netlify/functions/outbox.mts')
-    const req = new Request('http://localhost/outbox', {
+    const { verifyDpopToken } = await import('../../src/auth.js')
+    ;(verifyDpopToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      success: false,
+      statusCode: 401,
+      message: 'DPoP header required'
+    })
+
+    const { default: handler } = await import('../../netlify/functions/actor-router.mts')
+    const req = new Request('http://localhost/actor/outbox', {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
@@ -94,8 +115,15 @@ describe('outbox integration tests', () => {
   })
 
   it('returns 401 with invalid token format', async () => {
-    const { default: handler } = await import('../../netlify/functions/outbox.mts')
-    const req = new Request('http://localhost/outbox', {
+    const { verifyDpopToken } = await import('../../src/auth.js')
+    ;(verifyDpopToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      success: false,
+      statusCode: 401,
+      message: 'Token verification failed'
+    })
+
+    const { default: handler } = await import('../../netlify/functions/actor-router.mts')
+    const req = new Request('http://localhost/actor/outbox', {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
@@ -109,8 +137,8 @@ describe('outbox integration tests', () => {
   })
 
   it('returns 204 for OPTIONS preflight', async () => {
-    const { default: handler } = await import('../../netlify/functions/outbox.mts')
-    const req = new Request('http://localhost/outbox', {
+    const { default: handler } = await import('../../netlify/functions/actor-router.mts')
+    const req = new Request('http://localhost/actor/outbox', {
       method: 'OPTIONS',
       headers: {
         'Access-Control-Request-Method': 'POST',
@@ -124,14 +152,14 @@ describe('outbox integration tests', () => {
   })
 
   it('returns 200 with valid activity', async () => {
-    const { default: handler } = await import('../../netlify/functions/outbox.mts')
+    const { default: handler } = await import('../../netlify/functions/actor-router.mts')
     const activity = {
       type: 'Create',
       actor: 'http://localhost:9999/actor',
       to: ['https://recipient.example/actor'],
       '@context': 'https://www.w3.org/ns/activitystreams'
     }
-    const req = new Request('http://localhost/outbox', {
+    const req = new Request('http://localhost/actor/outbox', {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
@@ -149,14 +177,14 @@ describe('outbox integration tests', () => {
     mockValidateActivityActor.mockImplementationOnce(() => {
       throw new Error('Actor mismatch')
     })
-    const { default: handler } = await import('../../netlify/functions/outbox.mts')
+    const { default: handler } = await import('../../netlify/functions/actor-router.mts')
     const activity = {
       type: 'Create',
       actor: 'https://wrong.example/actor',
       to: ['https://recipient.example/actor'],
       '@context': 'https://www.w3.org/ns/activitystreams'
     }
-    const req = new Request('http://localhost/outbox', {
+    const req = new Request('http://localhost/actor/outbox', {
       method: 'POST',
       headers: {
         'content-type': 'application/json',

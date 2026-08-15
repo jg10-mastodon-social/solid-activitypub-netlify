@@ -20,7 +20,7 @@ describe('addToFollowers', () => {
       'https://other.example/actor',
       mockFetch as SolidFetch,
       'https://example.com/',
-      'https://example.com/actor'
+      'actor'
     )
 
     expect(mockFetch).toHaveBeenCalled()
@@ -38,7 +38,7 @@ describe('addToFollowers', () => {
       'https://other.example/actor',
       mockFetch as SolidFetch,
       'https://example.com/',
-      'https://example.com/actor'
+      'actor'
     )
 
     const patchCall = mockFetch.mock.calls.find(call => call[1]?.method === 'PATCH')
@@ -47,7 +47,7 @@ describe('addToFollowers', () => {
     expect(patchBody).toContain('https://other.example/actor')
   })
 
-  it('should use correct followers URL', async () => {
+  it('should use correct followers URL for the per-actor container', async () => {
     const { addToFollowers } = await import('../../src/services/addToFollowers.js')
     mockFetch.mockResolvedValue({
       ok: true,
@@ -59,13 +59,13 @@ describe('addToFollowers', () => {
       'https://other.example/actor',
       mockFetch as SolidFetch,
       'https://example.com/',
-      'https://example.com/actor'
+      'actor'
     )
 
     const derivePageUrlCall = mockFetch.mock.calls.find(call =>
       (call[0] as string).includes('followers')
     )
     expect(derivePageUrlCall).toBeDefined()
-    expect((derivePageUrlCall![0] as string)).toBe('https://example.com/followers/')
+    expect((derivePageUrlCall![0] as string)).toBe('https://example.com/actor/followers/')
   })
 })

@@ -20,11 +20,10 @@ export async function waitForServer(url: string, timeout: number): Promise<void>
   const start = Date.now()
   while (Date.now() - start < timeout) {
     try {
-      const response = await fetch(`${url}/outbox`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' }
+      const response = await fetch(`${url}/.well-known/webfinger?resource=acct:test@example.com`, {
+        method: 'GET'
       })
-      if (response.status === 401 || response.status === 403 || response.status === 500) {
+      if (response.status === 404) {
         return
       }
     } catch {}

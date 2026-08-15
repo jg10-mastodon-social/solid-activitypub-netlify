@@ -5,6 +5,8 @@ import { derivePageUrl } from '../services/derivePageUrl.js'
 import { getFollowers } from '../services/getFollowers.js'
 import { persistActivityItem } from '../services/persistActivity.js'
 import { signActivityRequest } from '../signing.js'
+// @ts-ignore
+import { baseUrl } from '../base-url.js'
 
 interface DistributionResult {
   recipient: string
@@ -34,6 +36,8 @@ async function distributeActivity(
         inboxUrl,
         JSON.stringify(activity),
         keyId,
+        actorUrl,
+        baseUrl,
         fetchFn
       )
       results.push({ recipient, status: response.status, ok: response.ok })
@@ -48,6 +52,7 @@ export async function handleOutboxActivity(
   activity: Record<string, unknown>,
   fetch: SolidFetch,
   outboxUrl: string,
+  actorName: string,
   actorUrl: string,
   keyId: string,
   solidStorageBaseUrl?: string
@@ -61,7 +66,7 @@ export async function handleOutboxActivity(
 
   if (solidStorageBaseUrl && isActivityPublic(normalizedActivity)) {
     try {
-      const followers = await getFollowers(solidStorageBaseUrl, fetch)
+      const followers = await getFollowers(solidStorageBaseUrl, actorName, fetch)
       const explicitRecipients = new Set(extractRecipients(normalizedActivity))
       const newRecipients = followers.filter(f => !explicitRecipients.has(f))
 
@@ -72,6 +77,8 @@ export async function handleOutboxActivity(
             inboxUrl,
             JSON.stringify(normalizedActivity),
             keyId,
+            actorUrl,
+            baseUrl,
             fetch
           )
           deliveryResults.push({ recipient: follower, status: response.status, ok: response.ok })

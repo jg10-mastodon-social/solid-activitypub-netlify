@@ -3,9 +3,10 @@ import { Parser, Store } from 'n3'
 
 export async function getFollowers(
   solidStorageBaseUrl: string,
+  actorName: string,
   fetch: SolidFetch
 ): Promise<string[]> {
-  const followersUrl = `${solidStorageBaseUrl}followers/`
+  const followersUrl = `${solidStorageBaseUrl}${actorName}/followers/`
 
   let firstPageUrl: string | null = null
 

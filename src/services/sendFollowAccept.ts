@@ -1,6 +1,8 @@
 import type { SolidFetch } from '../types.js'
 import { fetchActorInbox } from '../activity.js'
 import { signActivityRequest } from '../signing.js'
+// @ts-ignore
+import { baseUrl } from '../base-url.js'
 
 export async function sendFollowAccept(
   followActivity: Record<string, unknown>,
@@ -26,6 +28,8 @@ export async function sendFollowAccept(
     followerInbox,
     JSON.stringify(acceptActivity),
     keyId,
+    actorUrl,
+    baseUrl,
     fetch
   )
 

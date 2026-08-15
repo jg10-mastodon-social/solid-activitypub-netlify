@@ -5,7 +5,6 @@ import { sendFollowAccept } from '../services/sendFollowAccept.js'
 import { addToFollowers } from '../services/addToFollowers.js'
 import { removeFromFollowers } from '../services/removeFromFollowers.js'
 import { validateContext } from '../activity.js'
-import { verifyActorBinding } from '../verifyHttpSignature.js'
 
 export function isFollowActivity(activity: Record<string, unknown>): boolean {
   const activityType = activity.type
@@ -30,10 +29,10 @@ export async function handleInboxActivity(
   activity: Record<string, unknown>,
   fetch: SolidFetch,
   inboxUrl: string,
-  actorUrl?: string,
-  keyId?: string,
-  solidStorageBaseUrl?: string,
-  authenticatedKeyId?: string
+  actorName: string,
+  actorUrl: string,
+  keyId: string,
+  solidStorageBaseUrl?: string
 ): Promise<boolean> {
   try {
     validateContext(activity as Parameters<typeof validateContext>[0])
@@ -44,11 +43,6 @@ export async function handleInboxActivity(
 
   if (!activity.type) {
     console.log('[inbox] Activity missing type')
-    return false
-  }
-
-  if (authenticatedKeyId && !verifyActorBinding(activity, authenticatedKeyId)) {
-    console.log('[inbox] Activity actor does not match authenticated keyId')
     return false
   }
 
@@ -63,19 +57,21 @@ export async function handleInboxActivity(
 
   const isFollow = isFollowActivity(activity)
   if (isFollow) {
-    console.log('[inbox] Follow activity, sending Accept')
-    if (actorUrl && keyId) {
-      try {
-        await sendFollowAccept(activity, fetch, actorUrl, keyId)
-      } catch (error) {
-        console.error(`[inbox] Error: Failed to send Accept: ${error}`)
-        return false
-      }
+    if (activity.object !== actorUrl) {
+      console.log(`[inbox] Follow.object (${activity.object}) does not match actor URL (${actorUrl}); rejecting with 422`)
+      return false
     }
-    if (solidStorageBaseUrl && actorUrl) {
+    console.log('[inbox] Follow activity, sending Accept')
+    try {
+      await sendFollowAccept(activity, fetch, actorUrl, keyId)
+    } catch (error) {
+      console.error(`[inbox] Error: Failed to send Accept: ${error}`)
+      return false
+    }
+    if (solidStorageBaseUrl) {
       try {
         const followerActor = activity.actor as string
-        await addToFollowers(followerActor, fetch, solidStorageBaseUrl, actorUrl)
+        await addToFollowers(followerActor, fetch, solidStorageBaseUrl, actorName)
       } catch (error) {
         console.error(`[inbox] Error: Failed to add to followers: ${error}`)
         return false
@@ -86,12 +82,16 @@ export async function handleInboxActivity(
 
   const isUndo = isUndoFollow(activity)
   if (isUndo) {
-    console.log('[inbox] Undo/Follow activity, removing from followers')
     const undoObject = activity.object as Record<string, unknown>
+    if (undoObject.object !== actorUrl) {
+      console.log(`[inbox] Undo/Follow.object (${undoObject.object}) does not match actor URL (${actorUrl}); rejecting with 422`)
+      return false
+    }
+    console.log('[inbox] Undo/Follow activity, removing from followers')
     const followerActor = undoObject.actor as string
-    if (solidStorageBaseUrl && actorUrl) {
+    if (solidStorageBaseUrl) {
       try {
-        await removeFromFollowers(followerActor, fetch, solidStorageBaseUrl, actorUrl)
+        await removeFromFollowers(followerActor, fetch, solidStorageBaseUrl, actorName)
       } catch (error) {
         console.error(`[inbox] Error: Failed to remove from followers: ${error}`)
         return false

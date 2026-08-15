@@ -32,7 +32,8 @@ describe('outbox broadcast to followers', () => {
     const result = await handleOutboxActivity(
       activity,
       mockFetch as SolidFetch,
-      'https://example.com/outbox/',
+      'https://example.com/storage/actor/outbox/',
+      'actor',
       'https://example.com/actor',
       'https://example.com/actor#main-key',
       'https://example.com/storage/'
@@ -48,27 +49,27 @@ describe('outbox broadcast to followers', () => {
     let callCount = 0
     mockFetch.mockImplementation(async (url: string) => {
       callCount++
-      if (url === 'https://example.com/storage/followers/') {
+      if (url === 'https://example.com/storage/actor/followers/') {
         return {
           ok: true,
           status: 200,
           text: () => Promise.resolve(`
 @prefix as: <https://www.w3.org/ns/activitystreams#> .
 
-<https://example.com/storage/followers/>
+<https://example.com/storage/actor/followers/>
   a as:OrderedCollection ;
-  as:first <https://example.com/storage/followers/pages/1> .
+  as:first <https://example.com/storage/actor/followers/pages/1> .
 `)
         }
       }
-      if (url === 'https://example.com/storage/followers/pages/1') {
+      if (url === 'https://example.com/storage/actor/followers/pages/1') {
         return {
           ok: true,
           status: 200,
           text: () => Promise.resolve(`
 @prefix as: <https://www.w3.org/ns/activitystreams#> .
 
-<https://example.com/storage/followers/pages/1>
+<https://example.com/storage/actor/followers/pages/1>
   a as:OrderedCollectionPage ;
   as:items [
     a as:Follow ;
@@ -110,7 +111,8 @@ describe('outbox broadcast to followers', () => {
     const result = await handleOutboxActivity(
       activity,
       mockFetch as SolidFetch,
-      'https://example.com/outbox/',
+      'https://example.com/storage/actor/outbox/',
+      'actor',
       'https://example.com/actor',
       'https://example.com/actor#main-key',
       'https://example.com/storage/'
@@ -125,27 +127,27 @@ describe('outbox broadcast to followers', () => {
     const { handleOutboxActivity } = await import('../../src/handlers/outbox.js')
 
     mockFetch.mockImplementation(async (url: string) => {
-      if (url === 'https://example.com/storage/followers/') {
+      if (url === 'https://example.com/storage/actor/followers/') {
         return {
           ok: true,
           status: 200,
           text: () => Promise.resolve(`
 @prefix as: <https://www.w3.org/ns/activitystreams#> .
 
-<https://example.com/storage/followers/>
+<https://example.com/storage/actor/followers/>
   a as:OrderedCollection ;
-  as:first <https://example.com/storage/followers/pages/1> .
+  as:first <https://example.com/storage/actor/followers/pages/1> .
 `)
         }
       }
-      if (url === 'https://example.com/storage/followers/pages/1') {
+      if (url === 'https://example.com/storage/actor/followers/pages/1') {
         return {
           ok: true,
           status: 200,
           text: () => Promise.resolve(`
 @prefix as: <https://www.w3.org/ns/activitystreams#> .
 
-<https://example.com/storage/followers/pages/1>
+<https://example.com/storage/actor/followers/pages/1>
   a as:OrderedCollectionPage ;
   as:items [
     a as:Follow ;
@@ -178,7 +180,8 @@ describe('outbox broadcast to followers', () => {
     const result = await handleOutboxActivity(
       activity,
       mockFetch as SolidFetch,
-      'https://example.com/outbox/',
+      'https://example.com/storage/actor/outbox/',
+      'actor',
       'https://example.com/actor',
       'https://example.com/actor#main-key',
       'https://example.com/storage/'
@@ -192,27 +195,27 @@ describe('outbox broadcast to followers', () => {
     const { handleOutboxActivity } = await import('../../src/handlers/outbox.js')
 
     mockFetch.mockImplementation(async (url: string) => {
-      if (url === 'https://example.com/storage/followers/') {
+      if (url === 'https://example.com/storage/actor/followers/') {
         return {
           ok: true,
           status: 200,
           text: () => Promise.resolve(`
 @prefix as: <https://www.w3.org/ns/activitystreams#> .
 
-<https://example.com/storage/followers/>
+<https://example.com/storage/actor/followers/>
   a as:OrderedCollection ;
-  as:first <https://example.com/storage/followers/pages/1> .
+  as:first <https://example.com/storage/actor/followers/pages/1> .
 `)
         }
       }
-      if (url === 'https://example.com/storage/followers/pages/1') {
+      if (url === 'https://example.com/storage/actor/followers/pages/1') {
         return {
           ok: true,
           status: 200,
           text: () => Promise.resolve(`
 @prefix as: <https://www.w3.org/ns/activitystreams#> .
 
-<https://example.com/storage/followers/pages/1>
+<https://example.com/storage/actor/followers/pages/1>
   a as:OrderedCollectionPage ;
   as:items [
     a as:Follow ;
@@ -255,7 +258,8 @@ describe('outbox broadcast to followers', () => {
     const result = await handleOutboxActivity(
       activity,
       mockFetch as SolidFetch,
-      'https://example.com/outbox/',
+      'https://example.com/storage/actor/outbox/',
+      'actor',
       'https://example.com/actor',
       'https://example.com/actor#main-key',
       'https://example.com/storage/'
@@ -271,7 +275,7 @@ describe('outbox broadcast to followers', () => {
     const { handleOutboxActivity } = await import('../../src/handlers/outbox.js')
 
     mockFetch.mockImplementation(async (url: string) => {
-      if (url === 'https://example.com/storage/followers/') {
+      if (url === 'https://example.com/storage/actor/followers/') {
         return {
           ok: false,
           status: 500
@@ -300,7 +304,8 @@ describe('outbox broadcast to followers', () => {
     const result = await handleOutboxActivity(
       activity,
       mockFetch as SolidFetch,
-      'https://example.com/outbox/',
+      'https://example.com/storage/actor/outbox/',
+      'actor',
       'https://example.com/actor',
       'https://example.com/actor#main-key',
       'https://example.com/storage/'

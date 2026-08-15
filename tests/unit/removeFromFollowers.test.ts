@@ -18,12 +18,12 @@ describe('removeFromFollowers', () => {
       .mockResolvedValueOnce({
         ok: true,
         status: 200,
-        text: () => Promise.resolve(`<https://example.com/followers/> <https://www.w3.org/ns/activitystreams#first> <https://example.com/followers/pages/123>.`)
+        text: () => Promise.resolve(`<https://example.com/actor/followers/> <https://www.w3.org/ns/activitystreams#first> <https://example.com/actor/followers/pages/123>.`)
       })
       .mockResolvedValueOnce({
         ok: true,
         status: 200,
-        text: () => Promise.resolve(`<https://example.com/followers/pages/123> <https://www.w3.org/ns/activitystreams#items> <https://other.example/actor/follow/123>.
+        text: () => Promise.resolve(`<https://example.com/actor/followers/pages/123> <https://www.w3.org/ns/activitystreams#items> <https://other.example/actor/follow/123>.
 <https://other.example/actor/follow/123> a <https://www.w3.org/ns/activitystreams#Follow>.
 <https://other.example/actor/follow/123> <https://www.w3.org/ns/activitystreams#actor> <https://other.example/actor>.`)
       })
@@ -41,7 +41,7 @@ describe('removeFromFollowers', () => {
       'https://other.example/actor',
       mockFetch as SolidFetch,
       'https://example.com/',
-      'https://example.com/actor'
+      'actor'
     )
 
     const patchCall = mockFetch.mock.calls.find(call => call[1]?.method === 'PATCH')
@@ -57,12 +57,12 @@ describe('removeFromFollowers', () => {
       .mockResolvedValueOnce({
         ok: true,
         status: 200,
-        text: () => Promise.resolve(`<https://example.com/followers/> <https://www.w3.org/ns/activitystreams#first> <https://example.com/followers/pages/123>.`)
+        text: () => Promise.resolve(`<https://example.com/actor/followers/> <https://www.w3.org/ns/activitystreams#first> <https://example.com/actor/followers/pages/123>.`)
       })
       .mockResolvedValueOnce({
         ok: true,
         status: 200,
-        text: () => Promise.resolve(`<https://example.com/followers/pages/123> <https://www.w3.org/ns/activitystreams#items> <https://other.example/actor/follow/123>.
+        text: () => Promise.resolve(`<https://example.com/actor/followers/pages/123> <https://www.w3.org/ns/activitystreams#items> <https://other.example/actor/follow/123>.
 <https://other.example/actor/follow/123> a <https://www.w3.org/ns/activitystreams#Follow>.
 <https://other.example/actor/follow/123> <https://www.w3.org/ns/activitystreams#actor> <https://other.example/actor>.`)
       })
@@ -80,14 +80,14 @@ describe('removeFromFollowers', () => {
       'https://other.example/actor',
       mockFetch as SolidFetch,
       'https://example.com/',
-      'https://example.com/actor'
+      'actor'
     )
 
     const followersCall = mockFetch.mock.calls.find(call =>
       (call[0] as string).includes('followers')
     )
     expect(followersCall).toBeDefined()
-    expect((followersCall![0] as string)).toBe('https://example.com/followers/')
+    expect((followersCall![0] as string)).toBe('https://example.com/actor/followers/')
   })
 
   it('should resolve relative URL in first page link', async () => {
@@ -101,7 +101,7 @@ describe('removeFromFollowers', () => {
       .mockResolvedValueOnce({
         ok: true,
         status: 200,
-        text: () => Promise.resolve(`<https://example.com/followers/pages/1785063320555> <https://www.w3.org/ns/activitystreams#items> <https://other.example/actor/follow/123>.
+        text: () => Promise.resolve(`<https://example.com/actor/followers/pages/1785063320555> <https://www.w3.org/ns/activitystreams#items> <https://other.example/actor/follow/123>.
 <https://other.example/actor/follow/123> a <https://www.w3.org/ns/activitystreams#Follow>.
 <https://other.example/actor/follow/123> <https://www.w3.org/ns/activitystreams#actor> <https://other.example/actor>.`)
       })
@@ -119,12 +119,12 @@ describe('removeFromFollowers', () => {
       'https://other.example/actor',
       mockFetch as SolidFetch,
       'https://example.com/',
-      'https://example.com/actor'
+      'actor'
     )
 
     const patchCall = mockFetch.mock.calls.find(call => call[1]?.method === 'PATCH')
     expect(patchCall).toBeDefined()
-    expect(patchCall![0] as string).toBe('https://example.com/followers/pages/1785063320555')
+    expect(patchCall![0] as string).toBe('https://example.com/actor/followers/pages/1785063320555')
   })
 
   it('should handle multi-line Turtle format with semicolons', async () => {
@@ -133,7 +133,7 @@ describe('removeFromFollowers', () => {
       .mockResolvedValueOnce({
         ok: true,
         status: 200,
-        text: () => Promise.resolve(`<> <https://www.w3.org/ns/activitystreams#first> <https://example.com/followers/pages/123>.`)
+        text: () => Promise.resolve(`<> <https://www.w3.org/ns/activitystreams#first> <https://example.com/alice/followers/pages/123>.`)
       })
       .mockResolvedValueOnce({
         ok: true,
@@ -145,7 +145,7 @@ describe('removeFromFollowers', () => {
     as:items <https://activitypub.academy/users/albilus_puhuss/follow/1785410321943>.
 <https://activitypub.academy/users/albilus_puhuss/follow/1785410321943> a as:Follow;
     as:actor <https://activitypub.academy/users/albilus_puhuss>;
-    as:object <https://6a6b3224e294e60f3fd8c2da--willowy-kleicha-1afcb6.netlify.app/actor>.`)
+    as:object <https://6a6b3224e294e60f3fd8c2da--willowy-kleicha-1afcb6.netlify.app/alice>.`)
       })
       .mockResolvedValueOnce({
         ok: true,
@@ -166,7 +166,7 @@ describe('removeFromFollowers', () => {
       'https://activitypub.academy/users/albilus_puhuss',
       mockFetch as SolidFetch,
       'https://example.com/',
-      'https://6a6b3224e294e60f3fd8c2da--willowy-kleicha-1afcb6.netlify.app/actor'
+      'alice'
     )
 
     const patchCall = mockFetch.mock.calls.find(call => call[1]?.method === 'PATCH')
@@ -182,7 +182,7 @@ describe('removeFromFollowers', () => {
       .mockResolvedValueOnce({
         ok: true,
         status: 200,
-        text: () => Promise.resolve(`<> <https://www.w3.org/ns/activitystreams#first> <https://example.com/followers/pages/1>.`)
+        text: () => Promise.resolve(`<> <https://www.w3.org/ns/activitystreams#first> <https://example.com/actor/followers/pages/1>.`)
       })
       .mockResolvedValueOnce({
         ok: true,
@@ -191,7 +191,7 @@ describe('removeFromFollowers', () => {
 
 <> a as:OrderedCollectionPage;
     as:partOf <../>;
-    as:next <https://example.com/followers/pages/2>;
+    as:next <https://example.com/actor/followers/pages/2>;
     as:items <https://other.example/actor/follow/456>.
 <https://other.example/actor/follow/456> a as:Follow;
     as:actor <https://other.example/actor>;
@@ -204,7 +204,7 @@ describe('removeFromFollowers', () => {
 
 <> a as:OrderedCollectionPage;
     as:partOf <../>;
-    as:next <https://example.com/followers/pages/2>;
+    as:next <https://example.com/actor/followers/pages/2>;
     as:items <https://other.example/actor/follow/456>.
 <https://other.example/actor/follow/456> a as:Follow;
     as:actor <https://other.example/actor>;
@@ -231,11 +231,11 @@ describe('removeFromFollowers', () => {
       'https://activitypub.academy/users/albilus_puhuss',
       mockFetch as SolidFetch,
       'https://example.com/',
-      'https://example.com/actor'
+      'actor'
     )
 
     const patchCall = mockFetch.mock.calls.find(call => call[1]?.method === 'PATCH')
     expect(patchCall).toBeDefined()
-    expect(patchCall![0] as string).toBe('https://example.com/followers/pages/2')
+    expect(patchCall![0] as string).toBe('https://example.com/actor/followers/pages/2')
   })
 })

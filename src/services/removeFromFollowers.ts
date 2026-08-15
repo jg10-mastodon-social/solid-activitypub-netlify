@@ -7,9 +7,9 @@ export async function removeFromFollowers(
   followerActor: string,
   fetch: SolidFetch,
   solidStorageBaseUrl: string,
-  actorUrl: string
+  actorName: string
 ): Promise<void> {
-  const followersUrl = `${solidStorageBaseUrl}followers/`
+  const followersUrl = `${solidStorageBaseUrl}${actorName}/followers/`
 
   let currentPageUrl: string | null = null
 
@@ -40,15 +40,16 @@ export async function removeFromFollowers(
   while (pageUrl) {
     const deleted = await removeFromPage(pageUrl, followerActor, fetch)
     if (deleted) {
-      console.log(`[inbox] Removed ${followerActor} from followers collection`)
+      console.log(`[inbox] Removed ${followerActor} from ${actorName} followers collection`)
       return
     }
 
-    const nextPageUrl = await getNextPageUrl(pageUrl, fetch)
+    const nextPageUrl: string | null = await getNextPageUrl(pageUrl, fetch)
+    if (!nextPageUrl) break
     pageUrl = nextPageUrl
   }
 
-  throw new Error(`Could not find follower ${followerActor} in followers collection`)
+  throw new Error(`Could not find follower ${followerActor} in ${actorName} followers collection`)
 }
 
 async function removeFromPage(

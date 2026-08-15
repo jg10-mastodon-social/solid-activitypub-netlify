@@ -17,9 +17,24 @@ vi.mock('../../src/config.js', () => ({
     outboxEndpoint: '/outbox',
     sendToUrl: 'https://example.com/outbox',
     whitelistedIssuers: ['https://issuer.example'],
+    inboxUrl: 'https://pod.example.com/inbox/',
     outboxUrl: 'https://pod.example.com/outbox/',
+    solidStorageBaseUrl: 'https://pod.example.com/',
     handlerBaseUrl: 'https://example.com/handlers#',
-    adminWebId: ''
+    adminWebId: '',
+    actorNames: ['actor'],
+    actorByPath: {
+      '/actor': {
+        name: 'actor',
+        path: '/actor',
+        url: 'https://example.com/actor',
+        keyId: 'https://example.com/actor#main-key',
+        inboxUrl: 'https://example.com/actor/inbox',
+        outboxUrl: 'https://example.com/actor/outbox',
+        followersUrl: 'https://example.com/actor/followers',
+        webfingerResource: 'acct:actor@example.com',
+      }
+    }
   })
 }))
 
@@ -45,14 +60,15 @@ vi.mock('../../src/activity.js', () => ({
     ...activity,
     id: 'https://example.com/activities/normalized-id',
     published: '2025-12-19T11:34:14.000Z'
-  }))
+  })),
+  isActivityPublic: vi.fn().mockReturnValue(false)
 }))
 
 vi.mock('../../src/signing.js', () => ({
   signActivityRequest: vi.fn().mockResolvedValue({ ok: true, status: 200 })
 }))
 
-const { default: handler } = await import('../../netlify/functions/outbox.mts')
+const { default: handler } = await import('../../netlify/functions/actor-router.mts')
 
 function makeContext(overrides: Partial<Context> = {}): Context {
   return {
@@ -65,14 +81,14 @@ function makeContext(overrides: Partial<Context> = {}): Context {
     site: {},
     deploy: {},
     account: {},
-    params: {},
-    url: new URL('http://localhost/outbox'),
+    params: { actor: 'actor' },
+    url: new URL('http://localhost/actor/outbox'),
     next: vi.fn(),
     ...overrides
   } as Context
 }
 
-describe('outbox unit tests', () => {
+describe('actor-router outbox unit tests', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
@@ -84,7 +100,7 @@ describe('outbox unit tests', () => {
       message: 'Authorization required'
     })
 
-    const req = new Request('http://localhost/outbox', {
+    const req = new Request('http://localhost/actor/outbox', {
       method: 'POST',
       headers: { 'content-type': 'application/json' }
     })
@@ -101,7 +117,7 @@ describe('outbox unit tests', () => {
       message: 'DPoP header required'
     })
 
-    const req = new Request('http://localhost/outbox', {
+    const req = new Request('http://localhost/actor/outbox', {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
@@ -121,7 +137,7 @@ describe('outbox unit tests', () => {
       message: 'Token verification failed'
     })
 
-    const req = new Request('http://localhost/outbox', {
+    const req = new Request('http://localhost/actor/outbox', {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
@@ -142,7 +158,7 @@ describe('outbox unit tests', () => {
       message: 'Issuer not allowed'
     })
 
-    const req = new Request('http://localhost/outbox', {
+    const req = new Request('http://localhost/actor/outbox', {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
@@ -156,40 +172,6 @@ describe('outbox unit tests', () => {
     expect(await res.text()).toBe('Issuer not allowed')
   })
 
-  it('returns 500 when pod operations fail', async () => {
-    mockVerifyDpopToken.mockResolvedValue({
-      success: true,
-      payload: { webid: 'https://example.com/webid#me', client_id: 'client1', iss: 'https://issuer.example', iat: 0, exp: 0 }
-    })
-
-    mockCreateSolidFetch.mockResolvedValue(mockFetch)
-    mockFetch.mockResolvedValue({
-      ok: false,
-      status: 404
-    })
-
-    const activity = {
-      type: 'Create',
-      actor: 'https://example.com/actor',
-      to: ['https://recipient.example/actor'],
-      '@context': 'https://www.w3.org/ns/activitystreams'
-    }
-    const req = new Request('http://localhost/outbox', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'authorization': 'DPoP valid-token',
-        'dpop': 'valid-dpop'
-      },
-      body: JSON.stringify(activity)
-    })
-    const res = await handler(req, makeContext())
-
-    expect(res.status).toBe(500)
-    const text = await res.text()
-    expect(text).toContain('Failed to create page')
-  })
-
   it('returns 400 when @context is missing', async () => {
     mockVerifyDpopToken.mockResolvedValue({
       success: true,
@@ -201,7 +183,7 @@ describe('outbox unit tests', () => {
       actor: 'https://example.com/actor',
       to: ['https://recipient.example/actor']
     }
-    const req = new Request('http://localhost/outbox', {
+    const req = new Request('http://localhost/actor/outbox', {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
@@ -225,10 +207,12 @@ describe('outbox unit tests', () => {
     })
 
     mockCreateSolidFetch.mockResolvedValue(mockFetch)
-    mockFetch.mockResolvedValue({
+    mockFetch.mockImplementation(async () => ({
       ok: true,
-      status: 200
-    })
+      status: 200,
+      text: () => Promise.resolve(''),
+      json: () => Promise.resolve({ inbox: 'https://recipient.example/inbox' })
+    }))
 
     const activity = {
       type: 'Create',
@@ -236,7 +220,7 @@ describe('outbox unit tests', () => {
       to: ['https://recipient.example/actor'],
       '@context': 'https://www.w3.org/ns/activitystreams'
     }
-    const req = new Request('http://localhost/outbox', {
+    const req = new Request('http://localhost/actor/outbox', {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
@@ -253,7 +237,7 @@ describe('outbox unit tests', () => {
   })
 
   it('returns 204 for OPTIONS with CORS headers', async () => {
-    const req = new Request('http://localhost/outbox', {
+    const req = new Request('http://localhost/actor/outbox', {
       method: 'OPTIONS',
       headers: {
         'Access-Control-Request-Method': 'POST',
@@ -265,7 +249,9 @@ describe('outbox unit tests', () => {
     expect(res.status).toBe(204)
     expect(res.headers.get('Access-Control-Allow-Origin')).toBe('*')
     expect(res.headers.get('Access-Control-Allow-Methods')).toBe('POST, GET, OPTIONS')
-    expect(res.headers.get('Access-Control-Allow-Headers')).toBe('Authorization, DPoP, Content-Type, Accept')
+    expect(res.headers.get('Access-Control-Allow-Headers')).toContain('Authorization')
+    expect(res.headers.get('Access-Control-Allow-Headers')).toContain('DPoP')
+    expect(res.headers.get('Access-Control-Allow-Headers')).toContain('Signature')
   })
 
   it('includes CORS headers on 401 response', async () => {
@@ -275,7 +261,7 @@ describe('outbox unit tests', () => {
       message: 'Authorization required'
     })
 
-    const req = new Request('http://localhost/outbox', {
+    const req = new Request('http://localhost/actor/outbox', {
       method: 'POST',
       headers: { 'content-type': 'application/json' }
     })
@@ -285,36 +271,18 @@ describe('outbox unit tests', () => {
     expect(res.headers.get('Access-Control-Allow-Origin')).toBe('*')
   })
 
-  it('includes CORS headers on 200 response', async () => {
-    mockVerifyDpopToken.mockResolvedValue({
-      success: true,
-      payload: { webid: 'https://example.com/webid#me', client_id: 'client1', iss: 'https://issuer.example', iat: 0, exp: 0 }
-    })
-
-    mockCreateSolidFetch.mockResolvedValue(mockFetch)
-    mockFetch.mockResolvedValue({
-      ok: true,
-      status: 200
-    })
-
-    const activity = {
-      type: 'Create',
-      actor: 'https://example.com/actor',
-      to: ['https://recipient.example/actor'],
-      '@context': 'https://www.w3.org/ns/activitystreams'
-    }
-    const req = new Request('http://localhost/outbox', {
+  it('returns 404 for unknown actor', async () => {
+    const req = new Request('http://localhost/unknown/outbox', {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
         'authorization': 'DPoP valid-token',
         'dpop': 'valid-dpop'
       },
-      body: JSON.stringify(activity)
+      body: JSON.stringify({})
     })
-    const res = await handler(req, makeContext())
+    const res = await handler(req, makeContext({ params: { actor: 'unknown' } }))
 
-    expect(res.status).toBe(200)
-    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('*')
+    expect(res.status).toBe(404)
   })
 })

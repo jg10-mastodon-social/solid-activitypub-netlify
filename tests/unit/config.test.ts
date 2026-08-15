@@ -167,7 +167,7 @@ describe('loadConfig', () => {
     expect(() => loadConfig()).toThrow('SOLID_STORAGE_BASE_URL must end with /')
   })
 
-  it('defaults actorName to actor and actorPath to /actor when ACTOR_NAME is not set', async () => {
+  it('defaults actorNames to ["actor"] when ACTOR_NAME is not set', async () => {
     delete process.env.ACTOR_NAME
     process.env.WHITELISTED_ISSUERS = 'https://mocked.example.com'
     process.env.HANDLER_BASE_URL = 'https://mocked.example.com/handlers#'
@@ -176,12 +176,14 @@ describe('loadConfig', () => {
     const { loadConfig } = await import('../../src/config.js')
     const config = loadConfig()
 
-    expect(config.actorName).toBe('actor')
-    expect(config.actorPath).toBe('/actor')
+    expect(config.actorNames).toEqual(['actor'])
+    expect(config.actorByPath['/actor']).toBeDefined()
+    expect(config.actorByPath['/actor'].url).toBe('https://mocked.example.com/actor')
+    expect(config.actorByPath['/actor'].keyId).toBe('https://mocked.example.com/actor#main-key')
   })
 
-  it('sets actorName and actorPath from ACTOR_NAME env var', async () => {
-    process.env.ACTOR_NAME = 'myactor'
+  it('parses comma-separated ACTOR_NAME and builds actorByPath entries', async () => {
+    process.env.ACTOR_NAME = 'alice,bob'
     process.env.WHITELISTED_ISSUERS = 'https://mocked.example.com'
     process.env.HANDLER_BASE_URL = 'https://mocked.example.com/handlers#'
     process.env.SOLID_STORAGE_BASE_URL = 'https://pod.example.com/'
@@ -189,7 +191,20 @@ describe('loadConfig', () => {
     const { loadConfig } = await import('../../src/config.js')
     const config = loadConfig()
 
-    expect(config.actorName).toBe('myactor')
-    expect(config.actorPath).toBe('/myactor')
+    expect(config.actorNames).toEqual(['alice', 'bob'])
+    expect(config.actorByPath['/alice'].url).toBe('https://mocked.example.com/alice')
+    expect(config.actorByPath['/bob'].url).toBe('https://mocked.example.com/bob')
+  })
+
+  it('trims whitespace and rejects empty ACTOR_NAME entries', async () => {
+    process.env.ACTOR_NAME = '  alice , , bob  '
+    process.env.WHITELISTED_ISSUERS = 'https://mocked.example.com'
+    process.env.HANDLER_BASE_URL = 'https://mocked.example.com/handlers#'
+    process.env.SOLID_STORAGE_BASE_URL = 'https://pod.example.com/'
+
+    const { loadConfig } = await import('../../src/config.js')
+    const config = loadConfig()
+
+    expect(config.actorNames).toEqual(['alice', 'bob'])
   })
 })

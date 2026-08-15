@@ -11,7 +11,8 @@ const rootDir = path.resolve(__dirname, '..')
 const publicDir = path.join(rootDir, 'public')
 const baseUrlPath = path.join(rootDir, 'src/base-url.ts')
 const privateKeyPath = path.join(rootDir, 'src/private-key.ts')
-const actorPrivateKeyPath = path.join(rootDir, 'src/actor-private-key.ts')
+const actorKeysPath = path.join(rootDir, 'src/actor-keys.ts')
+const webfingerDataPath = path.join(rootDir, 'src/webfinger-data.ts')
 
 const context = process.env.CONTEXT
 let baseUrl: string | undefined
@@ -45,6 +46,15 @@ function derivePublicJwk(privateJwk: Record<string, unknown>): Record<string, un
     alg: 'ES256',
     kid: privateJwk.kid,
   }
+}
+
+function parseActorNames(raw: string | undefined): string[] {
+  if (!raw) return ['actor']
+  const names = raw.split(',').map((s) => s.trim()).filter((s) => s.length > 0)
+  if (names.length === 0) {
+    throw new Error('ACTOR_NAME must contain at least one non-empty actor name')
+  }
+  return names
 }
 
 async function generateIdentity() {
@@ -128,61 +138,79 @@ async function generateIdentity() {
   fs.writeFileSync(privateKeyPath, `export const privateKey = ${JSON.stringify(privateJwk)}\n`)
   console.log(`Written: ${privateKeyPath}`)
 
-  console.log('Generating actor and webfinger')
-  const { publicKey: actorPublicKey, privateKey: actorPrivateKey } = await generateKeyPair('RS256')
-  const actorPublicJwk = await exportJWK(actorPublicKey)
-  const actorPrivateJwk = await exportJWK(actorPrivateKey)
-  const actorPublicKeyPem = await exportSPKI(actorPublicKey)
-  const actorPrivateKeyPem = await exportPKCS8(actorPrivateKey)
+  console.log('Generating actor documents, keys, and webfinger data')
+  const actorNames = parseActorNames(process.env.ACTOR_NAME)
+  const domain = (baseUrl as string).replace(/^https?:\/\//, '')
+  const actorKeys: Record<string, Record<string, unknown>> = {}
+  const webfingerEntries: Record<string, unknown> = {}
 
-  const actorName = process.env.ACTOR_NAME || 'actor'
-  const actorUrl = `${baseUrl}/${actorName}`
+  for (const actorName of actorNames) {
+    const { publicKey: actorPublicKey, privateKey: actorPrivateKey } = await generateKeyPair('RS256')
+    const actorPrivateJwk = await exportJWK(actorPrivateKey)
+    const actorPublicKeyPem = await exportSPKI(actorPublicKey)
+    const actorPrivateKeyPem = await exportPKCS8(actorPrivateKey)
 
-  const actor = {
-    '@context': [
-      'https://www.w3.org/ns/activitystreams',
-      'https://w3id.org/security/v1'
-    ],
-    id: actorUrl,
-    type: 'Service',
-    preferredUsername: actorName,
-    inbox: `${baseUrl}/inbox`,
-    outbox: `${baseUrl}/outbox`,
-    followers: `${baseUrl}/followers`,
-    following: `${baseUrl}/following`,
-    liked: `${baseUrl}/liked`,
-    publicKey: {
-      id: `${actorUrl}#main-key`,
-      owner: actorUrl,
-      publicKeyPem: actorPublicKeyPem
-    },
-    manuallyApprovesFollowers: false
+    const actorUrl = `${baseUrl}/${actorName}`
+
+    const actor = {
+      '@context': [
+        'https://www.w3.org/ns/activitystreams',
+        'https://w3id.org/security/v1'
+      ],
+      id: actorUrl,
+      type: 'Service',
+      preferredUsername: actorName,
+      inbox: `${baseUrl}/${actorName}/inbox`,
+      outbox: `${baseUrl}/${actorName}/outbox`,
+      followers: `${baseUrl}/${actorName}/followers`,
+      following: `${baseUrl}/${actorName}/following`,
+      liked: `${baseUrl}/${actorName}/liked`,
+      publicKey: {
+        id: `${actorUrl}#main-key`,
+        owner: actorUrl,
+        publicKeyPem: actorPublicKeyPem
+      },
+      manuallyApprovesFollowers: false
+    }
+
+    const actorPath = path.join(publicDir, actorName)
+    fs.writeFileSync(actorPath, JSON.stringify(actor, null, 2))
+    console.log(`Written: ${actorPath}`)
+
+    actorKeys[actorName] = actorPrivateJwk
+
+    const resource = `acct:${actorName}@${domain}`
+    webfingerEntries[resource] = {
+      subject: resource,
+      aliases: [actorUrl],
+      links: [
+        {
+          rel: 'self',
+          type: 'application/activity+json',
+          href: actorUrl
+        }
+      ]
+    }
   }
 
-  const actorPath = path.join(publicDir, actorName)
-  fs.writeFileSync(actorPath, JSON.stringify(actor, null, 2))
-  console.log(`Written: ${actorPath}`)
+  fs.writeFileSync(actorKeysPath, `export const actorKeys: Record<string, Record<string, unknown>> = ${JSON.stringify(actorKeys, null, 2)}\n`)
+  console.log(`Written: ${actorKeysPath}`)
 
-  const domain = baseUrl.replace(/^https?:\/\//, '')
-  const webfinger = {
-    subject: `acct:${actorName}@${domain}`,
-    aliases: [actorUrl],
-    links: [
-      {
-        rel: 'self',
-        type: 'application/activity+json',
-        href: actorUrl
-      }
-    ]
+  fs.writeFileSync(webfingerDataPath, `export const webfingerEntries: Record<string, unknown> = ${JSON.stringify(webfingerEntries, null, 2)}\n`)
+  console.log(`Written: ${webfingerDataPath}`)
+
+  const headersLines: string[] = []
+  for (const actorName of actorNames) {
+    headersLines.push(`/${actorName}`)
+    headersLines.push(`  Content-Type: application/activity+json`)
+    headersLines.push(`  Access-Control-Allow-Origin: *`)
+    headersLines.push(`  Access-Control-Allow-Methods: GET, OPTIONS`)
+    headersLines.push(`  Access-Control-Allow-Headers: Content-Type`)
+    headersLines.push('')
   }
-
-  const webfingerPath = path.join(publicDir, '.well-known', 'webfinger')
-  fs.mkdirSync(path.dirname(webfingerPath), { recursive: true })
-  fs.writeFileSync(webfingerPath, JSON.stringify(webfinger, null, 2))
-  console.log(`Written: ${webfingerPath}`)
-
-  fs.writeFileSync(actorPrivateKeyPath, `export const actorPrivateKey = ${JSON.stringify(actorPrivateJwk)}\n`)
-  console.log(`Written: ${actorPrivateKeyPath}`)
+  const headersPath = path.join(publicDir, '_headers')
+  fs.writeFileSync(headersPath, headersLines.join('\n'))
+  console.log(`Written: ${headersPath}`)
 
   console.log('Identity files generated successfully')
 }

@@ -10,6 +10,17 @@ export type SolidFetch = (
   init?: RequestInit
 ) => Promise<Response>
 
+export interface ActorConfig {
+  name: string
+  path: string
+  url: string
+  keyId: string
+  inboxUrl: string
+  outboxUrl: string
+  followersUrl: string
+  webfingerResource: string
+}
+
 export interface Config {
   webId: string
   issuer: string
@@ -22,8 +33,8 @@ export interface Config {
   adminWebId: string
   inboxUrl: string
   outboxUrl: string
-  actorName: string
-  actorPath: string
+  actorNames: string[]
+  actorByPath: Record<string, ActorConfig>
 }
 
 export interface TokenPayload {

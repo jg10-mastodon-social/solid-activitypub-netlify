@@ -12,7 +12,7 @@ describe('outbox e2e tests', () => {
     }
   })
   it('returns 401 without authorization header', async () => {
-    const res = await fetch(`${devServerUrl}/outbox`, {
+    const res = await fetch(`${devServerUrl}/actor/outbox`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' }
     })
@@ -22,7 +22,7 @@ describe('outbox e2e tests', () => {
   })
 
   it('returns 401 without DPoP header', async () => {
-    const res = await fetch(`${devServerUrl}/outbox`, {
+    const res = await fetch(`${devServerUrl}/actor/outbox`, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
@@ -35,7 +35,7 @@ describe('outbox e2e tests', () => {
   })
 
   it('returns 401 with invalid token', async () => {
-    const res = await fetch(`${devServerUrl}/outbox`, {
+    const res = await fetch(`${devServerUrl}/actor/outbox`, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
@@ -48,7 +48,7 @@ describe('outbox e2e tests', () => {
   })
 
   it('returns 204 for OPTIONS preflight with CORS headers', async () => {
-    const res = await fetch(`${devServerUrl}/outbox`, {
+    const res = await fetch(`${devServerUrl}/actor/outbox`, {
       method: 'OPTIONS',
       headers: {
         'Access-Control-Request-Method': 'POST',
@@ -124,7 +124,7 @@ describe('outbox e2e tests', () => {
       .sign(identityPrivateKey)
 
     const dpopHeader = await new SignJWT({
-      htu: devServerUrl + '/outbox',
+      htu: devServerUrl + '/actor/outbox',
       htm: 'POST',
       jti: randomUUID(),
     })
@@ -140,7 +140,7 @@ describe('outbox e2e tests', () => {
       object: { type: 'Note', content: 'Hello from outbox' }
     }
 
-    const res = await fetch(`${devServerUrl}/outbox`, {
+    const res = await fetch(`${devServerUrl}/actor/outbox`, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
@@ -197,7 +197,7 @@ describe('outbox e2e tests', () => {
       .sign(identityPrivateKey)
 
     const dpopHeader = await new SignJWT({
-      htu: devServerUrl + '/outbox',
+      htu: devServerUrl + '/actor/outbox',
       htm: 'POST',
       jti: randomUUID(),
     })
@@ -213,7 +213,7 @@ describe('outbox e2e tests', () => {
       object: { type: 'Note', content: 'Hello followers!' }
     }
 
-    const res = await fetch(`${devServerUrl}/outbox`, {
+    const res = await fetch(`${devServerUrl}/actor/outbox`, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
@@ -229,7 +229,7 @@ describe('outbox e2e tests', () => {
     expect(receivedActivities.length).toBeGreaterThan(0)
 
     const followerActivity = receivedActivities.find(
-      a => a.url === `http://localhost:${MOCK_SOLID_PORT}/inbox`
+      a => a.url === `http://localhost:${MOCK_SOLID_PORT}/actor/inbox`
     )
     expect(followerActivity).toBeDefined()
 
@@ -283,7 +283,7 @@ describe('outbox e2e tests', () => {
       .sign(identityPrivateKey)
 
     const dpopHeader = await new SignJWT({
-      htu: devServerUrl + '/outbox',
+      htu: devServerUrl + '/actor/outbox',
       htm: 'POST',
       jti: randomUUID(),
     })
@@ -291,7 +291,7 @@ describe('outbox e2e tests', () => {
       .setIssuedAt(now)
       .sign(dpopKeyPair.privateKey)
 
-    const postRes = await fetch(`${devServerUrl}/outbox`, {
+    const postRes = await fetch(`${devServerUrl}/actor/outbox`, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',

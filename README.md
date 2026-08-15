@@ -27,10 +27,9 @@ netlify build --context=dev
 Build time generates:
 - `src/base-url.ts` - site URL (gitignored)
 - `src/private-key.ts` - OIDC ES256 signing key (gitignored)
-- `src/actor-private-key.ts` - actor RS256 signing key (gitignored)
+- `src/actor-keys.ts` - per-actor RS256 signing keys (gitignored)
 - `public/webid`, `public/jwks.json`, `public/.well-known/openid-configuration` - OIDC identity files
-- `public/${ACTOR_NAME}` - AS2 actor document (public key, inbox, outbox, followers)
-- `public/.well-known/webfinger` - WebFinger discovery document
+- `public/${actorName}` - one AS2 actor document per configured actor (public key, inbox, outbox, followers)
 
 ## Environment Variables
 
@@ -42,61 +41,88 @@ Build time generates:
 | `WEBID` | No | Solid WebID (default: `${BASE_URL}/webid`) |
 | `ISSUER` | No | OIDC issuer (default: `${BASE_URL}`) |
 | `SEND_TO_URL` | No | URL the outbox DPoP token is bound to (default: `${BASE_URL}/outbox`) |
-| `ACTOR_NAME` | No | Path segment for the actor document (default: `actor`) |
+| `ACTOR_NAME` | No | Comma-separated list of actor names. Default: `actor` (single actor). Examples: `alice`, `alice,bob`, `alice, bob, carol`. Whitespace is trimmed. |
 | `ADMIN_WEBID` | No | Admin WebID |
 | `JWKS` | No | Existing OIDC JWK (JSON) to reuse instead of generating a new keypair |
 
 ## How it works
 
-### Outbox POST `/outbox`
+Each configured actor (named in `ACTOR_NAME`) gets its own AS2 document, its own RSA signing key, its own outbox/inbox/followers collection on the pod, and its own per-actor endpoints.
 
-Solid-OIDC-authenticated. The handler ignores any sub-path — paging is managed internally.
+### Outbox POST `/${actorName}/outbox`
 
-1. Verify the DPoP token via `verifyDpopToken` (using `@solid/access-token-verifier`); reject with 401/403 on failure or if the token's issuer is not in `WHITELISTED_ISSUERS`.
-2. Parse the body as JSON; reject 400 on parse error.
-3. Validate `@context` and that `activity.actor` matches the server actor; reject 400/403 on failure.
-4. Normalize the activity: assign `id` and `published` if missing.
-5. Resolve explicit recipients from `to`/`cc`/`bto`/`bcc`/`audience`, look up each recipient's `inbox` via their actor document, and POST the activity there with an HTTP signature (`RSA-SHA256`, signed with the actor key in `src/actor-private-key.ts`).
-6. If the activity is public, load the followers collection from the pod and POST the activity to every follower not already in the explicit-recipient set.
-7. Derive the next paged-outbox slot on the pod (creating a new page when the current one is full, and patching the collection's `first`/`next` links).
-8. Persist the activity to that page by PATCHing a `solid:InsertDeletePatch` against the pod.
+One route per configured actor, e.g. `/alice/outbox`. Solid-OIDC-authenticated. The handler ignores any sub-path — paging is managed internally.
+
+1. Resolve `actorName` from the path; reject 404 if not a configured actor.
+2. Verify the DPoP token via `verifyDpopToken` (using `@solid/access-token-verifier`); reject with 401/403 on failure or if the token's issuer is not in `WHITELISTED_ISSUERS`.
+3. Parse the body as JSON; reject 400 on parse error.
+4. Validate `@context` and that `activity.actor` equals `${BASE_URL}/${actorName}`; reject 400/403 on failure.
+5. Normalize the activity: assign `id` and `published` if missing.
+6. Resolve explicit recipients from `to`/`cc`/`bto`/`bcc`/`audience`, look up each recipient's `inbox` via their actor document, and POST the activity there with an HTTP signature (`RSA-SHA256`, signed with this actor's key from `src/actor-keys.ts`).
+7. If the activity is public, load the followers collection at `${SOLID_STORAGE_BASE_URL}${actorName}/followers/` and POST the activity to every follower not already in the explicit-recipient set.
+8. Derive the next paged-outbox slot under `${SOLID_STORAGE_BASE_URL}${actorName}/outbox/` (creating a new page when the current one is full, and patching the collection's `first`/`next` links).
+9. Persist the activity to that page by PATCHing a `solid:InsertDeletePatch` against the pod.
 
 Response: `200` with `{status, delivered, failed, results}`. Partial delivery is reported, not retried.
 
-### Outbox GET `/outbox`, `/outbox/{page}`
+### Outbox GET `/${actorName}/outbox[/pages/{page}]`
 
-Proxies the paged outbox collection from the pod. No DPoP token is required on the incoming request; only the outgoing fetch to the pod is DPoP-authenticated. The `{page}` is the path of a specific page on the pod (e.g. `pages/12345`); omitting it proxies the collection root.
+Per-actor proxy of the paged outbox collection from the pod. No DPoP token is required on the incoming request; only the outgoing fetch to the pod is DPoP-authenticated. The `{page}` is the path of a specific page on the pod (e.g. `pages/12345`); omitting it proxies the collection root.
 
-1. Load config; resolve the `{page}` from the request path (preserving trailing slash).
-2. Compute the pod target as `${SOLID_STORAGE_BASE_URL}outbox/{page}`.
-3. Create a DPoP-authenticated fetch to the pod and GET the target with the request's `Accept` header (default `text/turtle`).
-4. Read the pod response body.
-5. Rewrite the pod URL prefix to the public base URL in the body so consumers see `${BASE_URL}/outbox/...`.
-6. Return the body to the caller with CORS headers.
-
-### Inbox POST `/inbox`
-
-HTTP-signature-authenticated. The handler ignores any sub-path — paging is managed internally.
-
-1. Parse the body as JSON; reject 400 on parse error.
-2. Verify the HTTP signature on the request via `verifyIncomingActivity`: require `Signature`/`Date`/`Digest` headers, verify the `Digest` against a SHA-256 of the JSON body, fetch the actor's `publicKeyPem` (with SSRF protection), and cryptographically verify the signature. Also bind the actor: `activity.actor` must equal the URL the signing keyId belongs to, else 400.
-3. Switch on activity type:
-   - `Delete` → ack and return (no persistence).
-   - `Follow` → send a signed `Accept` to the follower's inbox and add the follower to the followers collection on the pod.
-   - `Undo` of `Follow` → remove the follower from the collection.
-   - Anything else → derive the next paged-inbox slot and persist via `solid:InsertDeletePatch`.
-
-### Inbox GET `/inbox`, `/inbox/{page}`
-
-DPoP-authenticated proxy of the paged inbox collection on the pod, with pod URLs rewritten to the public base URL. The `{page}` is the path of a specific page on the pod (e.g. `pages/12345`); omitting it proxies the collection root.
-
-1. Load config; resolve the `{page}` from the request path (preserving trailing slash).
-2. Verify the DPoP token via `verifyDpopToken` (with the request URL and `GET` method); reject 401/403 on failure or if the issuer is not in `WHITELISTED_ISSUERS`.
-3. Compute the pod target as `${SOLID_STORAGE_BASE_URL}inbox/{page}`.
+1. Load config; resolve `actorName` from the path; reject 404 if not configured.
+2. Resolve the `{page}` from the request path (preserving trailing slash).
+3. Compute the pod target as `${SOLID_STORAGE_BASE_URL}${actorName}/outbox/{page}`.
 4. Create a DPoP-authenticated fetch to the pod and GET the target with the request's `Accept` header (default `text/turtle`).
 5. Read the pod response body.
-6. Rewrite the pod URL prefix to the public base URL in the body so consumers see `${BASE_URL}/inbox/...`.
+6. Rewrite the pod URL prefix to the public actor-scoped prefix in the body so consumers see `${BASE_URL}/${actorName}/outbox/...`.
 7. Return the body to the caller with CORS headers.
+
+### Inbox POST `/${actorName}/inbox`
+
+One route per configured actor, e.g. `/alice/inbox`. HTTP-signature-authenticated. The handler ignores any sub-path — paging is managed internally. There is no shared `/inbox` route — the URL names the local actor, and the activity is processed as if addressed to that actor.
+
+- For `Follow`: `object` must equal `${BASE_URL}/${actorName}` (else reject 422).
+- For `Undo` of `Follow`: the inner `object` must equal `${BASE_URL}/${actorName}` (else reject 422).
+- For any other activity: trust the URL and persist to `${actorName}/inbox/`. No content-addressing check.
+
+1. Resolve `actorName` from the path; reject 404 if not a configured actor.
+2. Parse the body as JSON; reject 400 on parse error.
+3. Verify the HTTP signature on the request via `verifyIncomingActivity`: require `Signature`/`Date`/`Digest` headers, verify the `Digest` against a SHA-256 of the JSON body, fetch the actor's `publicKeyPem` (with SSRF protection), and cryptographically verify the signature. Also bind the actor: `activity.actor` must equal the URL the signing keyId belongs to, else 400.
+4. Switch on activity type:
+   - `Delete` → ack and return (no persistence).
+   - `Follow` → send a signed `Accept` (signed with the matched local actor's key) to the follower's inbox, and add the follower to the followers collection at `${SOLID_STORAGE_BASE_URL}${actorName}/followers/`.
+   - `Undo` of `Follow` → remove the follower from `${actorName}/followers/`.
+   - Anything else → derive the next paged-inbox slot under `${SOLID_STORAGE_BASE_URL}${actorName}/inbox/` and persist via `solid:InsertDeletePatch`.
+
+### Inbox GET `/${actorName}/inbox[/pages/{page}]`
+
+Per-actor DPoP-authenticated proxy of the paged inbox collection on the pod, with pod URLs rewritten to the public actor-scoped prefix. The `{page}` is the path of a specific page on the pod (e.g. `pages/12345`); omitting it proxies the collection root.
+
+1. Load config; resolve `actorName` from the path; reject 404 if not configured.
+2. Resolve the `{page}` from the request path (preserving trailing slash).
+3. Verify the DPoP token via `verifyDpopToken` (with the request URL and `GET` method); reject 401/403 on failure or if the issuer is not in `WHITELISTED_ISSUERS`.
+4. Compute the pod target as `${SOLID_STORAGE_BASE_URL}${actorName}/inbox/{page}`.
+5. Create a DPoP-authenticated fetch to the pod and GET the target with the request's `Accept` header (default `text/turtle`).
+6. Read the pod response body.
+7. Rewrite the pod URL prefix to the public actor-scoped prefix in the body so consumers see `${BASE_URL}/${actorName}/inbox/...`.
+8. Return the body to the caller with CORS headers.
+
+### Followers GET `/${actorName}/followers[/pages/{page}]`
+
+Per-actor DPoP-authenticated proxy of the followers collection on the pod, with pod URLs rewritten to the public actor-scoped prefix.
+
+1. Load config; resolve `actorName` from the path; reject 404 if not configured.
+2. Resolve the `{page}` from the request path (preserving trailing slash).
+3. Verify the DPoP token via `verifyDpopToken` (with the request URL and `GET` method); reject 401/403 on failure or if the issuer is not in `WHITELISTED_ISSUERS`.
+4. Compute the pod target as `${SOLID_STORAGE_BASE_URL}${actorName}/followers/{page}`.
+5. Create a DPoP-authenticated fetch to the pod and GET the target with the request's `Accept` header (default `text/turtle`).
+6. Read the pod response body.
+7. Rewrite the pod URL prefix to the public actor-scoped prefix in the body so consumers see `${BASE_URL}/${actorName}/followers/...`.
+8. Return the body to the caller with CORS headers.
+
+### WebFinger `/.well-known/webfinger?resource=acct:${actorName}@${domain}`
+
+Served by the `webfinger` Netlify function. Returns JRD JSON describing the matching configured actor (200) or 404 if the resource is unknown.
 
 ## Testing
 
@@ -111,23 +137,23 @@ npm run test:e2e           # Real `netlify dev` + a mock Solid server (boots bot
 .
 ├── netlify/
 │   └── functions/
-│       ├── inbox.mts        # Inbox endpoint
-│       └── outbox.mts       # Outbox endpoint
+│       ├── actor-router.mts # Per-actor /:actor(outbox|inbox|followers)
+│       └── webfinger.mts    # /.well-known/webfinger dispatcher
 ├── netlify.toml             # Build config + function routing
 ├── public/                  # Auto-generated at build (gitignored)
-│   ├── ${ACTOR_NAME}        # AS2 actor document
+│   ├── ${actorName}         # One AS2 actor document per configured actor
 │   ├── webid                # WebID Turtle
 │   ├── jwks.json            # OIDC signing key (public)
-│   └── .well-known/         # openid-configuration, webfinger
+│   └── .well-known/         # openid-configuration
 ├── scripts/
-│   └── generate-identity.ts # Generates identity, actor, webfinger
+│   └── generate-identity.ts # Generates identity, actor docs, webfinger data
 ├── src/
 │   ├── activity.ts          # Activity validation, normalization, recipient extraction
 │   ├── auth.ts              # DPoP token verification
-│   ├── config.ts            # Config loading
-│   ├── handlers/            # Inbox/outbox activity handlers
+│   ├── config.ts            # Config loading (actorNames[], actorByPath map)
+│   ├── handlers/            # Inbox/outbox activity handlers (per-actor aware)
 │   ├── services/            # Solid-pod + RDF helpers (paging, patching, followers)
-│   ├── signing.ts           # Outgoing HTTP signature signing
+│   ├── signing.ts           # Outgoing HTTP signature signing (per-actor key lookup)
 │   ├── solidFetch.ts        # DPoP-authenticated fetch to pod
 │   ├── ssrf.ts              # SSRF protection for remote actor key fetches
 │   ├── types.ts
@@ -135,7 +161,7 @@ npm run test:e2e           # Real `netlify dev` + a mock Solid server (boots bot
 │   ├── verifyRequest.ts     # End-to-end HTTP signature verification (inbox POST)
 │   ├── base-url.ts          # Generated (gitignored)
 │   ├── private-key.ts       # Generated OIDC ES256 key (gitignored)
-│   └── actor-private-key.ts # Generated actor RS256 key (gitignored)
+│   └── actor-keys.ts        # Generated per-actor RS256 keys (gitignored)
 └── tests/
     ├── helpers.ts
     ├── helpers/             # dev-server + mock Solid server
@@ -148,17 +174,27 @@ npm run test:e2e           # Real `netlify dev` + a mock Solid server (boots bot
 
 ### Components and trust boundaries
 
-- **Netlify function** (`netlify/functions/{inbox,outbox}.mts`): the only externally reachable surface. Stateless across invocations; reconstructed on every cold start by the build.
-- **Solid pod** at `${SOLID_STORAGE_BASE_URL}`: durable storage for `inbox/`, `outbox/`, and `followers/` as paged AS2 collections. The function is the only writer; reads happen via a DPoP-authenticated fetch (`src/solidFetch.ts`).
+- **Netlify function** (`netlify/functions/{actor-router,webfinger}.mts`): the only externally reachable surface. Stateless across invocations; reconstructed on every cold start by the build. `actor-router.mts` handles the per-actor `/{actorName}/{outbox,inbox,followers}` GET/POST routes; `webfinger.mts` serves the WebFinger dispatcher.
+- **Solid pod** at `${SOLID_STORAGE_BASE_URL}`: durable storage for per-actor containers `${actorName}/inbox/`, `${actorName}/outbox/`, and `${actorName}/followers/` as paged AS2 collections. The function is the only writer; reads happen via a DPoP-authenticated fetch (`src/solidFetch.ts`).
 - **OIDC issuer**: any issuer in `WHITELISTED_ISSUERS` is trusted to authenticate users who may access the private collections (outbox write + inbox read). The function verifies each request's DPoP-bound access token via `@solid/access-token-verifier` — confirming the client controls the bound key and the token's issuer is in the allowlist.
 - **Remote ActivityPub servers**: discovered via WebFinger and actor-document fetches (`src/activity.ts`, `src/verifyRequest.ts`).
-- **Static identity** in `public/`: OIDC discovery, WebID, JWKS, WebFinger, and the AS2 actor document. Served by Netlify's CDN, regenerated on every build.
+- **Static identity** in `public/`: OIDC discovery, WebID, JWKS, the WebFinger data file, and one AS2 actor document per configured actor. Served by Netlify's CDN, regenerated on every build.
 
-### Two keypairs
+### Per-actor keypairs
 
-- **OIDC ES256**: private in `src/private-key.ts`, public in `public/jwks.json`. Verifies incoming DPoP tokens (`auth.ts`) and mints the DPoP token for the function's own pod traffic (`solidFetch.ts`). The public JWK can be supplied via `JWKS` to reuse a keypair across deploys.
-- **Actor RS256**: private in `src/actor-private-key.ts`, public PEM in `public/${ACTOR_NAME}` as `publicKey.publicKeyPem`. Signs outgoing requests (`signing.ts`); remote servers verify against the published PEM.
+- **OIDC ES256** (one): private in `src/private-key.ts`, public in `public/jwks.json`. Verifies incoming DPoP tokens (`auth.ts`) and mints the DPoP token for the function's own pod traffic (`solidFetch.ts`). The public JWK can be supplied via `JWKS` to reuse a keypair across deploys.
+- **Actor RS256** (one per configured actor): private JWKs live in `src/actor-keys.ts` keyed by actor name; the corresponding public PEMs are published in each `public/${actorName}` as `publicKey.publicKeyPem`. Signs outgoing requests (`signing.ts`); remote servers verify against the published PEM.
 
 ### Data on the pod
 
-All three collections (`inbox/`, `outbox/`, `followers/`) are stored as paged `as:Collection` + `as:OrderedCollectionPage` resources. Each page is a Turtle document with `as:items` quads pointing at its entries; pages are linked via `as:next` and the collection holds a single `as:first` pointing at the head page. Writes are PATCHes of a `solid:InsertDeletePatch` (see `src/services/buildPatch.ts`) — never full-document overwrites — so a single PATCH is the unit of consistency.
+All collections are stored as paged `as:Collection` + `as:OrderedCollectionPage` resources, grouped under a per-actor container:
+
+```
+${SOLID_STORAGE_BASE_URL}/
+├── ${actorName}/           # one container per configured actor
+│   ├── inbox/              # inbound activities
+│   ├── outbox/             # published activities
+│   └── followers/          # followers of this actor
+```
+
+Each page is a Turtle document with `as:items` quads pointing at its entries; pages are linked via `as:next` and the collection holds a single `as:first` pointing at the head page. Writes are PATCHes of a `solid:InsertDeletePatch` (see `src/services/buildPatch.ts`) — never full-document overwrites — so a single PATCH is the unit of consistency.

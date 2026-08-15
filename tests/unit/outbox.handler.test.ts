@@ -31,7 +31,8 @@ describe('outbox handler', () => {
     const result = await handleOutboxActivity(
       activity,
       mockFetch as SolidFetch,
-      'https://example.com/outbox/',
+      'https://example.com/actor/outbox/',
+      'actor',
       'https://example.com/actor',
       'https://example.com/actor#main-key'
     )
@@ -60,7 +61,8 @@ describe('outbox handler', () => {
     await expect(handleOutboxActivity(
       activity,
       mockFetch as SolidFetch,
-      'https://example.com/outbox/',
+      'https://example.com/actor/outbox/',
+      'actor',
       'https://example.com/actor',
       'https://example.com/actor#main-key'
     )).rejects.toThrow('Activity must include @context')
@@ -83,7 +85,8 @@ describe('outbox handler', () => {
     await expect(handleOutboxActivity(
       activity,
       mockFetch as SolidFetch,
-      'https://example.com/outbox/',
+      'https://example.com/actor/outbox/',
+      'actor',
       'https://example.com/actor',
       'https://example.com/actor#main-key'
     )).rejects.toThrow('Actor mismatch')
@@ -108,7 +111,8 @@ describe('outbox handler', () => {
     const result = await handleOutboxActivity(
       activity,
       mockFetch as SolidFetch,
-      'https://example.com/outbox/',
+      'https://example.com/actor/outbox/',
+      'actor',
       'https://example.com/actor',
       'https://example.com/actor#main-key'
     )
