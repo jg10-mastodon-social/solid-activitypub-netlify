@@ -97,6 +97,7 @@ export async function handleInboxActivity(
         return false
       }
     }
+    return true
   }
 
   let pageUrl: string | undefined

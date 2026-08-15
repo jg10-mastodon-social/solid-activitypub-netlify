@@ -371,7 +371,7 @@ describe('inbox handler', () => {
     expect(result).toBe(false)
   })
 
-  it('should handle Undo/Follow by removing from followers and persisting', async () => {
+  it('should handle Undo/Follow by removing from followers without persisting', async () => {
     const { handleInboxActivity } = await import('../../src/handlers/inbox.js')
     mockFetch
       .mockResolvedValueOnce({
@@ -385,30 +385,6 @@ describe('inbox handler', () => {
         text: () => Promise.resolve(`<https://example.com/actor/followers/pages/123> <https://www.w3.org/ns/activitystreams#items> <https://other.example/actor/follow/123>.
 <https://other.example/actor/follow/123> a <https://www.w3.org/ns/activitystreams#Follow>.
 <https://other.example/actor/follow/123> <https://www.w3.org/ns/activitystreams#actor> <https://other.example/actor>.`)
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        text: () => Promise.resolve('')
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        text: () => Promise.resolve(`<https://example.com/actor/inbox/> <https://www.w3.org/ns/activitystreams#first> <https://example.com/actor/inbox/pages/456>.`)
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        text: () => Promise.resolve('')
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        text: () => Promise.resolve('')
       })
       .mockResolvedValueOnce({
         ok: true,
@@ -438,5 +414,10 @@ describe('inbox handler', () => {
       (call[0] as string).includes('followers') && call[1]?.method === 'PATCH'
     )
     expect(removeCall).toBeDefined()
+
+    const inboxPatchCall = mockFetch.mock.calls.find(call =>
+      (call[0] as string).includes('/inbox') && call[1]?.method === 'PATCH'
+    )
+    expect(inboxPatchCall).toBeUndefined()
   })
 })
