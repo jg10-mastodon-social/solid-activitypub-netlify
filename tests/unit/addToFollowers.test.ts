@@ -26,7 +26,7 @@ describe('addToFollowers', () => {
     expect(mockFetch).toHaveBeenCalled()
   })
 
-  it('should patch followers page to add actor', async () => {
+  it('should patch followers page to add actor as an as:items triple', async () => {
     const { addToFollowers } = await import('../../src/services/addToFollowers.js')
     mockFetch.mockResolvedValue({
       ok: true,
@@ -45,6 +45,7 @@ describe('addToFollowers', () => {
     expect(patchCall).toBeDefined()
     const patchBody = patchCall![1].body as string
     expect(patchBody).toContain('https://other.example/actor')
+    expect(patchBody).toMatch(/as:items\s+<https:\/\/other\.example\/actor>/)
   })
 
   it('should use correct followers URL for the per-actor container', async () => {

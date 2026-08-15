@@ -306,12 +306,9 @@ setFollowerActors(actors: string[], actorName: string = 'actor'): void {
 
     if (collection === 'followers') {
       const actors = this.followerActorsByCollection[actorName] || []
-      const actorUrl = `http://localhost:${this.port}/${actorName}`
       if (actors.length > 0) {
-        const items = actors.map((actor, i) =>
-          `[] a <https://www.w3.org/ns/activitystreams#Follow>;
-    <https://www.w3.org/ns/activitystreams#actor> <${actor}>;
-    <https://www.w3.org/ns/activitystreams#object> <${actorUrl}>.`
+        const items = actors.map(actor =>
+          `<${pageUrl}> <https://www.w3.org/ns/activitystreams#items> <${actor}>.`
         ).join('\n')
         body += `\n\n${items}`
       }

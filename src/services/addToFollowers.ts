@@ -1,6 +1,6 @@
 import type { SolidFetch } from '../types.js'
 import { derivePageUrl } from './derivePageUrl.js'
-import { persistActivityItem } from './persistActivity.js'
+import { buildInsertItemLinkPatch } from './buildPatch.js'
 
 export async function addToFollowers(
   followerActor: string,
@@ -11,16 +11,21 @@ export async function addToFollowers(
   const followersUrl = `${solidStorageBaseUrl}${actorName}/followers/`
 
   const pageUrl = await derivePageUrl(followersUrl, fetch)
-  const url = new URL(pageUrl)
-  const skolemizeBase = `${url.origin}/.well-known/genid/`
 
-  const followerEntry = {
-    type: 'Follow',
-    actor: followerActor,
-    object: `${solidStorageBaseUrl.replace(/\/$/, '')}/${actorName}`,
-    id: `${followerActor}/follow/${Date.now()}`
+  const patchBody = buildInsertItemLinkPatch(pageUrl, followerActor)
+
+  const response = await fetch(pageUrl, {
+    method: 'PATCH',
+    headers: {
+      'content-type': 'text/n3',
+    },
+    body: patchBody,
+  })
+
+  if (!response.ok) {
+    const text = await response.text()
+    throw new Error(`Failed to add follower ${followerActor} to ${actorName}: ${response.status} ${text}`)
   }
 
-  await persistActivityItem(followerEntry, pageUrl, fetch, { skolemizeBase })
   console.log(`[inbox] Added ${followerActor} to ${actorName} followers collection`)
 }

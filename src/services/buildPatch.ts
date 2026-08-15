@@ -52,3 +52,27 @@ export function buildDeletePatch(
 `
   return patch
 }
+
+export function buildInsertItemLinkPatch(
+  pageUrl: string,
+  itemUri: string
+): string {
+  return `${INSERT_DELETE_PATCH_PREFIX}
+      _:patch a solid:InsertDeletePatch;
+      solid:inserts {
+        <${pageUrl}> as:items <${itemUri}>.
+      }.
+`
+}
+
+export function buildDeleteItemLinkPatch(
+  pageUrl: string,
+  itemUri: string
+): string {
+  return `${INSERT_DELETE_PATCH_PREFIX}
+      _:patch a solid:InsertDeletePatch;
+      solid:deletes {
+        <${pageUrl}> as:items <${itemUri}>.
+      }.
+`
+}

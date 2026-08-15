@@ -71,11 +71,7 @@ describe('outbox broadcast to followers', () => {
 
 <https://example.com/storage/actor/followers/pages/1>
   a as:OrderedCollectionPage ;
-  as:items [
-    a as:Follow ;
-    as:actor <https://follower.example/actor> ;
-    as:object <https://example.com/actor>
-  ] .
+  as:items <https://follower.example/actor> .
 `)
         }
       }
@@ -149,11 +145,7 @@ describe('outbox broadcast to followers', () => {
 
 <https://example.com/storage/actor/followers/pages/1>
   a as:OrderedCollectionPage ;
-  as:items [
-    a as:Follow ;
-    as:actor <https://recipient.example/actor> ;
-    as:object <https://example.com/actor>
-  ] .
+  as:items <https://recipient.example/actor> .
 `)
         }
       }
@@ -217,11 +209,7 @@ describe('outbox broadcast to followers', () => {
 
 <https://example.com/storage/actor/followers/pages/1>
   a as:OrderedCollectionPage ;
-  as:items [
-    a as:Follow ;
-    as:actor <https://follower.example/actor> ;
-    as:object <https://example.com/actor>
-  ] .
+  as:items <https://follower.example/actor> .
 `)
         }
       }

@@ -204,4 +204,4 @@ ${SOLID_STORAGE_BASE_URL}/
 │   └── followers/          # followers of this actor
 ```
 
-Each page is a Turtle document with `as:items` quads pointing at its entries; pages are linked via `as:next` and the collection holds a single `as:first` pointing at the head page. Writes are PATCHes of a `solid:InsertDeletePatch` (see `src/services/buildPatch.ts`) — never full-document overwrites — so a single PATCH is the unit of consistency.
+Each page is a Turtle document with `as:items` quads pointing at its entries; pages are linked via `as:next` and the collection holds a single `as:first` pointing at the head page. Writes are PATCHes of a `solid:InsertDeletePatch` (see `src/services/buildPatch.ts`) — never full-document overwrites — so a single PATCH is the unit of consistency. For the `followers` collection, each `as:items` value is the follower's actor URI directly (matching the W3C AS2 paged-OrderedCollection shape that Mastodon and other fediverse servers expect).

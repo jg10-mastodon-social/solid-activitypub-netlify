@@ -108,14 +108,14 @@ function parseFollowersPage(turtle: string, pageUrl: string): PageFollowers {
   )
   const nextPageUrl = nextQuads.length > 0 ? nextQuads[0].object.value : null
 
-  const actorQuads = store.getQuads(
-    null,
-    'https://www.w3.org/ns/activitystreams#actor',
+  const itemsQuads = store.getQuads(
+    pageUrl,
+    'https://www.w3.org/ns/activitystreams#items',
     null,
     null
   )
 
-  const followers = actorQuads.map(q => q.object.value)
+  const followers = itemsQuads.map(q => q.object.value)
 
   return { followers, nextPageUrl }
 }

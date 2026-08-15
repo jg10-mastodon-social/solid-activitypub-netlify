@@ -1,7 +1,7 @@
 import type { SolidFetch } from '../types.js'
-import { buildDeletePatch } from './buildPatch.js'
+import { buildDeleteItemLinkPatch } from './buildPatch.js'
 import { parseCollectionTurtle } from './rdfUtils.js'
-import { Parser, Store, NamedNode } from 'n3'
+import { Parser, Store } from 'n3'
 
 export async function removeFromFollowers(
   followerActor: string,
@@ -76,34 +76,18 @@ async function removeFromPage(
     store.addQuads(quads)
   }
 
-  const actorQuads = store.getQuads(
-    null,
-    'https://www.w3.org/ns/activitystreams#actor',
+  const itemQuads = store.getQuads(
+    pageUrl,
+    'https://www.w3.org/ns/activitystreams#items',
     followerActor,
     null
   )
 
-  if (actorQuads.length === 0) {
+  if (itemQuads.length === 0) {
     return false
   }
 
-  const entrySubject = actorQuads[0].subject.value
-  const entryQuads = store.getQuads(entrySubject, null, null, null)
-
-  if (entryQuads.length === 0) {
-    return false
-  }
-
-  const itemTurtle = entryQuads.map(q => {
-    const subject = `<${q.subject.value}>`
-    const predicate = `<${q.predicate.value}>`
-    const object = q.object instanceof NamedNode
-      ? `<${q.object.value}>`
-      : `"${q.object.value}"`
-    return `${subject} ${predicate} ${object}.`
-  }).join('\n')
-
-  const patchBody = buildDeletePatch(itemTurtle, entrySubject, pageUrl)
+  const patchBody = buildDeleteItemLinkPatch(pageUrl, followerActor)
 
   const deleteResponse = await fetch(pageUrl, {
     method: 'PATCH',

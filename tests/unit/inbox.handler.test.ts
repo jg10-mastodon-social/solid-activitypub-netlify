@@ -382,9 +382,7 @@ describe('inbox handler', () => {
       .mockResolvedValueOnce({
         ok: true,
         status: 200,
-        text: () => Promise.resolve(`<https://example.com/actor/followers/pages/123> <https://www.w3.org/ns/activitystreams#items> <https://other.example/actor/follow/123>.
-<https://other.example/actor/follow/123> a <https://www.w3.org/ns/activitystreams#Follow>.
-<https://other.example/actor/follow/123> <https://www.w3.org/ns/activitystreams#actor> <https://other.example/actor>.`)
+        text: () => Promise.resolve(`<https://example.com/actor/followers/pages/123> <https://www.w3.org/ns/activitystreams#items> <https://other.example/actor>.`)
       })
       .mockResolvedValueOnce({
         ok: true,

@@ -12,7 +12,7 @@ describe('removeFromFollowers', () => {
     vi.restoreAllMocks()
   })
 
-  it('should patch followers page to remove actor', async () => {
+  it('should patch followers page to remove the actor items triple', async () => {
     const { removeFromFollowers } = await import('../../src/services/removeFromFollowers.js')
     mockFetch
       .mockResolvedValueOnce({
@@ -23,18 +23,11 @@ describe('removeFromFollowers', () => {
       .mockResolvedValueOnce({
         ok: true,
         status: 200,
-        text: () => Promise.resolve(`<https://example.com/actor/followers/pages/123> <https://www.w3.org/ns/activitystreams#items> <https://other.example/actor/follow/123>.
-<https://other.example/actor/follow/123> a <https://www.w3.org/ns/activitystreams#Follow>.
-<https://other.example/actor/follow/123> <https://www.w3.org/ns/activitystreams#actor> <https://other.example/actor>.`)
+        text: () => Promise.resolve(`<https://example.com/actor/followers/pages/123> <https://www.w3.org/ns/activitystreams#items> <https://other.example/actor>.`)
       })
       .mockResolvedValueOnce({
         ok: true,
         status: 200
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        text: () => Promise.resolve('')
       })
 
     await removeFromFollowers(
@@ -49,6 +42,7 @@ describe('removeFromFollowers', () => {
     const patchBody = patchCall![1].body as string
     expect(patchBody).toContain('solid:deletes')
     expect(patchBody).not.toContain('solid:inserts')
+    expect(patchBody).toMatch(/as:items\s+<https:\/\/other\.example\/actor>/)
   })
 
   it('should use correct followers URL', async () => {
@@ -62,18 +56,11 @@ describe('removeFromFollowers', () => {
       .mockResolvedValueOnce({
         ok: true,
         status: 200,
-        text: () => Promise.resolve(`<https://example.com/actor/followers/pages/123> <https://www.w3.org/ns/activitystreams#items> <https://other.example/actor/follow/123>.
-<https://other.example/actor/follow/123> a <https://www.w3.org/ns/activitystreams#Follow>.
-<https://other.example/actor/follow/123> <https://www.w3.org/ns/activitystreams#actor> <https://other.example/actor>.`)
+        text: () => Promise.resolve(`<https://example.com/actor/followers/pages/123> <https://www.w3.org/ns/activitystreams#items> <https://other.example/actor>.`)
       })
       .mockResolvedValueOnce({
         ok: true,
         status: 200
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        text: () => Promise.resolve('')
       })
 
     await removeFromFollowers(
@@ -101,18 +88,11 @@ describe('removeFromFollowers', () => {
       .mockResolvedValueOnce({
         ok: true,
         status: 200,
-        text: () => Promise.resolve(`<https://example.com/actor/followers/pages/1785063320555> <https://www.w3.org/ns/activitystreams#items> <https://other.example/actor/follow/123>.
-<https://other.example/actor/follow/123> a <https://www.w3.org/ns/activitystreams#Follow>.
-<https://other.example/actor/follow/123> <https://www.w3.org/ns/activitystreams#actor> <https://other.example/actor>.`)
+        text: () => Promise.resolve(`<https://example.com/actor/followers/pages/1785063320555> <https://www.w3.org/ns/activitystreams#items> <https://other.example/actor>.`)
       })
       .mockResolvedValueOnce({
         ok: true,
         status: 200
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        text: () => Promise.resolve('')
       })
 
     await removeFromFollowers(
@@ -127,7 +107,7 @@ describe('removeFromFollowers', () => {
     expect(patchCall![0] as string).toBe('https://example.com/actor/followers/pages/1785063320555')
   })
 
-  it('should handle multi-line Turtle format with semicolons', async () => {
+  it('should handle multi-line Turtle format', async () => {
     const { removeFromFollowers } = await import('../../src/services/removeFromFollowers.js')
     mockFetch
       .mockResolvedValueOnce({
@@ -142,24 +122,11 @@ describe('removeFromFollowers', () => {
 
 <> a as:OrderedCollectionPage;
     as:partOf <../>;
-    as:items <https://activitypub.academy/users/albilus_puhuss/follow/1785410321943>.
-<https://activitypub.academy/users/albilus_puhuss/follow/1785410321943> a as:Follow;
-    as:actor <https://activitypub.academy/users/albilus_puhuss>;
-    as:object <https://6a6b3224e294e60f3fd8c2da--willowy-kleicha-1afcb6.netlify.app/alice>.`)
+    as:items <https://activitypub.academy/users/albilus_puhuss>.`)
       })
       .mockResolvedValueOnce({
         ok: true,
         status: 200
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        text: () => Promise.resolve('')
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        text: () => Promise.resolve('')
       })
 
     await removeFromFollowers(
@@ -173,7 +140,7 @@ describe('removeFromFollowers', () => {
     expect(patchCall).toBeDefined()
     const patchBody = patchCall![1].body as string
     expect(patchBody).toContain('solid:deletes')
-    expect(patchBody).toContain('https://activitypub.academy/users/albilus_puhuss/follow/1785410321943')
+    expect(patchBody).toMatch(/as:items\s+<https:\/\/activitypub\.academy\/users\/albilus_puhuss>/)
   })
 
   it('should find actor on second page when not on first page', async () => {
@@ -192,10 +159,7 @@ describe('removeFromFollowers', () => {
 <> a as:OrderedCollectionPage;
     as:partOf <../>;
     as:next <https://example.com/actor/followers/pages/2>;
-    as:items <https://other.example/actor/follow/456>.
-<https://other.example/actor/follow/456> a as:Follow;
-    as:actor <https://other.example/actor>;
-    as:object <https://example.com/actor>.`)
+    as:items <https://other.example/actor>.`)
       })
       .mockResolvedValueOnce({
         ok: true,
@@ -205,10 +169,7 @@ describe('removeFromFollowers', () => {
 <> a as:OrderedCollectionPage;
     as:partOf <../>;
     as:next <https://example.com/actor/followers/pages/2>;
-    as:items <https://other.example/actor/follow/456>.
-<https://other.example/actor/follow/456> a as:Follow;
-    as:actor <https://other.example/actor>;
-    as:object <https://example.com/actor>.`)
+    as:items <https://other.example/actor>.`)
       })
       .mockResolvedValueOnce({
         ok: true,
@@ -217,10 +178,7 @@ describe('removeFromFollowers', () => {
 
 <> a as:OrderedCollectionPage;
     as:partOf <../>;
-    as:items <https://activitypub.academy/users/albilus_puhuss/follow/789>.
-<https://activitypub.academy/users/albilus_puhuss/follow/789> a as:Follow;
-    as:actor <https://activitypub.academy/users/albilus_puhuss>;
-    as:object <https://example.com/actor>.`)
+    as:items <https://activitypub.academy/users/albilus_puhuss>.`)
       })
       .mockResolvedValueOnce({
         ok: true,

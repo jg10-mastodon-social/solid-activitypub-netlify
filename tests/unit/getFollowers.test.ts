@@ -34,11 +34,7 @@ describe('getFollowers', () => {
 
 <https://example.com/storage/actor/followers/pages/1>
   a as:OrderedCollectionPage ;
-  as:items [
-    a as:Follow ;
-    as:actor <https://follower1.example/actor> ;
-    as:object <https://example.com/actor>
-  ] .
+  as:items <https://follower1.example/actor> .
 `)
         }
       }
@@ -46,7 +42,7 @@ describe('getFollowers', () => {
     })
 
     const followers = await getFollowers('https://example.com/storage/', 'actor', mockFetch as SolidFetch)
-    expect(followers).toContain('https://follower1.example/actor')
+    expect(followers).toEqual(['https://follower1.example/actor'])
   })
 
   it('iterates through multiple pages via next links', async () => {
@@ -72,16 +68,11 @@ describe('getFollowers', () => {
           status: 200,
           text: () => Promise.resolve(`
 @prefix as: <https://www.w3.org/ns/activitystreams#> .
-@prefix asx: <https://example.com/ns/example#> .
 
 <https://example.com/storage/actor/followers/pages/1>
   a as:OrderedCollectionPage ;
   as:next <https://example.com/storage/actor/followers/pages/2> ;
-  as:items [
-    a as:Follow ;
-    as:actor <https://follower1.example/actor> ;
-    as:object <https://example.com/actor>
-  ] .
+  as:items <https://follower1.example/actor> .
 `)
         }
       }
@@ -94,11 +85,7 @@ describe('getFollowers', () => {
 
 <https://example.com/storage/actor/followers/pages/2>
   a as:OrderedCollectionPage ;
-  as:items [
-    a as:Follow ;
-    as:actor <https://follower2.example/actor> ;
-    as:object <https://example.com/actor>
-  ] .
+  as:items <https://follower2.example/actor> .
 `)
         }
       }
@@ -111,26 +98,43 @@ describe('getFollowers', () => {
     expect(followers.length).toBe(2)
   })
 
-  it('returns empty array when no followers', async () => {
+  it('returns empty array when page has no items', async () => {
     const { getFollowers } = await import('../../src/services/getFollowers.js')
 
-    mockFetch.mockResolvedValue({
-      ok: true,
-      status: 200,
-      text: () => Promise.resolve(`
+    mockFetch.mockImplementation(async (url: string) => {
+      if (url === 'https://example.com/storage/actor/followers/') {
+        return {
+          ok: true,
+          status: 200,
+          text: () => Promise.resolve(`
 @prefix as: <https://www.w3.org/ns/activitystreams#> .
 
-<https://example.com/actor/followers/>
+<https://example.com/storage/actor/followers/>
   a as:OrderedCollection ;
-  as:first <https://example.com/actor/followers/pages/1> .
+  as:first <https://example.com/storage/actor/followers/pages/1> .
 `)
+        }
+      }
+      if (url === 'https://example.com/storage/actor/followers/pages/1') {
+        return {
+          ok: true,
+          status: 200,
+          text: () => Promise.resolve(`
+@prefix as: <https://www.w3.org/ns/activitystreams#> .
+
+<https://example.com/storage/actor/followers/pages/1>
+  a as:OrderedCollectionPage .
+`)
+        }
+      }
+      throw new Error('Unexpected URL: ' + url)
     })
 
     const followers = await getFollowers('https://example.com/storage/', 'actor', mockFetch as SolidFetch)
     expect(followers).toEqual([])
   })
 
-  it('extracts actor URLs from Follow entries', async () => {
+  it('extracts multiple actor URIs from a single page', async () => {
     const { getFollowers } = await import('../../src/services/getFollowers.js')
 
     mockFetch.mockResolvedValue({
@@ -145,18 +149,8 @@ describe('getFollowers', () => {
 
 <https://example.com/storage/actor/followers/pages/1>
   a as:OrderedCollectionPage ;
-  as:items (
-    [
-      a as:Follow ;
-      as:actor <https://follower1.example/actor> ;
-      as:object <https://example.com/actor>
-    ]
-    [
-      a as:Follow ;
-      as:actor <https://follower2.example/actor> ;
-      as:object <https://example.com/actor>
-    ]
-  ) .
+  as:items <https://follower1.example/actor> ,
+           <https://follower2.example/actor> .
 `)
     })
 
