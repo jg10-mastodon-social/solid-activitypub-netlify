@@ -29,7 +29,6 @@ export interface Config {
   sendToUrl: string
   whitelistedIssuers: string[]
   solidStorageBaseUrl: string
-  handlerBaseUrl: string
   adminWebId: string
   inboxUrl: string
   outboxUrl: string

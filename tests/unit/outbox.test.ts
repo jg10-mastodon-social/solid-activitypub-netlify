@@ -20,7 +20,6 @@ vi.mock('../../src/config.js', () => ({
     inboxUrl: 'https://pod.example.com/inbox/',
     outboxUrl: 'https://pod.example.com/outbox/',
     solidStorageBaseUrl: 'https://pod.example.com/',
-    handlerBaseUrl: 'https://example.com/handlers#',
     adminWebId: '',
     actorNames: ['actor'],
     actorByPath: {

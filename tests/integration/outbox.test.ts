@@ -45,7 +45,6 @@ beforeAll(() => {
   process.env.SOLID_STORAGE_BASE_URL = 'http://localhost:9998/'
   process.env.WEBID = 'http://localhost:9999/webid'
   process.env.ISSUER = 'http://localhost:9999'
-  process.env.HANDLER_BASE_URL = 'https://example.com/handlers#'
   process.env.SEND_TO_URL = 'http://localhost:9999/outbox'
   process.env.ACTOR_NAME = 'actor'
 })

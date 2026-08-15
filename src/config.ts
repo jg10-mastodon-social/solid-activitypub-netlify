@@ -7,7 +7,6 @@ export interface EnvConfig {
   ISSUER: string
   WHITELISTED_ISSUERS: string
   SOLID_STORAGE_BASE_URL: string
-  HANDLER_BASE_URL: string
   SEND_TO_URL: string
   ADMIN_WEBID?: string
 }
@@ -52,9 +51,6 @@ export function loadConfig(): Config {
   if (!process.env.SOLID_STORAGE_BASE_URL) {
     throw new Error('SOLID_STORAGE_BASE_URL is required')
   }
-  if (!process.env.HANDLER_BASE_URL) {
-    throw new Error('HANDLER_BASE_URL is required')
-  }
   if (!process.env.SOLID_STORAGE_BASE_URL.endsWith('/')) {
     throw new Error('SOLID_STORAGE_BASE_URL must end with /')
   }
@@ -79,7 +75,6 @@ export function loadConfig(): Config {
     sendToUrl,
     whitelistedIssuers,
     solidStorageBaseUrl,
-    handlerBaseUrl: process.env.HANDLER_BASE_URL,
     adminWebId,
     inboxUrl,
     outboxUrl,
