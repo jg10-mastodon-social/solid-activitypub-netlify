@@ -72,14 +72,15 @@ export function validateTimestamp(dateHeader: string): boolean {
   return true
 }
 
-export function verifyDigest(body: string, digestHeader: string): boolean {
+export function verifyDigest(rawBody: ArrayBuffer | Uint8Array, digestHeader: string): boolean {
   if (!digestHeader) return false
 
   const match = digestHeader.match(/^SHA-256=(.+)$/i)
   if (!match) return false
 
   const expectedHash = match[1]
-  const actualHash = createHash('sha256').update(body, 'utf8').digest('base64')
+  const bytes = rawBody instanceof ArrayBuffer ? Buffer.from(rawBody) : Buffer.from(rawBody.buffer, rawBody.byteOffset, rawBody.byteLength)
+  const actualHash = createHash('sha256').update(bytes).digest('base64')
 
   return actualHash === expectedHash
 }

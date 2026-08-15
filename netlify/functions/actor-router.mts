@@ -217,9 +217,21 @@ async function handlePostInbox(
 ): Promise<Response> {
   if (!actor) return new Response('Unknown actor', { status: 404, headers: corsHeaders })
 
+  let rawBody: ArrayBuffer
+  try {
+    rawBody = await req.arrayBuffer()
+  } catch {
+    return new Response('Failed to read request body', {
+      status: 400,
+      headers: corsHeaders
+    })
+  }
+
+  const rawBytes = new Uint8Array(rawBody)
+
   let activity: Record<string, unknown>
   try {
-    activity = await req.json() as Record<string, unknown>
+    activity = JSON.parse(new TextDecoder('utf-8').decode(rawBytes)) as Record<string, unknown>
   } catch {
     return new Response('Invalid JSON body', {
       status: 400,
@@ -228,7 +240,7 @@ async function handlePostInbox(
   }
 
   try {
-    await verifyIncomingActivity(req, activity, fetchFn)
+    await verifyIncomingActivity(req, activity, rawBytes, fetchFn)
   } catch (error) {
     if (error instanceof HttpSignatureError) {
       console.log(`[router] POST /${actor.name}/inbox HTTP signature auth failed: ${error.message}`)

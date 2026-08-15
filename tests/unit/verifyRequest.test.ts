@@ -20,8 +20,8 @@ describe('verifyIncomingActivity', () => {
       })
       const activity = { type: 'Create', actor: 'https://other.example/actor' }
 
-      await expect(verifyIncomingActivity(req, activity, mockFetch)).rejects.toThrow(HttpSignatureError)
-      await expect(verifyIncomingActivity(req, activity, mockFetch)).rejects.toMatchObject({
+      await expect(verifyIncomingActivity(req, activity, new Uint8Array(), mockFetch)).rejects.toThrow(HttpSignatureError)
+      await expect(verifyIncomingActivity(req, activity, new Uint8Array(), mockFetch)).rejects.toMatchObject({
         message: 'Missing Signature header',
         statusCode: 401
       })
@@ -39,7 +39,7 @@ describe('verifyIncomingActivity', () => {
       })
       const activity = { type: 'Create', actor: 'https://other.example/actor' }
 
-      await expect(verifyIncomingActivity(req, activity, mockFetch)).rejects.toMatchObject({
+      await expect(verifyIncomingActivity(req, activity, new Uint8Array(), mockFetch)).rejects.toMatchObject({
         message: 'Missing Date header',
         statusCode: 400
       })
@@ -57,7 +57,7 @@ describe('verifyIncomingActivity', () => {
       })
       const activity = { type: 'Create', actor: 'https://other.example/actor' }
 
-      await expect(verifyIncomingActivity(req, activity, mockFetch)).rejects.toMatchObject({
+      await expect(verifyIncomingActivity(req, activity, new Uint8Array(), mockFetch)).rejects.toMatchObject({
         message: 'Missing Digest header',
         statusCode: 400
       })
@@ -78,7 +78,7 @@ describe('verifyIncomingActivity', () => {
       })
       const activity = { type: 'Create', actor: 'https://other.example/actor' }
 
-      await expect(verifyIncomingActivity(req, activity, mockFetch)).rejects.toMatchObject({
+      await expect(verifyIncomingActivity(req, activity, new Uint8Array(), mockFetch)).rejects.toMatchObject({
         message: 'Invalid Signature header',
         statusCode: 400
       })
@@ -97,7 +97,7 @@ describe('verifyIncomingActivity', () => {
       })
       const activity = { type: 'Create', actor: 'https://other.example/actor' }
 
-      await expect(verifyIncomingActivity(req, activity, mockFetch)).rejects.toMatchObject({
+      await expect(verifyIncomingActivity(req, activity, new Uint8Array(), mockFetch)).rejects.toMatchObject({
         message: 'Unsupported algorithm: hmac-sha256',
         statusCode: 400
       })
@@ -119,7 +119,7 @@ describe('verifyIncomingActivity', () => {
       })
       const activity = { type: 'Create', actor: 'https://other.example/actor' }
 
-      await expect(verifyIncomingActivity(req, activity, mockFetch)).rejects.toMatchObject({
+      await expect(verifyIncomingActivity(req, activity, new Uint8Array(), mockFetch)).rejects.toMatchObject({
         message: 'Request timestamp out of range',
         statusCode: 400
       })
@@ -139,7 +139,7 @@ describe('verifyIncomingActivity', () => {
       })
       const activity = { type: 'Create', actor: 'https://other.example/actor' }
 
-      await expect(verifyIncomingActivity(req, activity, mockFetch)).rejects.toMatchObject({
+      await expect(verifyIncomingActivity(req, activity, new Uint8Array(), mockFetch)).rejects.toMatchObject({
         message: 'Request timestamp out of range',
         statusCode: 400
       })
@@ -165,7 +165,7 @@ describe('verifyIncomingActivity', () => {
         body
       })
 
-      await expect(verifyIncomingActivity(req, activity, mockFetch)).rejects.toMatchObject({
+      await expect(verifyIncomingActivity(req, activity, new Uint8Array(), mockFetch)).rejects.toMatchObject({
         message: 'Digest verification failed',
         statusCode: 400
       })
@@ -191,7 +191,7 @@ describe('verifyIncomingActivity', () => {
         body
       })
 
-      await expect(verifyIncomingActivity(req, activity, mockFetch)).rejects.toMatchObject({
+      await expect(verifyIncomingActivity(req, activity, new TextEncoder().encode(body), mockFetch)).rejects.toMatchObject({
         message: 'Actor URL blocked',
         statusCode: 502
       })
@@ -220,7 +220,7 @@ describe('verifyIncomingActivity', () => {
         body
       })
 
-      await expect(verifyIncomingActivity(req, activity, mockFetch)).rejects.toMatchObject({
+      await expect(verifyIncomingActivity(req, activity, new TextEncoder().encode(body), mockFetch)).rejects.toMatchObject({
         message: 'Failed to fetch actor key',
         statusCode: 502
       })
@@ -256,7 +256,7 @@ describe('verifyIncomingActivity', () => {
         body
       })
 
-      await expect(verifyIncomingActivity(req, activity, mockFetch)).rejects.toMatchObject({
+      await expect(verifyIncomingActivity(req, activity, new TextEncoder().encode(body), mockFetch)).rejects.toMatchObject({
         message: 'keyId does not match actor publicKey',
         statusCode: 401
       })
@@ -300,7 +300,7 @@ describe('verifyIncomingActivity', () => {
         body
       })
 
-      await expect(verifyIncomingActivity(req, activity, mockFetch)).rejects.toMatchObject({
+      await expect(verifyIncomingActivity(req, activity, new TextEncoder().encode(body), mockFetch)).rejects.toMatchObject({
         message: 'Signature verification failed',
         statusCode: 401
       })
@@ -357,7 +357,7 @@ describe('verifyIncomingActivity', () => {
         body
       })
 
-      await expect(verifyIncomingActivity(req, activity, mockFetch)).rejects.toMatchObject({
+      await expect(verifyIncomingActivity(req, activity, new TextEncoder().encode(body), mockFetch)).rejects.toMatchObject({
         message: 'Actor does not match signature',
         statusCode: 400
       })
@@ -415,7 +415,211 @@ describe('verifyIncomingActivity', () => {
         body
       })
 
-      const result = await verifyIncomingActivity(req, activity, mockFetch)
+      const result = await verifyIncomingActivity(req, activity, new TextEncoder().encode(body), mockFetch)
+      expect(result.keyId).toBe('https://other.example/actor#main-key')
+    })
+  })
+
+  describe('digest verification over raw bytes (regression: HTTP signature auth must use the raw body, not re-serialised JSON)', () => {
+    it('should succeed when the sender signed non-compact JSON (e.g. Mastodon-style pretty body)', async () => {
+      const { verifyIncomingActivity } = await import('../../src/verifyRequest.js')
+      const { generateKeyPairSync, createSign, createHash } = await import('node:crypto')
+
+      const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 })
+      const privateKeyPem = privateKey.export({ type: 'pkcs8', format: 'pem' }) as string
+      const publicKeyPem = publicKey.export({ type: 'spki', format: 'pem' }) as string
+
+      const activity = {
+        '@context': 'https://www.w3.org/ns/activitystreams',
+        type: 'Create',
+        actor: 'https://other.example/actor',
+        object: { type: 'Note', id: 'https://other.example/note/1', content: 'hello' }
+      }
+
+      const rawBodyText = JSON.stringify(activity, null, 2)
+      const rawBodyBytes = new TextEncoder().encode(rawBodyText)
+      const digest = 'SHA-256=' + createHash('sha256').update(rawBodyBytes).digest('base64')
+
+      const url = new URL('https://example.com/inbox')
+      const dateHeader = new Date().toUTCString()
+      const signingString = [
+        '(request-target): post /inbox',
+        `host: ${url.host}`,
+        `date: ${dateHeader}`,
+        `digest: ${digest}`,
+        'content-type: application/activity+json'
+      ].join('\n')
+
+      const sign = createSign('RSA-SHA256')
+      sign.update(signingString)
+      sign.end()
+      const signatureBase64 = sign.sign(privateKeyPem, 'base64')
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          id: 'https://other.example/actor',
+          publicKey: {
+            id: 'https://other.example/actor#main-key',
+            owner: 'https://other.example/actor',
+            publicKeyPem
+          }
+        })
+      })
+
+      const req = new Request('https://example.com/inbox', {
+        method: 'POST',
+        headers: {
+          'Signature': `keyId="https://other.example/actor#main-key",algorithm="rsa-sha256",headers="(request-target) host date digest content-type",signature="${signatureBase64}"`,
+          'Date': dateHeader,
+          'Digest': digest,
+          'Content-Type': 'application/activity+json'
+        },
+        body: rawBodyText
+      })
+
+      const result = await verifyIncomingActivity(req, activity, rawBodyBytes, mockFetch)
+      expect(result.keyId).toBe('https://other.example/actor#main-key')
+    })
+
+    it('should succeed for a body whose key order differs from JSON.stringify(activity) would produce', async () => {
+      const { verifyIncomingActivity } = await import('../../src/verifyRequest.js')
+      const { generateKeyPairSync, createSign, createHash } = await import('node:crypto')
+
+      const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 })
+      const privateKeyPem = privateKey.export({ type: 'pkcs8', format: 'pem' }) as string
+      const publicKeyPem = publicKey.export({ type: 'spki', format: 'pem' }) as string
+
+      const activity = { type: 'Create', actor: 'https://other.example/actor' }
+
+      const rawBodyText = '{"actor":"https://other.example/actor","type":"Create"}'
+      const rawBodyBytes = new TextEncoder().encode(rawBodyText)
+      const digest = 'SHA-256=' + createHash('sha256').update(rawBodyBytes).digest('base64')
+
+      const url = new URL('https://example.com/inbox')
+      const dateHeader = new Date().toUTCString()
+      const signingString = [
+        '(request-target): post /inbox',
+        `host: ${url.host}`,
+        `date: ${dateHeader}`,
+        `digest: ${digest}`,
+        'content-type: application/activity+json'
+      ].join('\n')
+
+      const sign = createSign('RSA-SHA256')
+      sign.update(signingString)
+      sign.end()
+      const signatureBase64 = sign.sign(privateKeyPem, 'base64')
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          id: 'https://other.example/actor',
+          publicKey: {
+            id: 'https://other.example/actor#main-key',
+            owner: 'https://other.example/actor',
+            publicKeyPem
+          }
+        })
+      })
+
+      const req = new Request('https://example.com/inbox', {
+        method: 'POST',
+        headers: {
+          'Signature': `keyId="https://other.example/actor#main-key",algorithm="rsa-sha256",headers="(request-target) host date digest content-type",signature="${signatureBase64}"`,
+          'Date': dateHeader,
+          'Digest': digest,
+          'Content-Type': 'application/activity+json'
+        },
+        body: rawBodyText
+      })
+
+      const result = await verifyIncomingActivity(req, activity, rawBodyBytes, mockFetch)
+      expect(result.keyId).toBe('https://other.example/actor#main-key')
+    })
+
+    it('should reject when the rawBody bytes do not match the Digest header', async () => {
+      const { verifyIncomingActivity, HttpSignatureError } = await import('../../src/verifyRequest.js')
+      const { createHash } = await import('node:crypto')
+
+      const activity = { type: 'Create', actor: 'https://other.example/actor' }
+
+      const claimedBody = new TextEncoder().encode('{"type":"Create","actor":"https://other.example/actor"}')
+      const claimedDigest = 'SHA-256=' + createHash('sha256').update(claimedBody).digest('base64')
+
+      const req = new Request('https://example.com/inbox', {
+        method: 'POST',
+        headers: {
+          'Signature': 'keyId="https://other.example/actor#main-key",algorithm="rsa-sha256",headers="(request-target) host date digest content-type",signature="abc"',
+          'Date': new Date().toUTCString(),
+          'Digest': claimedDigest,
+          'Content-Type': 'application/activity+json'
+        },
+        body: new TextDecoder().decode(claimedBody)
+      })
+
+      const tamperedBytes = new TextEncoder().encode('{"type":"Create","actor":"https://attacker.example/actor"}')
+
+      await expect(verifyIncomingActivity(req, activity, tamperedBytes, mockFetch))
+        .rejects.toMatchObject({
+          name: 'HttpSignatureError',
+          message: 'Digest verification failed',
+          statusCode: 400
+        })
+    })
+
+    it('should accept an ArrayBuffer as rawBody', async () => {
+      const { verifyIncomingActivity } = await import('../../src/verifyRequest.js')
+      const { generateKeyPairSync, createSign, createHash } = await import('node:crypto')
+
+      const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 })
+      const privateKeyPem = privateKey.export({ type: 'pkcs8', format: 'pem' }) as string
+      const publicKeyPem = publicKey.export({ type: 'spki', format: 'pem' }) as string
+
+      const activity = { type: 'Create', actor: 'https://other.example/actor' }
+      const rawBodyText = JSON.stringify(activity)
+      const rawBodyBytes = new TextEncoder().encode(rawBodyText)
+      const digest = 'SHA-256=' + createHash('sha256').update(rawBodyBytes).digest('base64')
+
+      const url = new URL('https://example.com/inbox')
+      const dateHeader = new Date().toUTCString()
+      const signingString = [
+        '(request-target): post /inbox',
+        `host: ${url.host}`,
+        `date: ${dateHeader}`,
+        `digest: ${digest}`,
+        'content-type: application/activity+json'
+      ].join('\n')
+
+      const sign = createSign('RSA-SHA256')
+      sign.update(signingString)
+      sign.end()
+      const signatureBase64 = sign.sign(privateKeyPem, 'base64')
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          id: 'https://other.example/actor',
+          publicKey: {
+            id: 'https://other.example/actor#main-key',
+            owner: 'https://other.example/actor',
+            publicKeyPem
+          }
+        })
+      })
+
+      const req = new Request('https://example.com/inbox', {
+        method: 'POST',
+        headers: {
+          'Signature': `keyId="https://other.example/actor#main-key",algorithm="rsa-sha256",headers="(request-target) host date digest content-type",signature="${signatureBase64}"`,
+          'Date': dateHeader,
+          'Digest': digest,
+          'Content-Type': 'application/activity+json'
+        },
+        body: rawBodyText
+      })
+
+      const result = await verifyIncomingActivity(req, activity, rawBodyBytes.buffer, mockFetch)
       expect(result.keyId).toBe('https://other.example/actor#main-key')
     })
   })

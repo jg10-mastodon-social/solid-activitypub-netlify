@@ -20,6 +20,7 @@ export class HttpSignatureError extends Error {
 export async function verifyIncomingActivity(
   req: Request,
   activity: Record<string, unknown>,
+  rawBody: ArrayBuffer | Uint8Array,
   fetchFn: SolidFetch
 ): Promise<{ keyId: string }> {
   const signatureHeader = req.headers.get('Signature')
@@ -54,8 +55,7 @@ export async function verifyIncomingActivity(
     throw new HttpSignatureError('Request timestamp out of range', 400)
   }
 
-  const body = JSON.stringify(activity)
-  if (!verifyDigest(body, digestHeader)) {
+  if (!verifyDigest(rawBody, digestHeader)) {
     throw new HttpSignatureError('Digest verification failed', 400)
   }
 

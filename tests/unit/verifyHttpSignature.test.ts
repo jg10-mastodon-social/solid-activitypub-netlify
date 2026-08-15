@@ -146,23 +146,24 @@ describe('verifyDigest', () => {
     const { verifyDigest } = await import('../../src/verifyHttpSignature.js')
     const { createHash } = await import('node:crypto')
     const body = '{"type":"Create"}'
-    const expectedHash = createHash('sha256').update(body, 'utf8').digest('base64')
+    const expectedHash = createHash('sha256').update(new TextEncoder().encode(body)).digest('base64')
     const hash = 'SHA-256=' + expectedHash
-    expect(verifyDigest(body, hash)).toBe(true)
+    expect(verifyDigest(new TextEncoder().encode(body), hash)).toBe(true)
   })
 
   it('should reject mismatched digest', async () => {
     const { verifyDigest } = await import('../../src/verifyHttpSignature.js')
     const body = '{"type":"Create"}'
     const hash = 'SHA-256=WrongHashBase64=='
-    expect(verifyDigest(body, hash)).toBe(false)
+    expect(verifyDigest(new TextEncoder().encode(body), hash)).toBe(false)
   })
 
   it('should reject missing Digest header', async () => {
     const { verifyDigest } = await import('../../src/verifyHttpSignature.js')
     const body = '{"type":"Create"}'
-    expect(verifyDigest(body, '')).toBe(false)
-    expect(verifyDigest(body, undefined as unknown as string)).toBe(false)
+    const rawBody = new TextEncoder().encode(body)
+    expect(verifyDigest(rawBody, '')).toBe(false)
+    expect(verifyDigest(rawBody, undefined as unknown as string)).toBe(false)
   })
 })
 
@@ -273,6 +274,58 @@ describe('verifySignature', () => {
     const wrongSignature = 'Y2FiYWJjZGVmZw=='
     const result = await verifySignature(publicKeyPem, 'rsa-sha256', signingString, wrongSignature)
     expect(result).toBe(false)
+  })
+})
+
+describe('verifyDigest (raw-bytes contract)', () => {
+  it('should verify when given a Uint8Array of the raw body', async () => {
+    const { verifyDigest } = await import('../../src/verifyHttpSignature.js')
+    const { createHash } = await import('node:crypto')
+
+    const bodyText = '{"type":"Create","actor":"https://example.com/actor"}'
+    const expectedHash = createHash('sha256')
+      .update(new TextEncoder().encode(bodyText))
+      .digest('base64')
+
+    const rawBytes = new TextEncoder().encode(bodyText)
+    expect(verifyDigest(rawBytes, `SHA-256=${expectedHash}`)).toBe(true)
+  })
+
+  it('should verify when given an ArrayBuffer of the raw body', async () => {
+    const { verifyDigest } = await import('../../src/verifyHttpSignature.js')
+    const { createHash } = await import('node:crypto')
+
+    const bodyText = '{"type":"Create"}'
+    const expectedHash = createHash('sha256')
+      .update(new TextEncoder().encode(bodyText))
+      .digest('base64')
+
+    const buf = new TextEncoder().encode(bodyText).buffer
+    expect(verifyDigest(buf, `SHA-256=${expectedHash}`)).toBe(true)
+  })
+
+  it('should reject when raw bytes do not match the declared digest', async () => {
+    const { verifyDigest } = await import('../../src/verifyHttpSignature.js')
+    const wrong = new TextEncoder().encode('{"type":"Create"}')
+    const claimed = 'SHA-256=' + (await import('node:crypto')).createHash('sha256')
+      .update('{"type":"Announce"}', 'utf8').digest('base64')
+    expect(verifyDigest(wrong, claimed)).toBe(false)
+  })
+
+  it('should produce a different hash for whitespace-variant bytes that parse to the same object', async () => {
+    const { verifyDigest } = await import('../../src/verifyHttpSignature.js')
+    const { createHash } = await import('node:crypto')
+
+    const compact = '{"type":"Create","actor":"x"}'
+    const pretty = '{\n  "type": "Create",\n  "actor": "x"\n}'
+
+    const digestCompact = 'SHA-256=' + createHash('sha256').update(new TextEncoder().encode(compact)).digest('base64')
+    const digestPretty = 'SHA-256=' + createHash('sha256').update(new TextEncoder().encode(pretty)).digest('base64')
+
+    expect(digestCompact).not.toBe(digestPretty)
+    expect(verifyDigest(new TextEncoder().encode(compact), digestCompact)).toBe(true)
+    expect(verifyDigest(new TextEncoder().encode(pretty), digestPretty)).toBe(true)
+    expect(verifyDigest(new TextEncoder().encode(pretty), digestCompact)).toBe(false)
   })
 })
 
