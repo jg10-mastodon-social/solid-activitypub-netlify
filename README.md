@@ -58,7 +58,7 @@ One route per configured actor, e.g. `/alice/outbox`. Solid-OIDC-authenticated. 
 3. Parse the body as JSON; reject 400 on parse error.
 4. Validate `@context` and that `activity.actor` equals `${BASE_URL}/${actorName}`; reject 400/403 on failure.
 5. Normalize the activity: assign `id` and `published` if missing.
-6. Resolve explicit recipients from `to`/`cc`/`bto`/`bcc`/`audience`, look up each recipient's `inbox` via their actor document, and POST the activity there with an HTTP signature (`RSA-SHA256`, signed with this actor's key from `src/actor-keys.ts`).
+6. Resolve explicit recipients from `to`/`cc`/`bto`/`bcc`/`audience`, look up each recipient's `inbox` via their actor document, and POST the activity there with an HTTP signature (`RSA-SHA256`, signed with this actor's key from `src/actor-keys.ts`). **Debugging:** a delivery summary logs `[router] POST /${actorName}/outbox delivered to X/Y recipients` — grep this to see the delivery count without parsing the JSON response body.
 7. If the activity is public, load the followers collection at `${SOLID_STORAGE_BASE_URL}${actorName}/followers/` and POST the activity to every follower not already in the explicit-recipient set.
 8. Derive the next paged-outbox slot under `${SOLID_STORAGE_BASE_URL}${actorName}/outbox/` (creating a new page when the current one is full, and patching the collection's `first`/`next` links).
 9. Persist the activity to that page by PATCHing a `solid:InsertDeletePatch` against the pod.

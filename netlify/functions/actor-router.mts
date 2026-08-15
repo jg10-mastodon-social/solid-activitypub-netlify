@@ -166,6 +166,8 @@ async function handlePostOutbox(
       config.solidStorageBaseUrl
     )
 
+    console.log(`[router] POST /${actor.name}/outbox delivered to ${result.delivered}/${result.results.length} recipients`)
+
     const responseBody = JSON.stringify({
       status: 'ok',
       delivered: result.delivered,
