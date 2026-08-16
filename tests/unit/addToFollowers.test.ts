@@ -69,4 +69,74 @@ describe('addToFollowers', () => {
     expect(derivePageUrlCall).toBeDefined()
     expect((derivePageUrlCall![0] as string)).toBe('https://example.com/actor/followers/')
   })
+
+  it('should patch the followers root to set totalItems=1 on first add', async () => {
+    const { addToFollowers } = await import('../../src/services/addToFollowers.js')
+    mockFetch.mockImplementation(async (url: string) => {
+      if (url === 'https://example.com/actor/followers/') {
+        return {
+          ok: true,
+          status: 200,
+          text: () => Promise.resolve(``)
+        }
+      }
+      return {
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve('')
+      }
+    })
+
+    await addToFollowers(
+      'https://other.example/actor',
+      mockFetch as SolidFetch,
+      'https://example.com/',
+      'actor'
+    )
+
+    const rootPatch = mockFetch.mock.calls.find(call =>
+      call[1]?.method === 'PATCH' &&
+      (call[0] as string) === 'https://example.com/actor/followers/'
+    )
+    expect(rootPatch).toBeDefined()
+    const body = rootPatch![1].body as string
+    expect(body).toContain('totalItems')
+    expect(body).toContain('"1"')
+  })
+
+  it('should increment totalItems when root already has totalItems=5', async () => {
+    const { addToFollowers } = await import('../../src/services/addToFollowers.js')
+    mockFetch.mockImplementation(async (url: string) => {
+      if (url === 'https://example.com/actor/followers/') {
+        return {
+          ok: true,
+          status: 200,
+          text: () => Promise.resolve(`@prefix as: <https://www.w3.org/ns/activitystreams#> .
+<https://example.com/actor/followers/> as:totalItems "5" .
+`)
+        }
+      }
+      return {
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve('')
+      }
+    })
+
+    await addToFollowers(
+      'https://other.example/actor',
+      mockFetch as SolidFetch,
+      'https://example.com/',
+      'actor'
+    )
+
+    const rootPatch = mockFetch.mock.calls.find(call =>
+      call[1]?.method === 'PATCH' &&
+      (call[0] as string) === 'https://example.com/actor/followers/'
+    )
+    expect(rootPatch).toBeDefined()
+    const body = rootPatch![1].body as string
+    expect(body).toContain('"5"')
+    expect(body).toContain('"6"')
+  })
 })
