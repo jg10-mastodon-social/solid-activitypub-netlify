@@ -25,6 +25,7 @@ export class MockSolidServer {
   private patchedFollowersPages: Array<{ url: string; body: string }> = []
   private receivedActivities: Array<{ url: string; body: string }> = []
   private followerActorsByCollection: Record<string, string[]> = {}
+  private followersTotalItems: Record<string, number> = {}
 
   constructor(options: MockSolidServerOptions) {
     this.port = options.port
@@ -53,6 +54,7 @@ export class MockSolidServer {
     this.patchedOutboxPages = []
     this.receivedActivities = []
     this.followerActorsByCollection = {}
+    this.followersTotalItems = {}
   }
 
   setError(simulateError: boolean, errorType?: 'unreachable' | '404' | '500'): void {
@@ -66,6 +68,7 @@ setFollowerActors(actors: string[], actorName: string = 'actor'): void {
     const pageUrl = `http://localhost:${this.port}/${actorName}/followers/pages/1`
     this.collectionFirst.followers[actorName] = pageUrl
     this.createdPages.add(pageUrl)
+    this.followersTotalItems[actorName] = actors.length
   }
 }
 
@@ -209,6 +212,11 @@ setFollowerActors(actors: string[], actorName: string = 'actor'): void {
     const first = this.collectionFirst[collection][actorName]
     if (first) {
       body += `\n<${collectionUrl}> as:first <${first}>.`
+    }
+
+    if (collection === 'followers' && actorName in this.followersTotalItems) {
+      const n = this.followersTotalItems[actorName]
+      body += `\n<${collectionUrl}> as:totalItems "${n}" .`
     }
 
     res.writeHead(200, { 'Content-Type': 'text/turtle' })
