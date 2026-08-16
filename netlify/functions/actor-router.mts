@@ -6,6 +6,8 @@ import { handleInboxActivity, isActorDeleteActivity } from '../../src/handlers/i
 import { handleOutboxActivity } from '../../src/handlers/outbox.js'
 import { verifyIncomingActivity, HttpSignatureError, formatHttpSignatureError } from '../../src/verifyRequest.js'
 import type { Activity } from '../../src/activity.js'
+import { serializeFollowersCollection } from '../../src/services/serializeFollowersCollection.js'
+import { serializeFollowersPage } from '../../src/services/serializeFollowersPage.js'
 
 const getCorsHeaders = (origin: string | null) => ({
   'Access-Control-Allow-Origin': origin ?? '*',
@@ -72,6 +74,13 @@ function rewriteBody(
   return body.replaceAll(podBase, publicBase)
 }
 
+function wantsAs2Json(acceptHeader: string | null): boolean {
+  if (!acceptHeader) return false
+  const lowered = acceptHeader.toLowerCase()
+  return lowered.includes('application/activity+json') ||
+    lowered.includes('application/ld+json')
+}
+
 async function handleGet(
   req: Request,
   context: Context,
@@ -81,7 +90,7 @@ async function handleGet(
   collection: Collection,
   corsHeaders: Record<string, string>
 ): Promise<Response> {
-  const requiresAuth = collection !== 'outbox'
+  const requiresAuth = collection !== 'outbox' && collection !== 'followers'
   if (requiresAuth) {
     const authHeader = req.headers.get('authorization')
     const dpopHeader = req.headers.get('dpop')
@@ -106,6 +115,30 @@ async function handleGet(
   const page = context.params.page
   const requestPath = new URL(req.url).pathname
   const targetUrl = resolvePodTarget(config.solidStorageBaseUrl, actorName, collection, page, requestPath)
+
+  if (collection === 'followers' && wantsAs2Json(req.headers.get('Accept'))) {
+    const publicRootUrl = `${config.baseUrl}/${actorName}/followers`
+    const podRootUrl = `${config.solidStorageBaseUrl}${actorName}/followers/`
+    try {
+      const as2Response = page
+        ? await serializeFollowersPage(fetchFn, targetUrl, podRootUrl, publicRootUrl)
+        : await serializeFollowersCollection(fetchFn, podRootUrl, publicRootUrl)
+      const headers = new Headers(as2Response.headers)
+      for (const [k, v] of Object.entries(corsHeaders)) {
+        headers.set(k, v)
+      }
+      return new Response(as2Response.body, {
+        status: as2Response.status,
+        headers
+      })
+    } catch (error) {
+      console.error(`[router] GET ${collection} AS2 error: ${error}`)
+      return new Response(error instanceof Error ? error.message : 'Bad Gateway', {
+        status: 502,
+        headers: corsHeaders
+      })
+    }
+  }
 
   try {
     const acceptHeader = req.headers.get('Accept') || 'text/turtle'
