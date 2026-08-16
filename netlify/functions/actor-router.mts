@@ -25,6 +25,7 @@ export const config: Config = {
     '/:actor/followers/:page*',
   ],
   method: ['POST', 'GET', 'OPTIONS'],
+  preferStatic: true,
 }
 
 type Collection = 'inbox' | 'outbox' | 'followers'
