@@ -285,4 +285,39 @@ describe('removeFromFollowers', () => {
     expect(body).toContain('"1"')
     expect(body).toContain('"0"')
   })
+
+  it('should still remove successfully when the root GET fails', async () => {
+    const { removeFromFollowers } = await import('../../src/services/removeFromFollowers.js')
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve(`<https://example.com/actor/followers/> <https://www.w3.org/ns/activitystreams#first> <https://example.com/actor/followers/pages/123>.`)
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve(`<https://example.com/actor/followers/pages/123> <https://www.w3.org/ns/activitystreams#items> <https://other.example/actor>.`)
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        text: () => Promise.resolve('server error')
+      })
+
+    await expect(removeFromFollowers(
+      'https://other.example/actor',
+      mockFetch as SolidFetch,
+      'https://example.com/',
+      'actor'
+    )).resolves.toBeUndefined()
+
+    const patches = mockFetch.mock.calls.filter(call => call[1]?.method === 'PATCH')
+    const rootPatch = patches.find(p => (p[0] as string) === 'https://example.com/actor/followers/')
+    expect(rootPatch).toBeUndefined()
+  })
 })

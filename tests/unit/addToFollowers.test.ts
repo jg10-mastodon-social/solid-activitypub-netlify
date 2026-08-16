@@ -139,4 +139,26 @@ describe('addToFollowers', () => {
     expect(body).toContain('"5"')
     expect(body).toContain('"6"')
   })
+
+  it('should not patch the root if the page PATCH fails', async () => {
+    const { addToFollowers } = await import('../../src/services/addToFollowers.js')
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 500,
+      text: () => Promise.resolve('server error')
+    })
+
+    await expect(addToFollowers(
+      'https://other.example/actor',
+      mockFetch as SolidFetch,
+      'https://example.com/',
+      'actor'
+    )).rejects.toThrow()
+
+    const rootPatch = mockFetch.mock.calls.find(call =>
+      call[1]?.method === 'PATCH' &&
+      (call[0] as string) === 'https://example.com/actor/followers/'
+    )
+    expect(rootPatch).toBeUndefined()
+  })
 })
