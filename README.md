@@ -29,7 +29,6 @@ Build time generates:
 - `src/private-key.ts` - OIDC ES256 signing key (gitignored)
 - `src/actor-keys.ts` - per-actor RS256 signing keys (gitignored)
 - `public/webid`, `public/jwks.json`, `public/.well-known/openid-configuration` - OIDC identity files
-- `public/${actorName}` - one AS2 actor document per configured actor (public key, inbox, outbox, followers)
 
 ## Environment Variables
 
@@ -46,7 +45,7 @@ Build time generates:
 
 ## How it works
 
-Each configured actor (named in `ACTOR_NAME`) gets its own AS2 document, its own RSA signing key, its own outbox/inbox/followers collection on the pod, and its own per-actor endpoints.
+Each configured actor (named in `ACTOR_NAME`) gets its own RSA signing key, its own outbox/inbox/followers collection on the pod, its own per-actor endpoints, and its own AS2 actor document served by the `actor-router` function (overlay-merged with a profile from the pod on every request).
 
 Every request handled by the actor-router function logs a single `[router] METHOD /path` entry line at the start (e.g. `[router] POST /alice/outbox`), followed by any of the auth-failure / delivery-summary logs documented on each endpoint below. Grepping for `[router]` is the fastest way to follow a single request through the function.
 
@@ -132,6 +131,16 @@ Per-actor CORS-enabled public proxy of the followers collection on the pod, with
    - Otherwise (`text/turtle` or absent): rewrite the pod URL prefix to the public actor-scoped prefix in the body so consumers see `${BASE_URL}/${actorName}/followers/...`.
 7. Return the body with CORS headers (`Access-Control-Allow-Origin` echoes `Origin` and falls back to `*`; preflight returns `204`).
 
+### Actor GET `/${actorName}`
+
+Per-actor AS2 actor document served by the `actor-router` function.
+
+1. Resolve `actorName` from the path; reject 404 if not a configured actor.
+2. Export the per-actor RSA public key from `src/actor-keys.ts` as a PEM (`importJWK` + `exportSPKI` from `jose`). Computed at cold start and cached in module scope; key rotation therefore requires a redeploy.
+3. Build the immutable skeleton: `id`, `preferredUsername`, `inbox`, `outbox`, `followers`, `following`, `liked`, `publicKey` (with the PEM and `id: ${BASE_URL}/${actorName}#main-key`, `owner: ${BASE_URL}/${actorName}`), and `manuallyApprovesFollowers: false`. `type` defaults to `Service`.
+4. Attempt to fetch the profile from `${SOLID_STORAGE_BASE_URL}${actorName}/profile` (DPoP-authenticated, `Accept: text/turtle`). On 200, parse with `n3` and overlay any recognized fields onto the skeleton. On non-200 or parse error, log and leave the skeleton unchanged — the response still serves with default `type: 'Service'` and no profile fields.
+5. Return the merged JSON with `Content-Type: application/activity+json` and the CORS headers used elsewhere by the function.
+
 ### WebFinger `/.well-known/webfinger?resource=acct:${actorName}@${domain}`
 
 Served by the `webfinger` Netlify function. Returns JRD JSON describing the matching configured actor (200) or 404 if the resource is unknown.
@@ -149,22 +158,21 @@ npm run test:e2e           # Real `netlify dev` + a mock Solid server (boots bot
 .
 ├── netlify/
 │   └── functions/
-│       ├── actor-router.mts # Per-actor /:actor(outbox|inbox|followers)
+│       ├── actor-router.mts # Per-actor /:actor(/outbox|/inbox|/followers) — also serves /:actor (AS2 profile, profile overlay)
 │       └── webfinger.mts    # /.well-known/webfinger dispatcher
 ├── netlify.toml             # Build config + function routing
 ├── public/                  # Auto-generated at build (gitignored)
-│   ├── ${actorName}         # One AS2 actor document per configured actor
 │   ├── webid                # WebID Turtle
 │   ├── jwks.json            # OIDC signing key (public)
 │   └── .well-known/         # openid-configuration
 ├── scripts/
-│   └── generate-identity.ts # Generates identity, actor docs, webfinger data
+│   └── generate-identity.ts # Generates identity, actor keys, webfinger data
 ├── src/
 │   ├── activity.ts          # Activity validation, normalization, recipient extraction
 │   ├── auth.ts              # DPoP token verification
 │   ├── config.ts            # Config loading (actorNames[], actorByPath map)
 │   ├── handlers/            # Inbox/outbox activity handlers (per-actor aware)
-│   ├── services/            # Solid-pod + RDF helpers (paging, patching, followers)
+│   ├── services/            # Solid-pod + RDF helpers (paging, patching, followers, actorDoc.ts)
 │   ├── signing.ts           # Outgoing HTTP signature signing (per-actor key lookup)
 │   ├── solidFetch.ts        # DPoP-authenticated fetch to pod
 │   ├── ssrf.ts              # SSRF protection for remote actor key fetches
@@ -186,16 +194,16 @@ npm run test:e2e           # Real `netlify dev` + a mock Solid server (boots bot
 
 ### Components and trust boundaries
 
-- **Netlify function** (`netlify/functions/{actor-router,webfinger}.mts`): the only externally reachable surface. Stateless across invocations; reconstructed on every cold start by the build. `actor-router.mts` handles the per-actor `/{actorName}/{outbox,inbox,followers}` GET/POST routes; `webfinger.mts` serves the WebFinger dispatcher.
-- **Solid pod** at `${SOLID_STORAGE_BASE_URL}`: durable storage for per-actor containers `${actorName}/inbox/`, `${actorName}/outbox/`, and `${actorName}/followers/` as paged AS2 collections. The function is the only writer; reads happen via a DPoP-authenticated fetch (`src/solidFetch.ts`).
+- **Netlify function** (`netlify/functions/{actor-router,webfinger}.mts`): the only externally reachable surface. Stateless across invocations; reconstructed on every cold start by the build. `actor-router.mts` handles the per-actor `/{actorName}` GET (AS2 actor document with profile overlay) and `/{actorName}/{outbox,inbox,followers}` GET/POST routes; `webfinger.mts` serves the WebFinger dispatcher.
+- **Solid pod** at `${SOLID_STORAGE_BASE_URL}`: durable storage for per-actor containers `${actorName}/inbox/`, `${actorName}/outbox/`, and `${actorName}/followers/` as paged AS2 collections, plus an operator-managed `${actorName}/profile` Turtle document. The function is the only writer for the collections; reads (including the profile) happen via a DPoP-authenticated fetch (`src/solidFetch.ts`).
 - **OIDC issuer**: any issuer in `WHITELISTED_ISSUERS` is trusted to authenticate users who may access the private collections (outbox write + inbox read). The function verifies each request's DPoP-bound access token via `@solid/access-token-verifier` — confirming the client controls the bound key and the token's issuer is in the allowlist.
 - **Remote ActivityPub servers**: discovered via WebFinger and actor-document fetches (`src/activity.ts`, `src/verifyRequest.ts`).
-- **Static identity** in `public/`: OIDC discovery, WebID, JWKS, the WebFinger data file, and one AS2 actor document per configured actor. Served by Netlify's CDN, regenerated on every build.
+- **Static identity** in `public/`: OIDC discovery, WebID, JWKS, and the WebFinger data file. Served by Netlify's CDN, regenerated on every build.
 
 ### Per-actor keypairs
 
 - **OIDC ES256** (one): private in `src/private-key.ts`, public in `public/jwks.json`. Verifies incoming DPoP tokens (`auth.ts`) and mints the DPoP token for the function's own pod traffic (`solidFetch.ts`). The public JWK can be supplied via `JWKS` to reuse a keypair across deploys.
-- **Actor RS256** (one per configured actor): private JWKs live in `src/actor-keys.ts` keyed by actor name; the corresponding public PEMs are published in each `public/${actorName}` as `publicKey.publicKeyPem`. Signs outgoing requests (`signing.ts`); remote servers verify against the published PEM.
+- **Actor RS256** (one per configured actor): private JWKs live in `src/actor-keys.ts` keyed by actor name; the corresponding public PEMs are derived at cold start (`importJWK` + `exportSPKI`) and embedded in the actor document as `publicKey.publicKeyPem` — the AS2 field name remote servers use to verify the HTTP signatures this actor signs on outgoing requests (`signing.ts`).
 
 ### Data on the pod
 
@@ -204,9 +212,28 @@ All collections are stored as paged `as:Collection` + `as:OrderedCollectionPage`
 ```
 ${SOLID_STORAGE_BASE_URL}/
 ├── ${actorName}/           # one container per configured actor
+│   ├── profile             # operator-managed Turtle profile (as:type, as:name, as:summary, as:icon, as:image)
 │   ├── inbox/              # inbound activities
 │   ├── outbox/             # published activities
 │   └── followers/          # followers of this actor
 ```
 
 Each page is a Turtle document with `as:items` quads pointing at its entries; pages are linked via `as:next` and the collection holds a single `as:first` pointing at the head page. Writes are PATCHes of a `solid:InsertDeletePatch` (see `src/services/buildPatch.ts`) — never full-document overwrites — so a single PATCH is the unit of consistency. For the `followers` collection, each `as:items` value is the follower's actor URI directly (matching the W3C AS2 paged-OrderedCollection shape that Mastodon and other fediverse servers expect).
+
+The `profile` resource is a single Turtle document that the `actor-router` function reads on every `GET /${actorName}` and overlay-merges onto the immutable skeleton it builds from configuration and the per-actor RSA key. 
+
+Example profile:
+
+```turtle
+@prefix as: <https://www.w3.org/ns/activitystreams#>.
+
+<${SOLID_STORAGE_BASE_URL}${actorName}/profile>
+  a as:Person;
+  as:name "Alice Example";
+  as:summary "<p>Bio. <em>HTML allowed</em> — Mastodon sanitises server-side.</p>";
+  as:icon <${SOLID_STORAGE_BASE_URL}${actorName}/profile#icon>;
+  as:image <${SOLID_STORAGE_BASE_URL}${actorName}/profile#image>.
+
+<${SOLID_STORAGE_BASE_URL}${actorName}/profile#icon> a as:Image; as:mediaType "image/png"; as:url "https://cdn.example/avatar.png".
+<${SOLID_STORAGE_BASE_URL}${actorName}/profile#image> a as:Image; as:mediaType "image/jpeg"; as:url "https://cdn.example/header.jpg".
+```
