@@ -2,6 +2,7 @@ import type { SolidFetch } from '../types.js'
 import { derivePageUrl } from './derivePageUrl.js'
 import { buildInsertItemLinkPatch, buildUpdateLiteralPatch } from './buildPatch.js'
 import { parseFollowersRoot } from './rdfUtils.js'
+import { discoverMetaResourceUrl } from './solidHelpers.js'
 
 const AS_TOTALITEMS = 'https://www.w3.org/ns/activitystreams#totalItems'
 const XSD_NON_NEG_INT = 'http://www.w3.org/2001/XMLSchema#nonNegativeInteger'
@@ -25,13 +26,14 @@ async function incrementFollowersTotal(
       : totalItemsLiteralTurtle(followersUrl, current)
     const newTurtle = totalItemsLiteralTurtle(followersUrl, next)
     const patchBody = buildUpdateLiteralPatch(followersUrl, AS_TOTALITEMS, oldTurtle, newTurtle)
-    const patchResponse = await fetch(followersUrl, {
+    const metaUrl = await discoverMetaResourceUrl(followersUrl, fetch)
+    const patchResponse = await fetch(metaUrl, {
       method: 'PATCH',
       headers: { 'content-type': 'text/n3' },
       body: patchBody
     })
     if (!patchResponse.ok) {
-      console.warn(`[inbox] totalItems PATCH failed for ${followersUrl}: ${patchResponse.status}`)
+      console.warn(`[inbox] totalItems PATCH failed for ${metaUrl}: ${patchResponse.status}`)
     }
   } catch (error) {
     console.warn(`[inbox] Could not update totalItems on ${followersUrl}: ${error}`)

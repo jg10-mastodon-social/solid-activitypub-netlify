@@ -197,7 +197,7 @@ describe('removeFromFollowers', () => {
     expect(patchCall![0] as string).toBe('https://example.com/actor/followers/pages/2')
   })
 
-  it('should patch the followers root to decrement totalItems after a successful remove', async () => {
+  it('should patch the followers meta resource (via describedby link) to decrement totalItems after a successful remove', async () => {
     const { removeFromFollowers } = await import('../../src/services/removeFromFollowers.js')
     mockFetch
       .mockResolvedValueOnce({
@@ -223,6 +223,11 @@ describe('removeFromFollowers', () => {
       })
       .mockResolvedValueOnce({
         ok: true,
+        status: 200,
+        headers: new Headers({ link: '<https://example.com/actor/followers/.meta>; rel="describedby"' })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
         status: 200
       })
 
@@ -234,12 +239,152 @@ describe('removeFromFollowers', () => {
     )
 
     const patches = mockFetch.mock.calls.filter(call => call[1]?.method === 'PATCH')
-    const rootPatch = patches.find(p => (p[0] as string) === 'https://example.com/actor/followers/')
+    const rootPatch = patches.find(p => (p[0] as string) === 'https://example.com/actor/followers/.meta')
     expect(rootPatch).toBeDefined()
     const body = rootPatch![1].body as string
     expect(body).toContain('totalItems')
     expect(body).toContain('"2"')
     expect(body).toContain('"1"')
+  })
+
+  it('should not PATCH the followers container URL directly', async () => {
+    const { removeFromFollowers } = await import('../../src/services/removeFromFollowers.js')
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve(`<https://example.com/actor/followers/> <https://www.w3.org/ns/activitystreams#first> <https://example.com/actor/followers/pages/123>.`)
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve(`<https://example.com/actor/followers/pages/123> <https://www.w3.org/ns/activitystreams#items> <https://other.example/actor>.`)
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve(`@prefix as: <https://www.w3.org/ns/activitystreams#> .
+<https://example.com/actor/followers/> as:totalItems "2" .
+`)
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({ link: '<https://example.com/actor/followers/.meta>; rel="describedby"' })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200
+      })
+
+    await removeFromFollowers(
+      'https://other.example/actor',
+      mockFetch as SolidFetch,
+      'https://example.com/',
+      'actor'
+    )
+
+    const patches = mockFetch.mock.calls.filter(call => call[1]?.method === 'PATCH')
+    const directPatch = patches.find(p => (p[0] as string) === 'https://example.com/actor/followers/')
+    expect(directPatch).toBeUndefined()
+  })
+
+  it('should HEAD the followers root to discover the meta resource before PATCHing', async () => {
+    const { removeFromFollowers } = await import('../../src/services/removeFromFollowers.js')
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve(`<https://example.com/actor/followers/> <https://www.w3.org/ns/activitystreams#first> <https://example.com/actor/followers/pages/123>.`)
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve(`<https://example.com/actor/followers/pages/123> <https://www.w3.org/ns/activitystreams#items> <https://other.example/actor>.`)
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve(`@prefix as: <https://www.w3.org/ns/activitystreams#> .
+<https://example.com/actor/followers/> as:totalItems "2" .
+`)
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({ link: '<https://example.com/actor/followers/.meta>; rel="describedby"' })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200
+      })
+
+    await removeFromFollowers(
+      'https://other.example/actor',
+      mockFetch as SolidFetch,
+      'https://example.com/',
+      'actor'
+    )
+
+    const headCall = mockFetch.mock.calls.find(call =>
+      call[1]?.method === 'HEAD' &&
+      (call[0] as string) === 'https://example.com/actor/followers/'
+    )
+    expect(headCall).toBeDefined()
+  })
+
+  it('should fall back to <container>.meta when the Link header is absent', async () => {
+    const { removeFromFollowers } = await import('../../src/services/removeFromFollowers.js')
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve(`<https://example.com/actor/followers/> <https://www.w3.org/ns/activitystreams#first> <https://example.com/actor/followers/pages/123>.`)
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve(`<https://example.com/actor/followers/pages/123> <https://www.w3.org/ns/activitystreams#items> <https://other.example/actor>.`)
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve(`@prefix as: <https://www.w3.org/ns/activitystreams#> .
+<https://example.com/actor/followers/> as:totalItems "2" .
+`)
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers()
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200
+      })
+
+    await removeFromFollowers(
+      'https://other.example/actor',
+      mockFetch as SolidFetch,
+      'https://example.com/',
+      'actor'
+    )
+
+    const patches = mockFetch.mock.calls.filter(call => call[1]?.method === 'PATCH')
+    const rootPatch = patches.find(p => (p[0] as string) === 'https://example.com/actor/followers/.meta')
+    expect(rootPatch).toBeDefined()
   })
 
   it('should not decrement below 0', async () => {
@@ -268,6 +413,11 @@ describe('removeFromFollowers', () => {
       })
       .mockResolvedValueOnce({
         ok: true,
+        status: 200,
+        headers: new Headers({ link: '<https://example.com/actor/followers/.meta>; rel="describedby"' })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
         status: 200
       })
 
@@ -279,7 +429,7 @@ describe('removeFromFollowers', () => {
     )
 
     const patches = mockFetch.mock.calls.filter(call => call[1]?.method === 'PATCH')
-    const rootPatch = patches.find(p => (p[0] as string) === 'https://example.com/actor/followers/')
+    const rootPatch = patches.find(p => (p[0] as string) === 'https://example.com/actor/followers/.meta')
     expect(rootPatch).toBeDefined()
     const body = rootPatch![1].body as string
     expect(body).toContain('"1"')
