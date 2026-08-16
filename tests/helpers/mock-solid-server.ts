@@ -20,6 +20,7 @@ export class MockSolidServer {
     outbox: {},
     followers: {},
   }
+  private actorProfiles: Record<string, string> = {}
   private patchedInboxPages: Array<{ url: string; body: string }> = []
   private patchedOutboxPages: Array<{ url: string; body: string }> = []
   private patchedFollowersPages: Array<{ url: string; body: string }> = []
@@ -50,11 +51,20 @@ export class MockSolidServer {
     }
     this.createdPages.clear()
     this.collectionFirst = { inbox: {}, outbox: {}, followers: {} }
+    this.actorProfiles = {}
     this.patchedInboxPages = []
     this.patchedOutboxPages = []
     this.receivedActivities = []
     this.followerActorsByCollection = {}
     this.followersTotalItems = {}
+  }
+
+  setActorProfile(actorName: string, turtle: string): void {
+    this.actorProfiles[actorName] = turtle
+  }
+
+  clearActorProfile(actorName: string): void {
+    delete this.actorProfiles[actorName]
   }
 
   setError(simulateError: boolean, errorType?: 'unreachable' | '404' | '500'): void {
@@ -132,6 +142,12 @@ setFollowerActors(actors: string[], actorName: string = 'actor'): void {
       return
     }
 
+    const profileMatch = pathname.match(/^\/([^/]+)\/profile$/)
+    if (req.method === 'GET' && profileMatch) {
+      this.handleGetProfile(req, res, profileMatch[1])
+      return
+    }
+
     const parsed = parsePerActorPath(pathname)
     if (!parsed) {
       res.writeHead(404)
@@ -180,6 +196,17 @@ setFollowerActors(actors: string[], actorName: string = 'actor'): void {
 
     res.writeHead(200, { 'Content-Type': 'application/activity+json' })
     res.end(JSON.stringify(actor))
+  }
+
+  private handleGetProfile(req: http.IncomingMessage, res: http.ServerResponse, actorName: string): void {
+    const turtle = this.actorProfiles[actorName]
+    if (!turtle) {
+      res.writeHead(404)
+      res.end('Not Found')
+      return
+    }
+    res.writeHead(200, { 'Content-Type': 'text/turtle' })
+    res.end(turtle)
   }
 
   private handlePostActorInbox(req: http.IncomingMessage, res: http.ServerResponse): void {
