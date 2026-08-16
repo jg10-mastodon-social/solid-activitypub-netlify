@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import { generateKeyPair, exportJWK, importJWK, exportSPKI, exportPKCS8 } from 'jose'
+import { generateKeyPair, exportJWK, importJWK } from 'jose'
 import { createHash } from 'node:crypto'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -145,37 +145,10 @@ async function generateIdentity() {
   const webfingerEntries: Record<string, unknown> = {}
 
   for (const actorName of actorNames) {
-    const { publicKey: actorPublicKey, privateKey: actorPrivateKey } = await generateKeyPair('RS256')
+    const { privateKey: actorPrivateKey } = await generateKeyPair('RS256')
     const actorPrivateJwk = await exportJWK(actorPrivateKey)
-    const actorPublicKeyPem = await exportSPKI(actorPublicKey)
-    const actorPrivateKeyPem = await exportPKCS8(actorPrivateKey)
 
     const actorUrl = `${baseUrl}/${actorName}`
-
-    const actor = {
-      '@context': [
-        'https://www.w3.org/ns/activitystreams',
-        'https://w3id.org/security/v1'
-      ],
-      id: actorUrl,
-      type: 'Service',
-      preferredUsername: actorName,
-      inbox: `${baseUrl}/${actorName}/inbox`,
-      outbox: `${baseUrl}/${actorName}/outbox`,
-      followers: `${baseUrl}/${actorName}/followers`,
-      following: `${baseUrl}/${actorName}/following`,
-      liked: `${baseUrl}/${actorName}/liked`,
-      publicKey: {
-        id: `${actorUrl}#main-key`,
-        owner: actorUrl,
-        publicKeyPem: actorPublicKeyPem
-      },
-      manuallyApprovesFollowers: false
-    }
-
-    const actorPath = path.join(publicDir, actorName)
-    fs.writeFileSync(actorPath, JSON.stringify(actor, null, 2))
-    console.log(`Written: ${actorPath}`)
 
     actorKeys[actorName] = actorPrivateJwk
 
@@ -198,19 +171,6 @@ async function generateIdentity() {
 
   fs.writeFileSync(webfingerDataPath, `export const webfingerEntries: Record<string, unknown> = ${JSON.stringify(webfingerEntries, null, 2)}\n`)
   console.log(`Written: ${webfingerDataPath}`)
-
-  const headersLines: string[] = []
-  for (const actorName of actorNames) {
-    headersLines.push(`/${actorName}`)
-    headersLines.push(`  Content-Type: application/activity+json`)
-    headersLines.push(`  Access-Control-Allow-Origin: *`)
-    headersLines.push(`  Access-Control-Allow-Methods: GET, OPTIONS`)
-    headersLines.push(`  Access-Control-Allow-Headers: Content-Type`)
-    headersLines.push('')
-  }
-  const headersPath = path.join(publicDir, '_headers')
-  fs.writeFileSync(headersPath, headersLines.join('\n'))
-  console.log(`Written: ${headersPath}`)
 
   console.log('Identity files generated successfully')
 }
