@@ -99,6 +99,7 @@ One route per configured actor, e.g. `/alice/inbox`. HTTP-signature-authenticate
    - `Delete` → ack and return (no persistence).
    - `Follow` → send a signed `Accept` (signed with the matched local actor's key) to the follower's inbox, and add the follower to the followers collection at `${SOLID_STORAGE_BASE_URL}${actorName}/followers/`.
    - `Undo` of `Follow` → remove the follower from `${actorName}/followers/`.
+   - `Follow`/`Undo` also maintain an `as:totalItems` literal on the followers collection root via a `solid:InsertDeletePatch` that swaps the old literal for the new one (`addToFollowers` increments after a successful per-page item PATCH; `removeFromFollowers` decrements after a successful remove). The first add patches from "no triple" to `1`; decrements never go below `0`. Concurrent mutations can drift the counter; a drift self-corrects on the next mutation.
    - Anything else → derive the next paged-inbox slot under `${SOLID_STORAGE_BASE_URL}${actorName}/inbox/` and persist via `solid:InsertDeletePatch`.
 
 ### Inbox GET `/${actorName}/inbox[/pages/{page}]`
@@ -116,16 +117,20 @@ Per-actor DPoP-authenticated proxy of the paged inbox collection on the pod, wit
 
 ### Followers GET `/${actorName}/followers[/pages/{page}]`
 
-Per-actor DPoP-authenticated proxy of the followers collection on the pod, with pod URLs rewritten to the public actor-scoped prefix.
+Per-actor CORS-enabled public proxy of the followers collection on the pod, with pod URLs rewritten to the public actor-scoped prefix.
 
 1. Load config; resolve `actorName` from the path; reject 404 if not configured.
 2. Resolve the `{page}` from the request path (preserving trailing slash).
-3. Verify the DPoP token via `verifyDpopToken` (with the request URL and `GET` method); reject 401/403 on failure or if the issuer is not in `WHITELISTED_ISSUERS`. **Debugging:** a failure logs `[router] GET /${actorName}/followers auth failed: <reason>` — grep this to distinguish a missing header, an issuer not in `WHITELISTED_ISSUERS`, or a token-verification failure (bad signature, expired token, clock skew).
-4. Compute the pod target as `${SOLID_STORAGE_BASE_URL}${actorName}/followers/{page}`.
-5. Create a DPoP-authenticated fetch to the pod and GET the target with the request's `Accept` header (default `text/turtle`).
-6. Read the pod response body.
-7. Rewrite the pod URL prefix to the public actor-scoped prefix in the body so consumers see `${BASE_URL}/${actorName}/followers/...`.
-8. Return the body to the caller with CORS headers.
+3. Compute the pod target as `${SOLID_STORAGE_BASE_URL}${actorName}/followers/{page}`.
+4. Create a DPoP-authenticated fetch to the pod and GET the target with the request's `Accept` header (default `text/turtle`).
+5. Read the pod response body.
+6. Branch on `Accept`:
+   - `application/activity+json` (or `application/ld+json` with the AS profile), on the collection root or a page: serialise to AS2 JSON and return `Content-Type: application/activity+json`.
+      - The collection root is an `OrderedCollection` with `totalItems` and `first` (a public-URL `OrderedCollectionPage`).
+      - Each page is an `OrderedCollectionPage` with `partOf`, an `orderedItems` array of follower actor URIs, and optional `next`.
+      - All `id`/`first`/`partOf`/`next` use the public URL prefix `${BASE_URL}/${actorName}/followers[/...]` (never the pod URL).
+   - Otherwise (`text/turtle` or absent): rewrite the pod URL prefix to the public actor-scoped prefix in the body so consumers see `${BASE_URL}/${actorName}/followers/...`.
+7. Return the body with CORS headers (`Access-Control-Allow-Origin` echoes `Origin` and falls back to `*`; preflight returns `204`).
 
 ### WebFinger `/.well-known/webfinger?resource=acct:${actorName}@${domain}`
 
