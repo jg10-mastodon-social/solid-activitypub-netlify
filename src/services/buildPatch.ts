@@ -74,5 +74,24 @@ export function buildDeleteItemLinkPatch(
       solid:deletes {
         <${pageUrl}> as:items <${itemUri}>.
       }.
-`
+  `
+}
+
+export function buildUpdateLiteralPatch(
+  subject: string,
+  predicate: string,
+  oldLiteralTurtle: string,
+  newLiteralTurtle: string
+): string {
+  void subject
+  void predicate
+  return `${INSERT_DELETE_PATCH_PREFIX}
+      _:patch a solid:InsertDeletePatch;
+      solid:deletes {
+        ${oldLiteralTurtle}
+      };
+      solid:inserts {
+        ${newLiteralTurtle}
+      }.
+  `
 }

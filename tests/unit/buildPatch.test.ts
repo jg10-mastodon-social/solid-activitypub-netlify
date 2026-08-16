@@ -53,4 +53,62 @@ describe('buildPatch', () => {
       expect(patch).toContain('as:items <https://example.com/activities/1>')
     })
   })
+
+  describe('buildUpdateLiteralPatch', () => {
+    it('includes the standard prefix block', async () => {
+      const { buildUpdateLiteralPatch } = await import('../../src/services/buildPatch.js')
+      const patch = buildUpdateLiteralPatch(
+        'https://example.com/alice/followers/',
+        'https://www.w3.org/ns/activitystreams#totalItems',
+        '',
+        '<https://example.com/alice/followers/> <https://www.w3.org/ns/activitystreams#totalItems> "1"^^<http://www.w3.org/2001/XMLSchema#nonNegativeInteger> .'
+      )
+      expect(patch).toContain('@prefix as:')
+      expect(patch).toContain('@prefix solid:')
+      expect(patch).toContain('solid:InsertDeletePatch')
+    })
+
+    it('puts oldTurtle in solid:deletes and newTurtle in solid:inserts', async () => {
+      const { buildUpdateLiteralPatch } = await import('../../src/services/buildPatch.js')
+      const oldTurtle = '<https://example.com/alice/followers/> <https://www.w3.org/ns/activitystreams#totalItems> "5"^^<http://www.w3.org/2001/XMLSchema#nonNegativeInteger> .'
+      const newTurtle = '<https://example.com/alice/followers/> <https://www.w3.org/ns/activitystreams#totalItems> "6"^^<http://www.w3.org/2001/XMLSchema#nonNegativeInteger> .'
+      const patch = buildUpdateLiteralPatch(
+        'https://example.com/alice/followers/',
+        'https://www.w3.org/ns/activitystreams#totalItems',
+        oldTurtle,
+        newTurtle
+      )
+      const deletesMatch = patch.match(/solid:deletes\s*\{([\s\S]*?)\}/)
+      const insertsMatch = patch.match(/solid:inserts\s*\{([\s\S]*?)\}/)
+      expect(deletesMatch).not.toBeNull()
+      expect(insertsMatch).not.toBeNull()
+      expect(deletesMatch![1]).toContain(oldTurtle)
+      expect(insertsMatch![1]).toContain(newTurtle)
+    })
+
+    it('does not include an as:items link', async () => {
+      const { buildUpdateLiteralPatch } = await import('../../src/services/buildPatch.js')
+      const patch = buildUpdateLiteralPatch(
+        'https://example.com/alice/followers/',
+        'https://www.w3.org/ns/activitystreams#totalItems',
+        '',
+        '<https://example.com/alice/followers/> <https://www.w3.org/ns/activitystreams#totalItems> "1"^^<http://www.w3.org/2001/XMLSchema#nonNegativeInteger> .'
+      )
+      expect(patch).not.toContain('as:items')
+    })
+
+    it('allows empty oldTurtle for first-add (delete clause empty)', async () => {
+      const { buildUpdateLiteralPatch } = await import('../../src/services/buildPatch.js')
+      const newTurtle = '<https://example.com/alice/followers/> <https://www.w3.org/ns/activitystreams#totalItems> "1"^^<http://www.w3.org/2001/XMLSchema#nonNegativeInteger> .'
+      const patch = buildUpdateLiteralPatch(
+        'https://example.com/alice/followers/',
+        'https://www.w3.org/ns/activitystreams#totalItems',
+        '',
+        newTurtle
+      )
+      expect(patch).toContain('solid:deletes')
+      expect(patch).toContain('solid:inserts')
+      expect(patch).toContain(newTurtle)
+    })
+  })
 })
