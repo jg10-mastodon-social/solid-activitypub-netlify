@@ -33,6 +33,41 @@ export async function parseCollectionTurtle(
   }
 }
 
+export async function parseFollowersRoot(
+  turtle: string,
+  rootUrl: string
+): Promise<{ first?: string; totalItems?: number } | null> {
+  const parser = new Parser({ baseIRI: rootUrl })
+  const store = new Store()
+  const quads = parser.parse(turtle)
+  if (quads) {
+    store.addQuads(quads)
+  }
+
+  const firstQuads = store.getQuads(
+    rootUrl,
+    'https://www.w3.org/ns/activitystreams#first',
+    null,
+    null
+  )
+  const first = firstQuads.length > 0 ? firstQuads[0].object.value : undefined
+
+  const totalQuads = store.getQuads(
+    rootUrl,
+    'https://www.w3.org/ns/activitystreams#totalItems',
+    null,
+    null
+  )
+  let totalItems: number | undefined
+  if (totalQuads.length > 0) {
+    const raw = totalQuads[0].object.value
+    const n = Number.parseInt(raw, 10)
+    totalItems = Number.isFinite(n) ? n : undefined
+  }
+
+  return { first, totalItems }
+}
+
 export async function getChildResources(
   inboxUrl: string,
   fetch: SolidFetch
