@@ -8,6 +8,7 @@ import { verifyIncomingActivity, HttpSignatureError, formatHttpSignatureError } 
 import type { Activity } from '../../src/activity.js'
 import { serializeFollowersCollection } from '../../src/services/serializeFollowersCollection.js'
 import { serializeFollowersPage } from '../../src/services/serializeFollowersPage.js'
+import { buildActorSkeleton, applyProfile, parseProfileTurtle, getPublicKeyPem } from '../../src/services/actorDoc.js'
 
 const getCorsHeaders = (origin: string | null) => ({
   'Access-Control-Allow-Origin': origin ?? '*',
@@ -18,6 +19,7 @@ const getCorsHeaders = (origin: string | null) => ({
 
 export const config: Config = {
   path: [
+    '/:actor',
     '/:actor/inbox/:page*',
     '/:actor/outbox/:page*',
     '/:actor/followers/:page*',
@@ -47,6 +49,10 @@ function collectionFromPath(pathname: string): Collection | null {
   if (pathname.endsWith('/outbox') || pathname.includes('/outbox/')) return 'outbox'
   if (pathname.endsWith('/followers') || pathname.includes('/followers/')) return 'followers'
   return null
+}
+
+function isActorPath(pathname: string, actorName: string): boolean {
+  return pathname === `/${actorName}` || pathname === `/${actorName}/`
 }
 
 function resolvePodTarget(
@@ -159,6 +165,39 @@ async function handleGet(
       headers: corsHeaders
     })
   }
+}
+
+async function handleActorGet(
+  config: ReturnType<typeof loadConfig>,
+  fetchFn: Awaited<ReturnType<typeof createSolidFetch>>,
+  actor: ReturnType<typeof resolveActor>,
+  corsHeaders: Record<string, string>
+): Promise<Response> {
+  if (!actor) return new Response('Unknown actor', { status: 404, headers: corsHeaders })
+
+  const pem = await getPublicKeyPem(actor.name)
+  const skeleton = buildActorSkeleton(actor, pem)
+
+  const profileUrl = `${config.solidStorageBaseUrl}${actor.name}/profile`
+  try {
+    const profileResponse = await fetchFn(profileUrl, {
+      headers: { accept: 'text/turtle' }
+    })
+    if (profileResponse.ok) {
+      const turtle = await profileResponse.text()
+      const profile = parseProfileTurtle(turtle, profileUrl)
+      applyProfile(skeleton, profile)
+    } else if (profileResponse.status !== 404) {
+      console.log(`[router] GET /${actor.name} profile fetch returned ${profileResponse.status}; serving skeleton only`)
+    }
+  } catch (error) {
+    console.error(`[router] GET /${actor.name} profile fetch error: ${error}; serving skeleton only`)
+  }
+
+  return new Response(JSON.stringify(skeleton), {
+    status: 200,
+    headers: { ...corsHeaders, 'Content-Type': 'application/activity+json' }
+  })
 }
 
 async function handlePostOutbox(
@@ -335,12 +374,19 @@ export default async (req: Request, context: Context) => {
   }
 
   const pathname = new URL(req.url).pathname
+  const fetchFn = await createSolidFetch(config.webId, config.issuer)
+
+  if (isActorPath(pathname, actor.name)) {
+    if (req.method === 'GET') {
+      return handleActorGet(config, fetchFn, actor, corsHeaders)
+    }
+    return new Response('Method not allowed', { status: 405, headers: corsHeaders })
+  }
+
   const collection = collectionFromPath(pathname)
   if (!collection) {
     return new Response('Unknown collection', { status: 404, headers: corsHeaders })
   }
-
-  const fetchFn = await createSolidFetch(config.webId, config.issuer)
 
   if (req.method === 'GET') {
     return handleGet(req, context, config, fetchFn, actor.name, collection, corsHeaders)

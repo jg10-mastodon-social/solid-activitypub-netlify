@@ -1,5 +1,5 @@
 import { Parser, Store } from 'n3'
-import { importJWK, exportSPKI } from 'jose'
+import { createPrivateKey, createPublicKey } from 'node:crypto'
 import type { ActorConfig } from '../types.js'
 // @ts-ignore
 import { actorKeys } from '../actor-keys.js'
@@ -126,16 +126,21 @@ export function parseProfileTurtle(
 
 const pemCache: Map<string, string> = new Map()
 
+function derivePublicKeyPem(jwk: Record<string, unknown>): string {
+  const privateKey = createPrivateKey({ key: jwk, format: 'jwk' })
+  const publicKey = createPublicKey(privateKey)
+  return publicKey.export({ type: 'spki', format: 'pem' }) as string
+}
+
 export async function getPublicKeyPem(actorName: string): Promise<string> {
   const cached = pemCache.get(actorName)
   if (cached !== undefined) return cached
 
-  const jwk = actorKeys[actorName] as unknown as Parameters<typeof importJWK>[0]
+  const jwk = actorKeys[actorName] as Record<string, unknown> | undefined
   if (!jwk) {
     throw new Error(`No actor key for "${actorName}" — check ACTOR_NAME matches the last build`)
   }
-  const key = await importJWK(jwk, 'RS256')
-  const pem = await exportSPKI(key as Parameters<typeof exportSPKI>[0])
+  const pem = derivePublicKeyPem(jwk)
   pemCache.set(actorName, pem)
   return pem
 }
