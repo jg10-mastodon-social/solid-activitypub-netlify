@@ -1,7 +1,41 @@
 import type { SolidFetch } from '../types.js'
-import { buildDeleteItemLinkPatch } from './buildPatch.js'
-import { parseCollectionTurtle } from './rdfUtils.js'
+import { buildDeleteItemLinkPatch, buildUpdateLiteralPatch } from './buildPatch.js'
+import { parseCollectionTurtle, parseFollowersRoot } from './rdfUtils.js'
 import { Parser, Store } from 'n3'
+
+const AS_TOTALITEMS = 'https://www.w3.org/ns/activitystreams#totalItems'
+const XSD_NON_NEG_INT = 'http://www.w3.org/2001/XMLSchema#nonNegativeInteger'
+
+function totalItemsLiteralTurtle(subject: string, value: number): string {
+  return `<${subject}> <${AS_TOTALITEMS}> "${value}"^^<${XSD_NON_NEG_INT}> .`
+}
+
+async function decrementFollowersTotal(
+  followersUrl: string,
+  fetch: SolidFetch
+): Promise<void> {
+  try {
+    const response = await fetch(followersUrl, { headers: { accept: 'text/turtle' } })
+    const text = await response.text()
+    const parsed = await parseFollowersRoot(text, followersUrl)
+    const current = parsed?.totalItems ?? 0
+    const next = Math.max(0, current - 1)
+    if (next === current) return
+    const oldTurtle = totalItemsLiteralTurtle(followersUrl, current)
+    const newTurtle = totalItemsLiteralTurtle(followersUrl, next)
+    const patchBody = buildUpdateLiteralPatch(followersUrl, AS_TOTALITEMS, oldTurtle, newTurtle)
+    const patchResponse = await fetch(followersUrl, {
+      method: 'PATCH',
+      headers: { 'content-type': 'text/n3' },
+      body: patchBody
+    })
+    if (!patchResponse.ok) {
+      console.warn(`[inbox] totalItems PATCH failed for ${followersUrl}: ${patchResponse.status}`)
+    }
+  } catch (error) {
+    console.warn(`[inbox] Could not update totalItems on ${followersUrl}: ${error}`)
+  }
+}
 
 export async function removeFromFollowers(
   followerActor: string,
@@ -40,6 +74,7 @@ export async function removeFromFollowers(
   while (pageUrl) {
     const deleted = await removeFromPage(pageUrl, followerActor, fetch)
     if (deleted) {
+      await decrementFollowersTotal(followersUrl, fetch)
       console.log(`[inbox] Removed ${followerActor} from ${actorName} followers collection`)
       return
     }

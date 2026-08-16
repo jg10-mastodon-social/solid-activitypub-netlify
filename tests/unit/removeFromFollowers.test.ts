@@ -196,4 +196,93 @@ describe('removeFromFollowers', () => {
     expect(patchCall).toBeDefined()
     expect(patchCall![0] as string).toBe('https://example.com/actor/followers/pages/2')
   })
+
+  it('should patch the followers root to decrement totalItems after a successful remove', async () => {
+    const { removeFromFollowers } = await import('../../src/services/removeFromFollowers.js')
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve(`<https://example.com/actor/followers/> <https://www.w3.org/ns/activitystreams#first> <https://example.com/actor/followers/pages/123>.`)
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve(`<https://example.com/actor/followers/pages/123> <https://www.w3.org/ns/activitystreams#items> <https://other.example/actor>.`)
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve(`@prefix as: <https://www.w3.org/ns/activitystreams#> .
+<https://example.com/actor/followers/> as:totalItems "2" .
+`)
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200
+      })
+
+    await removeFromFollowers(
+      'https://other.example/actor',
+      mockFetch as SolidFetch,
+      'https://example.com/',
+      'actor'
+    )
+
+    const patches = mockFetch.mock.calls.filter(call => call[1]?.method === 'PATCH')
+    const rootPatch = patches.find(p => (p[0] as string) === 'https://example.com/actor/followers/')
+    expect(rootPatch).toBeDefined()
+    const body = rootPatch![1].body as string
+    expect(body).toContain('totalItems')
+    expect(body).toContain('"2"')
+    expect(body).toContain('"1"')
+  })
+
+  it('should not decrement below 0', async () => {
+    const { removeFromFollowers } = await import('../../src/services/removeFromFollowers.js')
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve(`<https://example.com/actor/followers/> <https://www.w3.org/ns/activitystreams#first> <https://example.com/actor/followers/pages/123>.`)
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve(`<https://example.com/actor/followers/pages/123> <https://www.w3.org/ns/activitystreams#items> <https://other.example/actor>.`)
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve(`@prefix as: <https://www.w3.org/ns/activitystreams#> .
+<https://example.com/actor/followers/> as:totalItems "1" .
+`)
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200
+      })
+
+    await removeFromFollowers(
+      'https://other.example/actor',
+      mockFetch as SolidFetch,
+      'https://example.com/',
+      'actor'
+    )
+
+    const patches = mockFetch.mock.calls.filter(call => call[1]?.method === 'PATCH')
+    const rootPatch = patches.find(p => (p[0] as string) === 'https://example.com/actor/followers/')
+    expect(rootPatch).toBeDefined()
+    const body = rootPatch![1].body as string
+    expect(body).toContain('"1"')
+    expect(body).toContain('"0"')
+  })
 })
