@@ -8,6 +8,7 @@ ActivityPub server using Netlify Functions, with collections stored on a Solid p
 
 - **Outbox** (POST): Solid-OIDC-authenticated. Normalizes the activity, distributes it to explicit recipients via HTTP-signed POSTs, fans out to followers for public posts, and persists to a paged outbox on the pod.
 - **Inbox** (POST): Validates `@context` and binds the authenticated key to `actor`. Sends a signed `Accept` for `Follow` and adds the follower; handles `Undo` `Follow`; persists other activities to a paged inbox.
+- **Shared Inbox** (POST `/inbox`): advertised as `endpoints.sharedInbox` on every actor's AS2 document so remote servers can collapse per-follower deliveries into one POST per origin server. See *Inbox POST* below.
 - **GET**: proxies the paged collection (DPoP-authenticated for the Inbox; unauthenticated for the Outbox — both rewrite pod URLs to the public base URL).
 - **Signatures**: a separate RSA actor key signs outgoing requests and is published in the AS2 actor document for recipients to verify.
 
@@ -45,7 +46,7 @@ Build time generates:
 
 ## How it works
 
-Each configured actor (named in `ACTOR_NAME`) gets its own RSA signing key, its own outbox/inbox/followers collection on the pod, its own per-actor endpoints, and its own AS2 actor document served by the `actor-router` function (overlay-merged with a profile from the pod on every request).
+Each configured actor (named in `ACTOR_NAME`) gets its own RSA signing key, its own outbox/inbox/followers collection on the pod, its own per-actor endpoints, and its own AS2 actor document served by the `actor-router` function (overlay-merged with a profile from the pod on every request). A single server-wide `/inbox` (the shared inbox) is also exposed and advertised on every actor's AS2 document as `endpoints.sharedInbox`.
 
 Every request handled by the actor-router function logs a single `[router] METHOD /path` entry line at the start (e.g. `[router] POST /alice/outbox`), followed by any of the auth-failure / delivery-summary logs documented on each endpoint below. Grepping for `[router]` is the fastest way to follow a single request through the function.
 
@@ -77,9 +78,9 @@ Per-actor proxy of the paged outbox collection from the pod. No DPoP token is re
 6. Rewrite the pod URL prefix to the public actor-scoped prefix in the body so consumers see `${BASE_URL}/${actorName}/outbox/...`.
 7. Return the body to the caller with CORS headers.
 
-### Inbox POST `/${actorName}/inbox`
+### Inbox POST
 
-One route per configured actor, e.g. `/alice/inbox`. HTTP-signature-authenticated. The handler ignores any sub-path — paging is managed internally. There is no shared `/inbox` route — the URL names the local actor, and the activity is processed as if addressed to that actor.
+One route per configured actor, e.g. `/alice/inbox`. HTTP-signature-authenticated. The handler ignores any sub-path — paging is managed internally. The URL names the local actor, and the activity is processed as if addressed to that actor. A server-wide shared inbox at `/inbox` is also exposed — see *Shared Inbox POST* below.
 
 - For `Follow`: `object` must equal `${BASE_URL}/${actorName}` (else reject 422).
 - For `Undo` of `Follow`: the inner `object` must equal `${BASE_URL}/${actorName}` (else reject 422).
@@ -100,6 +101,16 @@ One route per configured actor, e.g. `/alice/inbox`. HTTP-signature-authenticate
    - `Undo` of `Follow` → remove the follower from `${actorName}/followers/`.
    - `Follow`/`Undo` also maintain an `as:totalItems` literal on the followers collection root via a `solid:InsertDeletePatch` that swaps the old literal for the new one (`addToFollowers` increments after a successful per-page item PATCH; `removeFromFollowers` decrements after a successful remove). The first add patches from "no triple" to `1`; decrements never go below `0`. Concurrent mutations can drift the counter; a drift self-corrects on the next mutation.
    - Anything else → derive the next paged-inbox slot under `${SOLID_STORAGE_BASE_URL}${actorName}/inbox/` and persist via `solid:InsertDeletePatch`.
+
+#### Shared Inbox POST `/inbox`
+
+Single server-wide endpoint at `${BASE_URL}/inbox`, HTTP-signature-authenticated. Advertised as `endpoints.sharedInbox` in every actor's AS2 document so remote servers (Mastodon, etc.) can collapse per-follower deliveries — in particular `Delete` activities for account deletion, which arrive once per origin server instead of once per followed actor. The pipeline is identical to the per-actor route above (actor-`Delete` short-circuit, signature verification, Follow/Undo Follow/persist semantics) — the only piece the shared inbox adds is **target-actor resolution**, in this priority:
+
+- `Follow`: `activity.object` must equal a configured `actor.url`.
+- `Undo` `Follow`: `activity.object.object` must equal a configured `actor.url`.
+- Other activities: scan `to`/`cc`/`bto`/`bcc`/`audience` for the first value matching a configured `actor.url` or `actor.followersUrl`.
+
+No match → 422 (never silently drop into the wrong inbox; never persist when the target is ambiguous). GET on `/inbox` is not supported (POST-only, matching Mastodon's behavior).
 
 ### Inbox GET `/${actorName}/inbox[/pages/{page}]`
 
@@ -194,7 +205,7 @@ npm run test:e2e           # Real `netlify dev` + a mock Solid server (boots bot
 
 ### Components and trust boundaries
 
-- **Netlify function** (`netlify/functions/{actor-router,webfinger}.mts`): the only externally reachable surface. Stateless across invocations; reconstructed on every cold start by the build. `actor-router.mts` handles the per-actor `/{actorName}` GET (AS2 actor document with profile overlay) and `/{actorName}/{outbox,inbox,followers}` GET/POST routes; `webfinger.mts` serves the WebFinger dispatcher.
+- **Netlify function** (`netlify/functions/{actor-router,webfinger}.mts`): the only externally reachable surface. Stateless across invocations; reconstructed on every cold start by the build. `actor-router.mts` handles the per-actor `/{actorName}` GET (AS2 actor document with profile overlay) and `/{actorName}/{outbox,inbox,followers}` GET/POST routes, plus the single server-wide `/inbox` shared inbox (advertised as `endpoints.sharedInbox` on every actor document); `webfinger.mts` serves the WebFinger dispatcher.
 - **Solid pod** at `${SOLID_STORAGE_BASE_URL}`: durable storage for per-actor containers `${actorName}/inbox/`, `${actorName}/outbox/`, and `${actorName}/followers/` as paged AS2 collections, plus an operator-managed `${actorName}/profile` Turtle document. The function is the only writer for the collections; reads (including the profile) happen via a DPoP-authenticated fetch (`src/solidFetch.ts`).
 - **OIDC issuer**: any issuer in `WHITELISTED_ISSUERS` is trusted to authenticate users who may access the private collections (outbox write + inbox read). The function verifies each request's DPoP-bound access token via `@solid/access-token-verifier` — confirming the client controls the bound key and the token's issuer is in the allowlist.
 - **Remote ActivityPub servers**: discovered via WebFinger and actor-document fetches (`src/activity.ts`, `src/verifyRequest.ts`).
