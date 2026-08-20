@@ -121,6 +121,7 @@ describe('actor-router GET /:actor integration', () => {
     expect(actor.publicKey.id).toBe('http://localhost:9999/actor#main-key')
     expect(actor.publicKey.owner).toBe('http://localhost:9999/actor')
     expect(actor.publicKey.publicKeyPem).toMatch(/-----BEGIN PUBLIC KEY-----/)
+    expect(actor.endpoints).toEqual({ sharedInbox: 'http://localhost:9999/inbox' })
     expect(actor.name).toBeUndefined()
     expect(actor.summary).toBeUndefined()
     expect(actor.icon).toBeUndefined()
@@ -141,6 +142,7 @@ describe('actor-router GET /:actor integration', () => {
     expect(actor.type).toBe('Person')
     expect(actor.name).toBe('Alice Example')
     expect(actor.summary).toBe('<p>Bio.</p>')
+    expect(actor.endpoints).toEqual({ sharedInbox: 'http://localhost:9999/inbox' })
     expect(actor.icon).toEqual({
       type: 'Image',
       mediaType: 'image/png',

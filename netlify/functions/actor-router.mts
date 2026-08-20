@@ -2,7 +2,7 @@ import type { Config, Context } from '@netlify/functions'
 import { createSolidFetch } from '../../src/solidFetch.js'
 import { verifyDpopToken } from '../../src/auth.js'
 import { loadConfig } from '../../src/config.js'
-import { handleInboxActivity, isActorDeleteActivity } from '../../src/handlers/inbox.js'
+import { handleInboxActivity, handleSharedInboxActivity, isActorDeleteActivity } from '../../src/handlers/inbox.js'
 import { handleOutboxActivity } from '../../src/handlers/outbox.js'
 import { verifyIncomingActivity, HttpSignatureError, formatHttpSignatureError } from '../../src/verifyRequest.js'
 import type { Activity } from '../../src/activity.js'
@@ -19,6 +19,7 @@ const getCorsHeaders = (origin: string | null) => ({
 
 export const config: Config = {
   path: [
+    '/inbox',
     '/:actor',
     '/:actor/inbox/:page*',
     '/:actor/outbox/:page*',
@@ -360,6 +361,77 @@ async function handlePostInbox(
   }
 }
 
+async function handlePostSharedInbox(
+  req: Request,
+  config: ReturnType<typeof loadConfig>,
+  fetchFn: Awaited<ReturnType<typeof createSolidFetch>>,
+  corsHeaders: Record<string, string>
+): Promise<Response> {
+  let rawBody: ArrayBuffer
+  try {
+    rawBody = await req.arrayBuffer()
+  } catch {
+    return new Response('Failed to read request body', {
+      status: 400,
+      headers: corsHeaders
+    })
+  }
+
+  const rawBytes = new Uint8Array(rawBody)
+
+  let activity: Record<string, unknown>
+  try {
+    activity = JSON.parse(new TextDecoder('utf-8').decode(rawBytes)) as Record<string, unknown>
+  } catch {
+    return new Response('Invalid JSON body', {
+      status: 400,
+      headers: corsHeaders
+    })
+  }
+
+  if (isActorDeleteActivity(activity)) {
+    const actorUrl = typeof activity.actor === 'string' ? activity.actor : 'unknown'
+    console.log(`[router] inbox short-circuit: actor Delete for ${actorUrl}, skipping signature verification`)
+    return new Response('ok', { status: 200, headers: corsHeaders })
+  }
+
+  try {
+    await verifyIncomingActivity(req, activity, rawBytes, fetchFn)
+  } catch (error) {
+    if (error instanceof HttpSignatureError) {
+      console.error(formatHttpSignatureError(error))
+      console.log(`[router] inbox reject: ${activitySummary(activity)}`)
+      return new Response(error.message, {
+        status: error.statusCode,
+        headers: corsHeaders
+      })
+    }
+    throw error
+  }
+
+  try {
+    const result = await handleSharedInboxActivity(
+      activity,
+      fetchFn,
+      { actorByPath: config.actorByPath, solidStorageBaseUrl: config.solidStorageBaseUrl }
+    )
+    if (!result.success) {
+      console.log(`[router] inbox reject: ${activitySummary(activity)}`)
+      return new Response('Failed to process activity', {
+        status: 422,
+        headers: corsHeaders
+      })
+    }
+    return new Response('ok', { status: 200, headers: corsHeaders })
+  } catch (error) {
+    console.error(`[router] POST shared inbox error: ${error}`)
+    return new Response(error instanceof Error ? error.message : 'Internal error', {
+      status: 500,
+      headers: corsHeaders
+    })
+  }
+}
+
 export default async (req: Request, context: Context) => {
   const corsHeaders = getCorsHeaders(req.headers.get('Origin'))
   console.log(`[router] ${req.method} ${new URL(req.url).pathname}`)
@@ -368,13 +440,23 @@ export default async (req: Request, context: Context) => {
     return new Response(null, { status: 204, headers: corsHeaders })
   }
 
+  const pathname = new URL(req.url).pathname
+
+  if (pathname === '/inbox') {
+    if (req.method !== 'POST') {
+      return new Response('Method not allowed', { status: 405, headers: corsHeaders })
+    }
+    const config = loadConfig()
+    const fetchFn = await createSolidFetch(config.webId, config.issuer)
+    return handlePostSharedInbox(req, config, fetchFn, corsHeaders)
+  }
+
   const config = loadConfig()
   const actor = resolveActor(config, context.params.actor)
   if (!actor) {
     return new Response('Unknown actor', { status: 404, headers: corsHeaders })
   }
 
-  const pathname = new URL(req.url).pathname
   const fetchFn = await createSolidFetch(config.webId, config.issuer)
 
   if (isActorPath(pathname, actor.name)) {

@@ -18,6 +18,7 @@ export interface ActorConfig {
   inboxUrl: string
   outboxUrl: string
   followersUrl: string
+  sharedInboxUrl: string
   webfingerResource: string
 }
 

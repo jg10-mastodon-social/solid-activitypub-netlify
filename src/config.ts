@@ -26,6 +26,7 @@ function buildActorConfigs(
   names: string[]
 ): Record<string, ActorConfig> {
   const domain = baseUrlValue.replace(/^https?:\/\//, '')
+  const sharedInboxUrl = `${baseUrlValue}/inbox`
   const byPath: Record<string, ActorConfig> = {}
   for (const name of names) {
     const url = `${baseUrlValue}/${name}`
@@ -37,6 +38,7 @@ function buildActorConfigs(
       inboxUrl: `${baseUrlValue}/${name}/inbox`,
       outboxUrl: `${baseUrlValue}/${name}/outbox`,
       followersUrl: `${baseUrlValue}/${name}/followers`,
+      sharedInboxUrl,
       webfingerResource: `acct:${name}@${domain}`,
     }
   }

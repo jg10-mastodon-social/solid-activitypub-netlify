@@ -29,6 +29,7 @@ const sampleActor: ActorConfig = {
   inboxUrl: 'https://example.com/alice/inbox',
   outboxUrl: 'https://example.com/alice/outbox',
   followersUrl: 'https://example.com/alice/followers',
+  sharedInboxUrl: 'https://example.com/inbox',
   webfingerResource: 'acct:alice@example.com'
 }
 
@@ -50,6 +51,9 @@ describe('buildActorSkeleton', () => {
       followers: 'https://example.com/alice/followers',
       following: 'https://example.com/alice/following',
       liked: 'https://example.com/alice/liked',
+      endpoints: {
+        sharedInbox: 'https://example.com/inbox'
+      },
       publicKey: {
         id: 'https://example.com/alice#main-key',
         owner: 'https://example.com/alice',

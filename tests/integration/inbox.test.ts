@@ -3,6 +3,7 @@ import type { Context } from '@netlify/functions'
 
 const mockVerifyIncomingActivity = vi.fn()
 const mockHandleInboxActivity = vi.fn()
+const mockHandleSharedInboxActivity = vi.fn()
 
 vi.mock('../../src/base-url.js', () => ({
   baseUrl: 'http://localhost:9999'
@@ -32,7 +33,8 @@ vi.mock('../../src/handlers/inbox.js', async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>
   return {
     ...actual,
-    handleInboxActivity: mockHandleInboxActivity
+    handleInboxActivity: mockHandleInboxActivity,
+    handleSharedInboxActivity: mockHandleSharedInboxActivity
   }
 })
 
@@ -202,5 +204,122 @@ describe('actor-router inbox short-circuit for actor Delete activities', () => {
 
     expect(mockVerifyIncomingActivity).toHaveBeenCalledTimes(1)
     expect(res.status).toBe(401)
+  })
+})
+
+describe('actor-router shared inbox POST /inbox', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('returns 200 for an actor Delete at /inbox without verifying the signature', async () => {
+    const { default: handler } = await import('../../netlify/functions/actor-router.mts')
+
+    const activity = {
+      type: 'Delete',
+      actor: TOMBSTONED_ACTOR,
+      object: TOMBSTONED_ACTOR,
+      '@context': 'https://www.w3.org/ns/activitystreams'
+    }
+
+    const req = new Request('http://localhost/inbox', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(activity)
+    })
+
+    const ctx = makeContext({
+      params: {},
+      url: new URL('http://localhost/inbox')
+    })
+
+    const res = await handler(req, ctx)
+
+    expect(res.status).toBe(200)
+    expect(await res.text()).toBe('ok')
+    expect(mockVerifyIncomingActivity).not.toHaveBeenCalled()
+    expect(mockHandleInboxActivity).not.toHaveBeenCalled()
+  })
+
+  it('delegates a Follow at /inbox to handleSharedInboxActivity', async () => {
+    const { default: handler } = await import('../../netlify/functions/actor-router.mts')
+
+    mockVerifyIncomingActivity.mockResolvedValueOnce({ keyId: 'https://other.example/actor#main-key' })
+    mockHandleSharedInboxActivity.mockResolvedValueOnce({ success: true, actorName: 'actor' })
+
+    const activity = {
+      type: 'Follow',
+      actor: 'https://other.example/actor',
+      object: 'http://localhost:9999/actor',
+      '@context': 'https://www.w3.org/ns/activitystreams'
+    }
+
+    const req = new Request('http://localhost/inbox', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(activity)
+    })
+
+    const ctx = makeContext({
+      params: {},
+      url: new URL('http://localhost/inbox')
+    })
+
+    const res = await handler(req, ctx)
+
+    expect(res.status).toBe(200)
+    expect(mockVerifyIncomingActivity).toHaveBeenCalledTimes(1)
+    expect(mockHandleSharedInboxActivity).toHaveBeenCalledTimes(1)
+    const callArgs = mockHandleSharedInboxActivity.mock.calls[0]
+    expect(callArgs[0]).toMatchObject({ type: 'Follow', object: 'http://localhost:9999/actor' })
+  })
+
+  it('returns 422 for a Create at /inbox addressed only to Public', async () => {
+    const { default: handler } = await import('../../netlify/functions/actor-router.mts')
+
+    mockVerifyIncomingActivity.mockResolvedValueOnce({ keyId: 'https://other.example/actor#main-key' })
+    mockHandleSharedInboxActivity.mockResolvedValueOnce({ success: false, reason: 'no_target_actor' })
+
+    const activity = {
+      type: 'Create',
+      actor: 'https://other.example/actor',
+      to: ['https://www.w3.org/ns/activitystreams#Public'],
+      object: { type: 'Note', content: 'hi' },
+      '@context': 'https://www.w3.org/ns/activitystreams'
+    }
+
+    const req = new Request('http://localhost/inbox', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(activity)
+    })
+
+    const ctx = makeContext({
+      params: {},
+      url: new URL('http://localhost/inbox')
+    })
+
+    const res = await handler(req, ctx)
+
+    expect(res.status).toBe(422)
+    expect(mockVerifyIncomingActivity).toHaveBeenCalledTimes(1)
+    expect(mockHandleSharedInboxActivity).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns 405 for GET /inbox', async () => {
+    const { default: handler } = await import('../../netlify/functions/actor-router.mts')
+
+    const req = new Request('http://localhost/inbox', {
+      method: 'GET'
+    })
+
+    const ctx = makeContext({
+      params: {},
+      url: new URL('http://localhost/inbox')
+    })
+
+    const res = await handler(req, ctx)
+
+    expect(res.status).toBe(405)
   })
 })

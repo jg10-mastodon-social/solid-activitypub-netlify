@@ -419,3 +419,120 @@ describe('inbox handler', () => {
     expect(inboxPatchCall).toBeUndefined()
   })
 })
+
+import type { ActorConfig } from '../../src/types.js'
+
+describe('resolveTargetActorFromActivity', () => {
+  const actorAlice: ActorConfig = {
+    name: 'alice',
+    path: '/alice',
+    url: 'https://example.com/alice',
+    keyId: 'https://example.com/alice#main-key',
+    inboxUrl: 'https://example.com/alice/inbox',
+    outboxUrl: 'https://example.com/alice/outbox',
+    followersUrl: 'https://example.com/alice/followers',
+    sharedInboxUrl: 'https://example.com/inbox',
+    webfingerResource: 'acct:alice@example.com'
+  }
+  const actorBob: ActorConfig = {
+    name: 'bob',
+    path: '/bob',
+    url: 'https://example.com/bob',
+    keyId: 'https://example.com/bob#main-key',
+    inboxUrl: 'https://example.com/bob/inbox',
+    outboxUrl: 'https://example.com/bob/outbox',
+    followersUrl: 'https://example.com/bob/followers',
+    sharedInboxUrl: 'https://example.com/inbox',
+    webfingerResource: 'acct:bob@example.com'
+  }
+  const actorByPath = { '/alice': actorAlice, '/bob': actorBob }
+
+  it('resolves Follow by matching activity.object to an actor URL', async () => {
+    const { resolveTargetActorFromActivity } = await import('../../src/handlers/inbox.js')
+    const activity = {
+      type: 'Follow',
+      actor: 'https://other.example/actor',
+      object: 'https://example.com/alice'
+    }
+    expect(resolveTargetActorFromActivity(activity, actorByPath)).toBe(actorAlice)
+  })
+
+  it('resolves Undo Follow by matching inner object.object to an actor URL', async () => {
+    const { resolveTargetActorFromActivity } = await import('../../src/handlers/inbox.js')
+    const activity = {
+      type: 'Undo',
+      actor: 'https://other.example/actor',
+      object: {
+        type: 'Follow',
+        actor: 'https://other.example/actor',
+        object: 'https://example.com/bob'
+      }
+    }
+    expect(resolveTargetActorFromActivity(activity, actorByPath)).toBe(actorBob)
+  })
+
+  it('resolves other activities by scanning cc for a matching followers URL', async () => {
+    const { resolveTargetActorFromActivity } = await import('../../src/handlers/inbox.js')
+    const activity = {
+      type: 'Create',
+      actor: 'https://other.example/actor',
+      to: ['https://www.w3.org/ns/activitystreams#Public'],
+      cc: ['https://example.com/alice/followers'],
+      object: { type: 'Note', content: 'hi' }
+    }
+    expect(resolveTargetActorFromActivity(activity, actorByPath)).toBe(actorAlice)
+  })
+
+  it('resolves other activities by scanning to for a matching actor URL', async () => {
+    const { resolveTargetActorFromActivity } = await import('../../src/handlers/inbox.js')
+    const activity = {
+      type: 'Create',
+      actor: 'https://other.example/actor',
+      to: ['https://example.com/bob'],
+      object: { type: 'Note', content: 'hi' }
+    }
+    expect(resolveTargetActorFromActivity(activity, actorByPath)).toBe(actorBob)
+  })
+
+  it('returns null when only Public is in the addressing fields', async () => {
+    const { resolveTargetActorFromActivity } = await import('../../src/handlers/inbox.js')
+    const activity = {
+      type: 'Create',
+      actor: 'https://other.example/actor',
+      to: ['https://www.w3.org/ns/activitystreams#Public'],
+      object: { type: 'Note', content: 'hi' }
+    }
+    expect(resolveTargetActorFromActivity(activity, actorByPath)).toBeNull()
+  })
+
+  it('returns null when the addressing field contains a foreign URL', async () => {
+    const { resolveTargetActorFromActivity } = await import('../../src/handlers/inbox.js')
+    const activity = {
+      type: 'Create',
+      actor: 'https://other.example/actor',
+      cc: ['https://other.example/followers'],
+      object: { type: 'Note', content: 'hi' }
+    }
+    expect(resolveTargetActorFromActivity(activity, actorByPath)).toBeNull()
+  })
+
+  it('returns null when the addressing fields are missing entirely', async () => {
+    const { resolveTargetActorFromActivity } = await import('../../src/handlers/inbox.js')
+    const activity = {
+      type: 'Create',
+      actor: 'https://other.example/actor',
+      object: { type: 'Note', content: 'hi' }
+    }
+    expect(resolveTargetActorFromActivity(activity, actorByPath)).toBeNull()
+  })
+
+  it('returns null when Follow.object does not match any configured actor', async () => {
+    const { resolveTargetActorFromActivity } = await import('../../src/handlers/inbox.js')
+    const activity = {
+      type: 'Follow',
+      actor: 'https://other.example/actor',
+      object: 'https://other.example/actor'
+    }
+    expect(resolveTargetActorFromActivity(activity, actorByPath)).toBeNull()
+  })
+})

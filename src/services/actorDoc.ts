@@ -43,6 +43,9 @@ export function buildActorSkeleton(
     followers: actor.followersUrl,
     following: `${actor.url}/following`,
     liked: `${actor.url}/liked`,
+    endpoints: {
+      sharedInbox: actor.sharedInboxUrl
+    },
     publicKey: {
       id: actor.keyId,
       owner: actor.url,

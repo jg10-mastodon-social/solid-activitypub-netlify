@@ -1,4 +1,4 @@
-import type { SolidFetch } from '../types.js'
+import type { ActorConfig, SolidFetch } from '../types.js'
 import { derivePageUrl } from '../services/derivePageUrl.js'
 import { persistActivityItem } from '../services/persistActivity.js'
 import { sendFollowAccept } from '../services/sendFollowAccept.js'
@@ -60,6 +60,92 @@ export function isActorDeleteActivity(activity: Record<string, unknown>): boolea
   }
 
   return false
+}
+
+function findActorByUrl(
+  url: string,
+  actorByPath: Record<string, ActorConfig>
+): ActorConfig | null {
+  for (const actor of Object.values(actorByPath)) {
+    if (actor.url === url || actor.followersUrl === url) {
+      return actor
+    }
+  }
+  return null
+}
+
+export function resolveTargetActorFromActivity(
+  activity: Record<string, unknown>,
+  actorByPath: Record<string, ActorConfig>
+): ActorConfig | null {
+  if (isFollowActivity(activity)) {
+    const match = findActorByUrl(activity.object as string, actorByPath)
+    if (match) return match
+  }
+
+  if (isUndoFollow(activity)) {
+    const inner = activity.object
+    if (inner && typeof inner === 'object' && !Array.isArray(inner)) {
+      const innerObj = (inner as Record<string, unknown>).object
+      const match = findActorByUrl(innerObj as string, actorByPath)
+      if (match) return match
+    }
+  }
+
+  const fields = ['to', 'cc', 'bto', 'bcc', 'audience'] as const
+  for (const field of fields) {
+    const value = activity[field]
+    if (value === undefined) continue
+    const values = Array.isArray(value) ? value : [value]
+    for (const v of values) {
+      const match = findActorByUrl(v as string, actorByPath)
+      if (match) return match
+    }
+  }
+
+  return null
+}
+
+export interface SharedInboxResult {
+  success: boolean
+  actorName?: string
+  reason?: 'missing_context' | 'missing_type' | 'no_target_actor'
+}
+
+export async function handleSharedInboxActivity(
+  activity: Record<string, unknown>,
+  fetch: SolidFetch,
+  config: { actorByPath: Record<string, ActorConfig>; solidStorageBaseUrl?: string }
+): Promise<SharedInboxResult> {
+  try {
+    validateContext(activity as Parameters<typeof validateContext>[0])
+  } catch {
+    console.log('[inbox] Shared inbox activity missing @context')
+    return { success: false, reason: 'missing_context' }
+  }
+
+  if (!activity.type) {
+    console.log('[inbox] Shared inbox activity missing type')
+    return { success: false, reason: 'missing_type' }
+  }
+
+  const targetActor = resolveTargetActorFromActivity(activity, config.actorByPath)
+  if (!targetActor) {
+    return { success: false, reason: 'no_target_actor' }
+  }
+
+  const podInboxUrl = `${config.solidStorageBaseUrl ?? ''}${targetActor.name}/inbox/`
+  const success = await handleInboxActivity(
+    activity,
+    fetch,
+    podInboxUrl,
+    targetActor.name,
+    targetActor.url,
+    targetActor.keyId,
+    config.solidStorageBaseUrl
+  )
+
+  return { success, actorName: targetActor.name }
 }
 
 export async function handleInboxActivity(
