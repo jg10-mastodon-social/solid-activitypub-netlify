@@ -11,6 +11,8 @@ import { verifyIncomingActivity, HttpSignatureError, formatHttpSignatureError } 
 import type { Activity } from '../../src/activity.js'
 import { serializeFollowersCollection } from '../../src/services/serializeFollowersCollection.js'
 import { serializeFollowersPage } from '../../src/services/serializeFollowersPage.js'
+import { serializeFollowingCollection } from '../../src/services/serializeFollowingCollection.js'
+import { serializeFollowingPage } from '../../src/services/serializeFollowingPage.js'
 import { buildActorSkeleton, applyProfile, parseProfileTurtle, getPublicKeyPem } from '../../src/services/actorDoc.js'
 
 const routerFilename = fileURLToPath(import.meta.url)
@@ -32,12 +34,13 @@ export const config: Config = {
     '/:actor/inbox/:page*',
     '/:actor/outbox/:page*',
     '/:actor/followers/:page*',
+    '/:actor/following/:page*',
   ],
   method: ['POST', 'GET', 'OPTIONS'],
   preferStatic: true,
 }
 
-type Collection = 'inbox' | 'outbox' | 'followers'
+type Collection = 'inbox' | 'outbox' | 'followers' | 'following'
 
 function activitySummary(activity: Record<string, unknown>): string {
   const type = typeof activity.type === 'string' ? activity.type : 'unknown'
@@ -57,6 +60,7 @@ function resolveActor(config: ReturnType<typeof loadConfig>, actorParam: string 
 function collectionFromPath(pathname: string): Collection | null {
   if (pathname.endsWith('/inbox') || pathname.includes('/inbox/')) return 'inbox'
   if (pathname.endsWith('/outbox') || pathname.includes('/outbox/')) return 'outbox'
+  if (pathname.endsWith('/following') || pathname.includes('/following/')) return 'following'
   if (pathname.endsWith('/followers') || pathname.includes('/followers/')) return 'followers'
   return null
 }
@@ -118,7 +122,7 @@ async function handleGet(
   collection: Collection,
   corsHeaders: Record<string, string>
 ): Promise<Response> {
-  const requiresAuth = collection !== 'outbox' && collection !== 'followers'
+  const requiresAuth = collection !== 'outbox' && collection !== 'followers' && collection !== 'following'
   if (requiresAuth) {
     const authHeader = req.headers.get('authorization')
     const dpopHeader = req.headers.get('dpop')
@@ -144,27 +148,53 @@ async function handleGet(
   const requestPath = new URL(req.url).pathname
   const targetUrl = resolvePodTarget(config.solidStorageBaseUrl, actorName, collection, page, requestPath)
 
-  if (collection === 'followers' && wantsAs2Json(req.headers.get('Accept'))) {
-    const publicRootUrl = `${config.baseUrl}/${actorName}/followers`
-    const podRootUrl = `${config.solidStorageBaseUrl}${actorName}/followers/`
-    try {
-      const as2Response = page
-        ? await serializeFollowersPage(fetchFn, targetUrl, podRootUrl, publicRootUrl)
-        : await serializeFollowersCollection(fetchFn, podRootUrl, publicRootUrl)
-      const headers = new Headers(as2Response.headers)
-      for (const [k, v] of Object.entries(corsHeaders)) {
-        headers.set(k, v)
+  if (wantsAs2Json(req.headers.get('Accept'))) {
+    if (collection === 'followers') {
+      const publicRootUrl = `${config.baseUrl}/${actorName}/followers`
+      const podRootUrl = `${config.solidStorageBaseUrl}${actorName}/followers/`
+      try {
+        const as2Response = page
+          ? await serializeFollowersPage(fetchFn, targetUrl, podRootUrl, publicRootUrl)
+          : await serializeFollowersCollection(fetchFn, podRootUrl, publicRootUrl)
+        const headers = new Headers(as2Response.headers)
+        for (const [k, v] of Object.entries(corsHeaders)) {
+          headers.set(k, v)
+        }
+        return new Response(as2Response.body, {
+          status: as2Response.status,
+          headers
+        })
+      } catch (error) {
+        console.error(`[router] GET ${collection} AS2 error: ${error}`)
+        return new Response(error instanceof Error ? error.message : 'Bad Gateway', {
+          status: 502,
+          headers: corsHeaders
+        })
       }
-      return new Response(as2Response.body, {
-        status: as2Response.status,
-        headers
-      })
-    } catch (error) {
-      console.error(`[router] GET ${collection} AS2 error: ${error}`)
-      return new Response(error instanceof Error ? error.message : 'Bad Gateway', {
-        status: 502,
-        headers: corsHeaders
-      })
+    }
+
+    if (collection === 'following') {
+      const publicRootUrl = `${config.baseUrl}/${actorName}/following`
+      const podRootUrl = `${config.solidStorageBaseUrl}${actorName}/following/`
+      try {
+        const as2Response = page
+          ? await serializeFollowingPage(fetchFn, targetUrl, podRootUrl, publicRootUrl)
+          : await serializeFollowingCollection(fetchFn, podRootUrl, publicRootUrl)
+        const headers = new Headers(as2Response.headers)
+        for (const [k, v] of Object.entries(corsHeaders)) {
+          headers.set(k, v)
+        }
+        return new Response(as2Response.body, {
+          status: as2Response.status,
+          headers
+        })
+      } catch (error) {
+        console.error(`[router] GET ${collection} AS2 error: ${error}`)
+        return new Response(error instanceof Error ? error.message : 'Bad Gateway', {
+          status: 502,
+          headers: corsHeaders
+        })
+      }
     }
   }
 
