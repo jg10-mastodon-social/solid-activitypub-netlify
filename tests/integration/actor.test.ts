@@ -1,5 +1,15 @@
-import { describe, it, expect, vi, beforeAll } from 'vitest'
+import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest'
+import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
 import type { Context } from '@netlify/functions'
+
+const __test_filename = fileURLToPath(import.meta.url)
+const __test_dirname = path.dirname(__test_filename)
+const __test_rootDir = path.resolve(__test_dirname, '..', '..')
+const __test_publicDir = path.join(__test_rootDir, 'public')
+const __test_templateSrc = path.join(__test_rootDir, 'static-ui', 'actor-page.template.html')
+const __test_templateDst = path.join(__test_publicDir, 'actor-page.template.html')
 
 const mockActorKeys = {
   actor: {
@@ -62,6 +72,15 @@ beforeAll(() => {
   process.env.ISSUER = 'http://localhost:9999'
   process.env.SEND_TO_URL = 'http://localhost:9999/outbox'
   process.env.ACTOR_NAME = 'actor'
+
+  fs.mkdirSync(__test_publicDir, { recursive: true })
+  fs.copyFileSync(__test_templateSrc, __test_templateDst)
+})
+
+afterAll(() => {
+  if (fs.existsSync(__test_templateDst)) {
+    fs.unlinkSync(__test_templateDst)
+  }
 })
 
 function makeContext(overrides: Partial<Context> = {}): Context {
@@ -191,5 +210,40 @@ describe('actor-router GET /:actor integration', () => {
     const res = await handler(req, makeContext())
 
     expect(res.status).toBe(405)
+  })
+
+  it('returns HTML for GET /:actor when Accept includes text/html', async () => {
+    Object.keys(profileFixtures).forEach(k => delete profileFixtures[k])
+    vi.clearAllMocks()
+
+    const { default: handler } = await import('../../netlify/functions/actor-router.mts')
+    const req = new Request('http://localhost/actor', {
+      method: 'GET',
+      headers: { 'Accept': 'text/html,application/xhtml+xml' }
+    })
+    const res = await handler(req, makeContext())
+
+    expect(res.status).toBe(200)
+    expect(res.headers.get('Content-Type')).toContain('text/html')
+    const body = await res.text()
+    expect(body).toContain('@actor@localhost:9999')
+    expect(body).toContain('uri="http://localhost:9999/actor"')
+    expect(body).toContain('pos-value')
+    expect(body).toContain('activitystreams#outbox')
+  })
+
+  it('returns 404 for GET /unknown with Accept: text/html (HTML branch does not bypass actor resolution)', async () => {
+    Object.keys(profileFixtures).forEach(k => delete profileFixtures[k])
+    vi.clearAllMocks()
+
+    const { default: handler } = await import('../../netlify/functions/actor-router.mts')
+    const req = new Request('http://localhost/unknown', {
+      method: 'GET',
+      headers: { 'Accept': 'text/html' }
+    })
+    const ctx = makeContext({ params: { actor: 'unknown' } })
+    const res = await handler(req, ctx)
+
+    expect(res.status).toBe(404)
   })
 })

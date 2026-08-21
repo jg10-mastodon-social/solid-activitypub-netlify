@@ -29,6 +29,8 @@ if (!baseUrl) {
   process.exit(1)
 }
 
+const staticUiDir = path.join(rootDir, 'static-ui')
+
 fs.writeFileSync(baseUrlPath, `export const baseUrl = '${baseUrl}'\n`)
 console.log(`Written: ${baseUrlPath}`)
 
@@ -171,6 +173,30 @@ async function generateIdentity() {
 
   fs.writeFileSync(webfingerDataPath, `export const webfingerEntries: Record<string, unknown> = ${JSON.stringify(webfingerEntries, null, 2)}\n`)
   console.log(`Written: ${webfingerDataPath}`)
+
+  console.log('Copying default UI from static-ui/ into public/')
+  const landingTemplatePath = path.join(staticUiDir, 'index.html')
+  const landingTemplate = fs.readFileSync(landingTemplatePath, 'utf-8')
+  const actorItems = actorNames
+    .map(name => `        <li><a href="/${name}">@${name}@${domain}</a></li>`)
+    .join('\n')
+  const landingHtml = landingTemplate.replace(
+    /      <ul id="actors">\n        <!-- one <li> per actor, emitted by scripts\/generate-identity\.ts -->\n      <\/ul>/,
+    `      <ul id="actors">\n${actorItems}\n      </ul>`
+  )
+  const landingPath = path.join(publicDir, 'index.html')
+  fs.writeFileSync(landingPath, landingHtml)
+  console.log(`Written: ${landingPath}`)
+
+  const actorPageTemplateSrc = path.join(staticUiDir, 'actor-page.template.html')
+  const actorPageTemplateDst = path.join(publicDir, 'actor-page.template.html')
+  fs.copyFileSync(actorPageTemplateSrc, actorPageTemplateDst)
+  console.log(`Written: ${actorPageTemplateDst}`)
+
+  const templatesSrc = path.join(staticUiDir, 'templates')
+  const templatesDst = path.join(publicDir, 'templates')
+  fs.cpSync(templatesSrc, templatesDst, { recursive: true })
+  console.log(`Copied: ${templatesSrc} -> ${templatesDst}`)
 
   console.log('Identity files generated successfully')
 }

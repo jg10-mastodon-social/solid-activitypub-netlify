@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@{{ACTOR_NAME}}@{{DOMAIN}}</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/@ionic/core/css/palettes/dark.system.css"
+      rel="stylesheet"
+    />
+    <meta name="color-scheme" content="dark light" />
+    <script
+      type="module"
+      src="https://cdn.jsdelivr.net/npm/@ionic/core/dist/ionic/ionic.esm.js"
+    ></script>
+    <script
+      nomodule=""
+      src="https://cdn.jsdelivr.net/npm/@ionic/core/dist/ionic/ionic.js"
+    ></script>
+    <script
+      type="module"
+      src="https://cdn.jsdelivr.net/npm/@pod-os/elements/dist/elements/elements.esm.js"
+    ></script>
+    <link
+      href="https://cdn.jsdelivr.net/npm/@pod-os/elements/dist/elements/elements.css"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css" />
+    <script src="/templates/ImportHtml.js" defer></script>
+  </head>
+  <body>
+    <ion-content class="ion-padding">
+      <pos-app>
+        <pos-router mode="pod">
+          <pos-resource uri="{{BASE_URL}}/{{ACTOR_NAME}}">
+            <h1>
+              <pos-value
+                predicate="https://www.w3.org/ns/activitystreams#name"
+              ></pos-value>
+              <small
+                >@{{ACTOR_NAME}}@{{DOMAIN}}</small
+              >
+            </h1>
+            <p>
+              <pos-value
+                predicate="https://www.w3.org/ns/activitystreams#summary"
+              ></pos-value>
+            </p>
+            <pos-list
+              rel="https://www.w3.org/ns/activitystreams#outbox"
+              fetch
+            >
+              <template>
+                <import-html
+                  src="/templates/discussion/header.html"
+                ></import-html>
+                <import-html
+                  src="/templates/discussion/outbox.html"
+                ></import-html>
+              </template>
+            </pos-list>
+          </pos-resource>
+        </pos-router>
+      </pos-app>
+    </ion-content>
+  </body>
+</html>

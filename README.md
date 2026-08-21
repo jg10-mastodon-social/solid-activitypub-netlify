@@ -152,9 +152,20 @@ Per-actor AS2 actor document served by the `actor-router` function.
 4. Attempt to fetch the profile from `${SOLID_STORAGE_BASE_URL}${actorName}/profile` (DPoP-authenticated, `Accept: text/turtle`). On 200, parse with `n3` and overlay any recognized fields onto the skeleton. On non-200 or parse error, log and leave the skeleton unchanged — the response still serves with default `type: 'Service'` and no profile fields.
 5. Return the merged JSON with `Content-Type: application/activity+json` and the CORS headers used elsewhere by the function.
 
+The same `GET /:actor` route also serves a default browser UI: when the request's `Accept` header includes `text/html`, the function returns an HTML page backed by [Pod-OS Elements](https://pod-os.org) that reads the actor JSON-LD at `${BASE_URL}/${actorName}` and renders the profile and outbox. For any other Accept value (missing, `application/activity+json`, `application/ld+json`, `*/*`) the response is the AS2 JSON document above, so Mastodon-style federation flows are unchanged.
+
 ### WebFinger `/.well-known/webfinger?resource=acct:${actorName}@${domain}`
 
 Served by the `webfinger` Netlify function. Returns JRD JSON describing the matching configured actor (200) or 404 if the resource is unknown.
+
+### Default UI
+
+A browser-friendly interface is shipped as static assets in `static-ui/` and copied into `public/` by `scripts/generate-identity.ts` on every build:
+
+- `GET /` — landing page (`public/index.html`) listing every actor in `ACTOR_NAME` with a `@name@domain` link to its per-actor page.
+- `GET /:actor` with `Accept: text/html` — per-actor page (`actor-page.template.html`) rendered by Pod-OS Elements. The page reads the actor JSON-LD at `${BASE_URL}/${actorName}` to display `as:name` and `as:summary`, then follows `as:outbox` to walk the paged outbox collection (the existing outbox GET endpoint already serves Turtle with public-URL rewriting). The page uses Ionic for layout and the `<import-html>` custom element (`public/templates/ImportHtml.js`) to inline Pod-OS fragment templates at `public/templates/discussion/{header,outbox}.html`.
+
+UI sources live in `static-ui/` (tracked). Operators wanting to customise the landing page or per-actor template can edit those files; the next build overwrites the copies in `public/`.
 
 ## Testing
 

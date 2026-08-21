@@ -1,4 +1,7 @@
 import type { Config, Context } from '@netlify/functions'
+import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
 import { createSolidFetch } from '../../src/solidFetch.js'
 import { verifyDpopToken } from '../../src/auth.js'
 import { loadConfig } from '../../src/config.js'
@@ -9,6 +12,11 @@ import type { Activity } from '../../src/activity.js'
 import { serializeFollowersCollection } from '../../src/services/serializeFollowersCollection.js'
 import { serializeFollowersPage } from '../../src/services/serializeFollowersPage.js'
 import { buildActorSkeleton, applyProfile, parseProfileTurtle, getPublicKeyPem } from '../../src/services/actorDoc.js'
+
+const routerFilename = fileURLToPath(import.meta.url)
+const routerDirname = path.dirname(routerFilename)
+const publicRootDir = path.resolve(routerDirname, '..', '..', 'public')
+const actorPageTemplatePath = path.join(publicRootDir, 'actor-page.template.html')
 
 const getCorsHeaders = (origin: string | null) => ({
   'Access-Control-Allow-Origin': origin ?? '*',
@@ -87,6 +95,18 @@ function wantsAs2Json(acceptHeader: string | null): boolean {
   const lowered = acceptHeader.toLowerCase()
   return lowered.includes('application/activity+json') ||
     lowered.includes('application/ld+json')
+}
+
+function wantsHtml(acceptHeader: string | null): boolean {
+  if (!acceptHeader) return false
+  return acceptHeader.toLowerCase().includes('text/html')
+}
+
+function renderActorPageHtml(template: string, baseUrl: string, actorName: string, domain: string): string {
+  return template
+    .replaceAll('{{BASE_URL}}', baseUrl)
+    .replaceAll('{{ACTOR_NAME}}', actorName)
+    .replaceAll('{{DOMAIN}}', domain)
 }
 
 async function handleGet(
@@ -173,9 +193,24 @@ async function handleActorGet(
   config: ReturnType<typeof loadConfig>,
   fetchFn: Awaited<ReturnType<typeof createSolidFetch>>,
   actor: ReturnType<typeof resolveActor>,
-  corsHeaders: Record<string, string>
+  corsHeaders: Record<string, string>,
+  req: Request
 ): Promise<Response> {
   if (!actor) return new Response('Unknown actor', { status: 404, headers: corsHeaders })
+
+  if (wantsHtml(req.headers.get('Accept'))) {
+    try {
+      const template = fs.readFileSync(actorPageTemplatePath, 'utf-8')
+      const domain = config.baseUrl.replace(/^https?:\/\//, '')
+      const html = renderActorPageHtml(template, config.baseUrl, actor.name, domain)
+      return new Response(html, {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' }
+      })
+    } catch (error) {
+      console.error(`[router] GET /${actor.name} HTML template error: ${error}; falling back to JSON`)
+    }
+  }
 
   const pem = await getPublicKeyPem(actor.name)
   const skeleton = buildActorSkeleton(actor, pem)
@@ -461,7 +496,7 @@ export default async (req: Request, context: Context) => {
 
   if (isActorPath(pathname, actor.name)) {
     if (req.method === 'GET') {
-      return handleActorGet(config, fetchFn, actor, corsHeaders)
+      return handleActorGet(config, fetchFn, actor, corsHeaders, req)
     }
     return new Response('Method not allowed', { status: 405, headers: corsHeaders })
   }

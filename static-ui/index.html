@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ActivityPub</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@ionic/core/css/ionic.bundle.css"
+    />
+    <meta name="color-scheme" content="dark light" />
+  </head>
+  <body>
+    <ion-content class="ion-padding">
+      <h1>ActivityPub</h1>
+      <p>
+        This server hosts ActivityPub actor(s) backed by a Solid pod.
+        Follow any handle from your fediverse account.
+      </p>
+      <ul id="actors">
+        <!-- one <li> per actor, emitted by scripts/generate-identity.ts -->
+      </ul>
+      <p>
+        <small
+          >For machine-readable actor documents, request
+          <code>Accept: application/activity+json</code>.</small
+        >
+      </p>
+    </ion-content>
+  </body>
+</html>

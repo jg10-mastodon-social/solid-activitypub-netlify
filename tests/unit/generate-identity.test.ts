@@ -217,4 +217,61 @@ describe('generate-identity', () => {
       expect(content).toContain(`"kid":"${expectedKid}"`)
     })
   })
+
+  describe('default UI generation', () => {
+    const landingPath = path.join(publicDir, 'index.html')
+    const actorPageTemplatePath = path.join(publicDir, 'actor-page.template.html')
+    const templatesDir = path.join(publicDir, 'templates')
+    const importHtmlPath = path.join(templatesDir, 'ImportHtml.js')
+    const outboxFragmentPath = path.join(templatesDir, 'discussion', 'outbox.html')
+    const headerFragmentPath = path.join(templatesDir, 'discussion', 'header.html')
+
+    it('writes public/index.html with one link per actor', async () => {
+      await runScript(undefined, undefined, 'alice,bob')
+
+      expect(fs.existsSync(landingPath)).toBe(true)
+      const content = fs.readFileSync(landingPath, 'utf-8')
+      expect(content).toContain('href="/alice"')
+      expect(content).toContain('href="/bob"')
+      expect(content).toContain('@alice@localhost:9999')
+      expect(content).toContain('@bob@localhost:9999')
+      expect(content).not.toContain('{{')
+    })
+
+    it('uses production domain in landing links', async () => {
+      await runScript(undefined, 'production', 'alice')
+
+      const content = fs.readFileSync(landingPath, 'utf-8')
+      expect(content).toContain('@alice@example.com')
+    })
+
+    it('copies public/actor-page.template.html with placeholders intact', async () => {
+      await runScript()
+
+      expect(fs.existsSync(actorPageTemplatePath)).toBe(true)
+      const content = fs.readFileSync(actorPageTemplatePath, 'utf-8')
+      expect(content).toContain('{{BASE_URL}}')
+      expect(content).toContain('{{ACTOR_NAME}}')
+      expect(content).toContain('{{DOMAIN}}')
+    })
+
+    it('copies public/templates/ImportHtml.js', async () => {
+      await runScript()
+
+      expect(fs.existsSync(importHtmlPath)).toBe(true)
+      const content = fs.readFileSync(importHtmlPath, 'utf-8')
+      expect(content).toContain('import-html')
+    })
+
+    it('copies public/templates/discussion/outbox.html and header.html', async () => {
+      await runScript()
+
+      expect(fs.existsSync(outboxFragmentPath)).toBe(true)
+      expect(fs.existsSync(headerFragmentPath)).toBe(true)
+      const outbox = fs.readFileSync(outboxFragmentPath, 'utf-8')
+      expect(outbox).toContain('activitystreams#first')
+      const header = fs.readFileSync(headerFragmentPath, 'utf-8')
+      expect(header).toContain('Discussion')
+    })
+  })
 })

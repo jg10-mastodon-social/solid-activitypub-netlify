@@ -1,0 +1,43 @@
+<pos-list rel="https://www.w3.org/ns/activitystreams#first" fetch>
+  <template>
+    <ion-list>
+      <pos-list rel="https://www.w3.org/ns/activitystreams#items">
+        <template>
+          <ion-card>
+            <pos-list rel="https://www.w3.org/ns/activitystreams#object">
+              <template>
+                <ion-card-header>
+                  <pos-value
+                    predicate="https://www.w3.org/ns/activitystreams#attributedTo"
+                  ></pos-value>
+                  <ion-card-subtitle>
+                    <pos-value
+                      predicate="https://www.w3.org/ns/activitystreams#published"
+                    ></pos-value>
+                  </ion-card-subtitle>
+                </ion-card-header>
+                <ion-card-content>
+                  <pos-value
+                    predicate="https://www.w3.org/ns/activitystreams#content"
+                  ></pos-value>
+                </ion-card-content>
+              </template>
+            </pos-list>
+          </ion-card>
+          <pos-switch>
+            <pos-case
+              if-property="https://www.w3.org/ns/activitystreams#next"
+            >
+              <template>
+                <pos-rich-link
+                  rel="https://www.w3.org/ns/activitystreams#next"
+                  >&rarr;</pos-rich-link
+                >
+              </template>
+            </pos-case>
+          </pos-switch>
+        </template>
+      </pos-list>
+    </ion-list>
+  </template>
+</pos-list>
