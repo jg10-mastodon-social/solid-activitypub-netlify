@@ -61,8 +61,9 @@ One route per configured actor, e.g. `/alice/outbox`. Solid-OIDC-authenticated. 
 5. Normalize the activity: assign `id` and `published` if missing.
 6. Resolve explicit recipients from `to`/`cc`/`bto`/`bcc`/`audience`, look up each recipient's `inbox` via their actor document, and POST the activity there with an HTTP signature (`RSA-SHA256`, signed with this actor's key from `src/actor-keys.ts`). **Debugging:** a delivery summary logs `[router] POST /${actorName}/outbox delivered to X/Y recipients` — grep this to see the delivery count without parsing the JSON response body.
 7. If the activity is public, load the followers collection at `${SOLID_STORAGE_BASE_URL}${actorName}/followers/` and POST the activity to every follower not already in the explicit-recipient set.
-8. Derive the next paged-outbox slot under `${SOLID_STORAGE_BASE_URL}${actorName}/outbox/` (creating a new page when the current one is full, and patching the collection's `first`/`next` links).
-9. Persist the activity to that page by PATCHing a `solid:InsertDeletePatch` against the pod.
+8. For `Undo Follow` specifically: remove the `object.object` (the formerly-followed actor URI) from `${SOLID_STORAGE_BASE_URL}${actorName}/following/`, decrementing `as:totalItems` on the collection root via `solid:InsertDeletePatch` (mirror of the followers decrement). Failure to update the collection is non-fatal — log a warning and continue so the outbox POST still returns 200 with its delivery summary.
+9. Derive the next paged-outbox slot under `${SOLID_STORAGE_BASE_URL}${actorName}/outbox/` (creating a new page when the current one is full, and patching the collection's `first`/`next` links).
+10. Persist the activity to that page by PATCHing a `solid:InsertDeletePatch` against the pod.
 
 Response: `200` with `{status, delivered, failed, results}`. Partial delivery is reported, not retried.
 
@@ -99,15 +100,17 @@ One route per configured actor, e.g. `/alice/inbox`. HTTP-signature-authenticate
    - `Delete` → ack and return (no persistence).
    - `Follow` → send a signed `Accept` (signed with the matched local actor's key) to the follower's inbox, and add the follower to the followers collection at `${SOLID_STORAGE_BASE_URL}${actorName}/followers/`.
    - `Undo` of `Follow` → remove the follower from `${actorName}/followers/`.
+   - `Accept` of `Follow` for this actor → add the wrapped `Follow.object` (the followed actor URI) to the following collection at `${SOLID_STORAGE_BASE_URL}${actorName}/following/`. Other Accept activities are acked without persistence.
    - `Follow`/`Undo` also maintain an `as:totalItems` literal on the followers collection root via a `solid:InsertDeletePatch` that swaps the old literal for the new one (`addToFollowers` increments after a successful per-page item PATCH; `removeFromFollowers` decrements after a successful remove). The first add patches from "no triple" to `1`; decrements never go below `0`. Concurrent mutations can drift the counter; a drift self-corrects on the next mutation.
    - Anything else → derive the next paged-inbox slot under `${SOLID_STORAGE_BASE_URL}${actorName}/inbox/` and persist via `solid:InsertDeletePatch`.
 
 #### Shared Inbox POST `/inbox`
 
-Single server-wide endpoint at `${BASE_URL}/inbox`, HTTP-signature-authenticated. Advertised as `endpoints.sharedInbox` in every actor's AS2 document so remote servers (Mastodon, etc.) can collapse per-follower deliveries — in particular `Delete` activities for account deletion, which arrive once per origin server instead of once per followed actor. The pipeline is identical to the per-actor route above (actor-`Delete` short-circuit, signature verification, Follow/Undo Follow/persist semantics) — the only piece the shared inbox adds is **target-actor resolution**, in this priority:
+Single server-wide endpoint at `${BASE_URL}/inbox`, HTTP-signature-authenticated. Advertised as `endpoints.sharedInbox` in every actor's AS2 document so remote servers (Mastodon, etc.) can collapse per-follower deliveries — in particular `Delete` activities for account deletion, which arrive once per origin server instead of once per followed actor. The pipeline is identical to the per-actor route above (actor-`Delete` short-circuit, signature verification, Follow/Undo Follow/Accept of Follow/persist semantics) — the only piece the shared inbox adds is **target-actor resolution**, in this priority:
 
 - `Follow`: `activity.object` must equal a configured `actor.url`.
 - `Undo` `Follow`: `activity.object.object` must equal a configured `actor.url`.
+- `Accept` of `Follow`: the wrapped `Follow.actor` must resolve to a configured `actor.url`; otherwise the Accept is acked without action.
 - Other activities: scan `to`/`cc`/`bto`/`bcc`/`audience` for the first value matching a configured `actor.url` or `actor.followersUrl`.
 
 No match → 422 (never silently drop into the wrong inbox; never persist when the target is ambiguous). GET on `/inbox` is not supported (POST-only, matching Mastodon's behavior).
@@ -125,21 +128,21 @@ Per-actor DPoP-authenticated proxy of the paged inbox collection on the pod, wit
 7. Rewrite the pod URL prefix to the public actor-scoped prefix in the body so consumers see `${BASE_URL}/${actorName}/inbox/...`.
 8. Return the body to the caller with CORS headers.
 
-### Followers GET `/${actorName}/followers[/pages/{page}]`
+### Public per-actor collection GET `/followers` and `/following`
 
-Per-actor CORS-enabled public proxy of the followers collection on the pod, with pod URLs rewritten to the public actor-scoped prefix.
+Per-actor CORS-enabled public proxy of the followers and following collections on the pod, with pod URLs rewritten to the public actor-scoped prefix. Both collections follow the same algorithm and are documented together here. The route is `/${actorName}/{collection}[/pages/{page}]` with `collection ∈ {followers, following}`.
 
 1. Load config; resolve `actorName` from the path; reject 404 if not configured.
 2. Resolve the `{page}` from the request path (preserving trailing slash).
-3. Compute the pod target as `${SOLID_STORAGE_BASE_URL}${actorName}/followers/{page}`.
+3. Compute the pod target as `${SOLID_STORAGE_BASE_URL}${actorName}/{collection}/{page}`.
 4. Create a DPoP-authenticated fetch to the pod and GET the target with the request's `Accept` header (default `text/turtle`).
 5. Read the pod response body.
 6. Branch on `Accept`:
    - `application/activity+json` (or `application/ld+json` with the AS profile), on the collection root or a page: serialise to AS2 JSON and return `Content-Type: application/activity+json`.
       - The collection root is an `OrderedCollection` with `totalItems` and `first` (a public-URL `OrderedCollectionPage`).
-      - Each page is an `OrderedCollectionPage` with `partOf`, an `orderedItems` array of follower actor URIs, and optional `next`.
-      - All `id`/`first`/`partOf`/`next` use the public URL prefix `${BASE_URL}/${actorName}/followers[/...]` (never the pod URL).
-   - Otherwise (`text/turtle` or absent): rewrite the pod URL prefix to the public actor-scoped prefix in the body so consumers see `${BASE_URL}/${actorName}/followers/...`.
+      - Each page is an `OrderedCollectionPage` with `partOf`, an `orderedItems` array of actor URIs (a follower's URI for `/followers`, a followed actor's URI for `/following`), and optional `next`.
+      - All `id`/`first`/`partOf`/`next` use the public URL prefix `${BASE_URL}/${actorName}/{collection}[/...]` (never the pod URL).
+   - Otherwise (`text/turtle` or absent): rewrite the pod URL prefix to the public actor-scoped prefix in the body so consumers see `${BASE_URL}/${actorName}/{collection}/...`.
 7. Return the body with CORS headers (`Access-Control-Allow-Origin` echoes `Origin` and falls back to `*`; preflight returns `204`).
 
 ### Actor GET `/${actorName}`
@@ -237,10 +240,11 @@ ${SOLID_STORAGE_BASE_URL}/
 │   ├── profile             # operator-managed Turtle profile (as:type, as:name, as:summary, as:icon, as:image)
 │   ├── inbox/              # inbound activities
 │   ├── outbox/             # published activities
-│   └── followers/          # followers of this actor
+│   ├── followers/          # followers of this actor
+│   └── following/          # actors this actor follows
 ```
 
-Each page is a Turtle document with `as:items` quads pointing at its entries; pages are linked via `as:next` and the collection holds a single `as:first` pointing at the head page. Writes are PATCHes of a `solid:InsertDeletePatch` (see `src/services/buildPatch.ts`) — never full-document overwrites — so a single PATCH is the unit of consistency. For the `followers` collection, each `as:items` value is the follower's actor URI directly (matching the W3C AS2 paged-OrderedCollection shape that Mastodon and other fediverse servers expect).
+Each page is a Turtle document with `as:items` quads pointing at its entries; pages are linked via `as:next` and the collection holds a single `as:first` pointing at the head page. Writes are PATCHes of a `solid:InsertDeletePatch` (see `src/services/buildPatch.ts`) — never full-document overwrites — so a single PATCH is the unit of consistency. For the `followers` and `following` collections, each `as:items` value is an actor URI directly (matching the W3C AS2 paged-OrderedCollection shape that Mastodon and other fediverse servers expect).
 
 The `profile` resource is a single Turtle document that the `actor-router` function reads on every `GET /${actorName}` and overlay-merges onto the immutable skeleton it builds from configuration and the per-actor RSA key. 
 
