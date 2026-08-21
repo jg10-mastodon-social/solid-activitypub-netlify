@@ -29,6 +29,7 @@ const sampleActor: ActorConfig = {
   inboxUrl: 'https://example.com/alice/inbox',
   outboxUrl: 'https://example.com/alice/outbox',
   followersUrl: 'https://example.com/alice/followers',
+  followingUrl: 'https://example.com/alice/following',
   sharedInboxUrl: 'https://example.com/inbox',
   webfingerResource: 'acct:alice@example.com'
 }

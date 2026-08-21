@@ -41,7 +41,7 @@ export function buildActorSkeleton(
     inbox: actor.inboxUrl,
     outbox: actor.outboxUrl,
     followers: actor.followersUrl,
-    following: `${actor.url}/following`,
+    following: actor.followingUrl,
     liked: `${actor.url}/liked`,
     endpoints: {
       sharedInbox: actor.sharedInboxUrl

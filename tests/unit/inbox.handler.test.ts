@@ -431,6 +431,7 @@ describe('resolveTargetActorFromActivity', () => {
     inboxUrl: 'https://example.com/alice/inbox',
     outboxUrl: 'https://example.com/alice/outbox',
     followersUrl: 'https://example.com/alice/followers',
+    followingUrl: 'https://example.com/alice/following',
     sharedInboxUrl: 'https://example.com/inbox',
     webfingerResource: 'acct:alice@example.com'
   }
@@ -442,6 +443,7 @@ describe('resolveTargetActorFromActivity', () => {
     inboxUrl: 'https://example.com/bob/inbox',
     outboxUrl: 'https://example.com/bob/outbox',
     followersUrl: 'https://example.com/bob/followers',
+    followingUrl: 'https://example.com/bob/following',
     sharedInboxUrl: 'https://example.com/inbox',
     webfingerResource: 'acct:bob@example.com'
   }

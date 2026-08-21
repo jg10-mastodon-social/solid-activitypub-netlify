@@ -38,6 +38,7 @@ function buildActorConfigs(
       inboxUrl: `${baseUrlValue}/${name}/inbox`,
       outboxUrl: `${baseUrlValue}/${name}/outbox`,
       followersUrl: `${baseUrlValue}/${name}/followers`,
+      followingUrl: `${baseUrlValue}/${name}/following`,
       sharedInboxUrl,
       webfingerResource: `acct:${name}@${domain}`,
     }
