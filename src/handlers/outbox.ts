@@ -4,6 +4,8 @@ import { extractRecipients, fetchActorInbox, validateActivityActor, validateCont
 import { derivePageUrl } from '../services/derivePageUrl.js'
 import { getFollowers } from '../services/getFollowers.js'
 import { persistActivityItem } from '../services/persistActivity.js'
+import { removeFromFollowing } from '../services/removeFromFollowing.js'
+import { isUndoFollow } from './inbox.js'
 import { signActivityRequest } from '../signing.js'
 // @ts-ignore
 import { baseUrl } from '../base-url.js'
@@ -88,6 +90,19 @@ export async function handleOutboxActivity(
       }
     } catch (error) {
       console.warn(`[outbox] Failed to broadcast to followers: ${error}`)
+    }
+  }
+
+  if (isUndoFollow(activity) && solidStorageBaseUrl) {
+    const inner = activity.object as Record<string, unknown>
+    const target = inner?.object
+    if (typeof target === 'string') {
+      try {
+        await removeFromFollowing(target, fetch, solidStorageBaseUrl, actorName)
+        console.log(`[outbox] Undo Follow, removed ${target} from ${actorName} following collection`)
+      } catch (error) {
+        console.warn(`[outbox] Failed to remove from following collection: ${error}`)
+      }
     }
   }
 
