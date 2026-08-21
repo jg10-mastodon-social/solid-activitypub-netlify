@@ -4,12 +4,19 @@ import { persistActivityItem } from '../services/persistActivity.js'
 import { sendFollowAccept } from '../services/sendFollowAccept.js'
 import { addToFollowers } from '../services/addToFollowers.js'
 import { removeFromFollowers } from '../services/removeFromFollowers.js'
+import { addToFollowing } from '../services/addToFollowing.js'
 import { validateContext } from '../activity.js'
 
 export function isFollowActivity(activity: Record<string, unknown>): boolean {
   const activityType = activity.type
   return activityType === 'Follow' || activityType === 'as:Follow'
     || (Array.isArray(activityType) && activityType.some(t => t === 'Follow' || t === 'as:Follow'))
+}
+
+export function isAcceptActivity(activity: Record<string, unknown>): boolean {
+  const activityType = activity.type
+  return activityType === 'Accept' || activityType === 'as:Accept'
+    || (Array.isArray(activityType) && activityType.some(t => t === 'Accept' || t === 'as:Accept'))
 }
 
 export function isUndoActivity(activity: Record<string, unknown>): boolean {
@@ -175,6 +182,28 @@ export async function handleInboxActivity(
 
   if (isDelete) {
     console.log('[inbox] Delete activity, skipping persistence')
+    return true
+  }
+
+  if (isAcceptActivity(activity)) {
+    const inner = activity.object
+    if (inner && typeof inner === 'object' && !Array.isArray(inner)) {
+      const follow = inner as Record<string, unknown>
+      if (isFollowActivity(follow) && follow.actor === actorUrl) {
+        const target = follow.object
+        if (typeof target === 'string' && solidStorageBaseUrl) {
+          try {
+            await addToFollowing(target, fetch, solidStorageBaseUrl, actorName)
+            console.log(`[inbox] Accept of Follow, added ${target} to ${actorName} following collection`)
+            return true
+          } catch (error) {
+            console.error(`[inbox] Error: Failed to add to following: ${error}`)
+            return false
+          }
+        }
+      }
+    }
+    console.log('[inbox] Accept activity, no action')
     return true
   }
 
