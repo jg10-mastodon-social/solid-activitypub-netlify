@@ -212,25 +212,28 @@ describe('actor-router GET /:actor integration', () => {
     expect(res.status).toBe(405)
   })
 
-  it('returns HTML for GET /:actor when Accept includes text/html', async () => {
-    Object.keys(profileFixtures).forEach(k => delete profileFixtures[k])
-    vi.clearAllMocks()
+it('returns HTML for GET /:actor when Accept includes text/html', async () => {
+      Object.keys(profileFixtures).forEach(k => delete profileFixtures[k])
+      vi.clearAllMocks()
 
-    const { default: handler } = await import('../../netlify/functions/actor-router.mts')
-    const req = new Request('http://localhost/actor', {
-      method: 'GET',
-      headers: { 'Accept': 'text/html,application/xhtml+xml' }
+      const { default: handler } = await import('../../netlify/functions/actor-router.mts')
+      const req = new Request('http://localhost/actor', {
+        method: 'GET',
+        headers: { 'Accept': 'text/html,application/xhtml+xml' }
+      })
+      const res = await handler(req, makeContext())
+
+      expect(res.status).toBe(200)
+      expect(res.headers.get('Content-Type')).toContain('text/html')
+      const body = await res.text()
+      expect(body).toContain('@actor@localhost:9999')
+      expect(body).toContain('uri="http://localhost:9999/actor"')
+      expect(body).toContain('pos-value')
+      expect(body).toContain('activitystreams#outbox')
+      expect(body).toContain('<pos-app restore-previous-session>')
+      expect(body).toContain('<import-html src="/templates/actor-controls.html">')
+      expect(body).toContain('src="/templates/actor-controls.js"')
     })
-    const res = await handler(req, makeContext())
-
-    expect(res.status).toBe(200)
-    expect(res.headers.get('Content-Type')).toContain('text/html')
-    const body = await res.text()
-    expect(body).toContain('@actor@localhost:9999')
-    expect(body).toContain('uri="http://localhost:9999/actor"')
-    expect(body).toContain('pos-value')
-    expect(body).toContain('activitystreams#outbox')
-  })
 
   it('returns 404 for GET /unknown with Accept: text/html (HTML branch does not bypass actor resolution)', async () => {
     Object.keys(profileFixtures).forEach(k => delete profileFixtures[k])

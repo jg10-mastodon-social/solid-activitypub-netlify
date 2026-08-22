@@ -30,7 +30,7 @@
   </head>
   <body>
     <ion-content class="ion-padding">
-      <pos-app>
+      <pos-app restore-previous-session>
         <pos-router mode="pod">
           <pos-resource uri="{{BASE_URL}}/{{ACTOR_NAME}}">
             <h1>
@@ -59,9 +59,11 @@
                 ></import-html>
               </template>
             </pos-list>
+            <import-html src="/templates/actor-controls.html"></import-html>
           </pos-resource>
         </pos-router>
       </pos-app>
     </ion-content>
+    <script type="module" src="/templates/actor-controls.js"></script>
   </body>
 </html>
