@@ -1,11 +1,11 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@{{ACTOR_NAME}}@{{DOMAIN}}</title>
     <link
-      href="https://cdn.jsdelivr.net/npm/@ionic/core/css/palettes/dark.system.css"
+      href="https://cdn.jsdelivr.net/npm/@ionic/core/css/ionic.bundle.css"
       rel="stylesheet"
     />
     <meta name="color-scheme" content="dark light" />
@@ -29,27 +29,22 @@
     <script src="/templates/ImportHtml.js" defer></script>
   </head>
   <body>
-    <ion-content class="ion-padding">
-      <pos-app restore-previous-session>
-        <pos-router mode="pod">
-          <pos-resource uri="{{BASE_URL}}/{{ACTOR_NAME}}">
+    <pos-app restore-previous-session>
+      <pos-router mode="pod">
+        <pos-resource uri="{{BASE_URL}}/{{ACTOR_NAME}}">
+          <ion-content class="ion-padding">
             <h1>
               <pos-value
                 predicate="https://www.w3.org/ns/activitystreams#name"
               ></pos-value>
-              <small
-                >@{{ACTOR_NAME}}@{{DOMAIN}}</small
-              >
+              <small>@{{ACTOR_NAME}}@{{DOMAIN}}</small>
             </h1>
             <p>
               <pos-value
                 predicate="https://www.w3.org/ns/activitystreams#summary"
               ></pos-value>
             </p>
-            <pos-list
-              rel="https://www.w3.org/ns/activitystreams#outbox"
-              fetch
-            >
+            <pos-list rel="https://www.w3.org/ns/activitystreams#outbox" fetch>
               <template>
                 <import-html
                   src="/templates/discussion/header.html"
@@ -60,10 +55,10 @@
               </template>
             </pos-list>
             <import-html src="/templates/actor-controls.html"></import-html>
-          </pos-resource>
-        </pos-router>
-      </pos-app>
-    </ion-content>
+          </ion-content>
+        </pos-resource>
+      </pos-router>
+    </pos-app>
     <script type="module" src="/templates/actor-controls.js"></script>
   </body>
 </html>
