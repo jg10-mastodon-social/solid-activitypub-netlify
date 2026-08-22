@@ -29,15 +29,17 @@ vi.mock('jose', async () => {
     ...actual as any,
     importJWK: vi.fn().mockResolvedValue({ type: 'private-key' }),
     calculateJwkThumbprint: vi.fn().mockResolvedValue('test-jkt'),
-    SignJWT: vi.fn().mockImplementation(() => ({
-      setProtectedHeader: vi.fn().mockReturnThis(),
-      setIssuedAt: vi.fn().mockReturnThis(),
-      setExpirationTime: vi.fn().mockReturnThis(),
-      setAudience: vi.fn().mockReturnThis(),
-      setIssuer: vi.fn().mockReturnThis(),
-      setJti: vi.fn().mockReturnThis(),
-      sign: vi.fn().mockResolvedValue('mock-signed-token'),
-    })),
+    SignJWT: vi.fn().mockImplementation(function () {
+      return {
+        setProtectedHeader: vi.fn().mockReturnThis(),
+        setIssuedAt: vi.fn().mockReturnThis(),
+        setExpirationTime: vi.fn().mockReturnThis(),
+        setAudience: vi.fn().mockReturnThis(),
+        setIssuer: vi.fn().mockReturnThis(),
+        setJti: vi.fn().mockReturnThis(),
+        sign: vi.fn().mockResolvedValue('mock-signed-token'),
+      }
+    }),
   }
 })
 
