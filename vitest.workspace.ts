@@ -26,4 +26,14 @@ export default [
       singleThread: true,
     },
   },
+  {
+    extends: './vitest.config.ts',
+    test: {
+      name: 'ui',
+      include: ['static-ui/templates/**/*.spec.tsx'],
+      environment: 'stencil',
+      setupFiles: ['./tests/ui-setup.ts'],
+      environmentOptions: { stencil: { domEnvironment: 'happy-dom' } },
+    },
+  },
 ]
