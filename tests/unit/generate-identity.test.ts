@@ -238,6 +238,32 @@ describe('generate-identity', () => {
       expect(content).not.toContain('{{')
     })
 
+    it('wires the login fragment into public/index.html', async () => {
+      await runScript(undefined, undefined, 'alice')
+
+      const landingContent = fs.readFileSync(landingPath, 'utf-8')
+      expect(landingContent).toContain('<pos-app restore-previous-session>')
+      expect(landingContent).toContain('<pos-router mode="pod">')
+      expect(landingContent).toContain('<pos-resource uri="http://localhost:9999/">')
+      expect(landingContent).toContain('<import-html src="/templates/actor-controls.html">')
+      expect(landingContent).toContain('src="/templates/actor-controls.js"')
+      expect(landingContent).toContain('<ul id="actors">')
+      expect(landingContent).not.toContain('{{')
+
+      const fragmentPath = path.join(publicDir, 'templates', 'actor-controls.html')
+      const fragmentContent = fs.readFileSync(fragmentPath, 'utf-8')
+      expect(fragmentContent).toContain('<pos-login>')
+      expect(fragmentContent).toContain('<pos-type-badges>')
+      expect(fragmentContent).toContain('https://www.w3.org/ns/activitystreams#Service')
+      expect(fragmentContent).toContain('https://www.w3.org/ns/activitystreams#Person')
+      expect(fragmentContent).toContain('https://www.w3.org/ns/activitystreams#Group')
+      expect(fragmentContent).toContain('https://www.w3.org/ns/activitystreams#Organization')
+      expect(fragmentContent).toContain('https://www.w3.org/ns/activitystreams#Application')
+
+      const jsPath = path.join(publicDir, 'templates', 'actor-controls.js')
+      expect(fs.existsSync(jsPath)).toBe(true)
+    })
+
     it('uses production domain in landing links', async () => {
       await runScript(undefined, 'production', 'alice')
 

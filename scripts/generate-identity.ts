@@ -178,12 +178,14 @@ async function generateIdentity() {
   const landingTemplatePath = path.join(staticUiDir, 'index.html')
   const landingTemplate = fs.readFileSync(landingTemplatePath, 'utf-8')
   const actorItems = actorNames
-    .map(name => `        <li><a href="/${name}">@${name}@${domain}</a></li>`)
+    .map(name => `            <li><a href="/${name}">@${name}@${domain}</a></li>`)
     .join('\n')
-  const landingHtml = landingTemplate.replace(
-    /      <ul id="actors">\n        <!-- one <li> per actor, emitted by scripts\/generate-identity\.ts -->\n      <\/ul>/,
-    `      <ul id="actors">\n${actorItems}\n      </ul>`
-  )
+  const landingHtml = landingTemplate
+    .replaceAll('{{BASE_URL}}', baseUrl)
+    .replace(
+      /            <ul id="actors">\n              <!-- one <li> per actor, emitted by scripts\/generate-identity\.ts -->\n            <\/ul>/,
+      `            <ul id="actors">\n${actorItems}\n            </ul>`
+    )
   const landingPath = path.join(publicDir, 'index.html')
   fs.writeFileSync(landingPath, landingHtml)
   console.log(`Written: ${landingPath}`)

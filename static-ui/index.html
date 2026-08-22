@@ -9,23 +9,48 @@
       href="https://cdn.jsdelivr.net/npm/@ionic/core/css/ionic.bundle.css"
     />
     <meta name="color-scheme" content="dark light" />
+    <script
+      type="module"
+      src="https://cdn.jsdelivr.net/npm/@ionic/core/dist/ionic/ionic.esm.js"
+    ></script>
+    <script
+      nomodule=""
+      src="https://cdn.jsdelivr.net/npm/@ionic/core/dist/ionic/ionic.js"
+    ></script>
+    <script
+      type="module"
+      src="https://cdn.jsdelivr.net/npm/@pod-os/elements/dist/elements/elements.esm.js"
+    ></script>
+    <link
+      href="https://cdn.jsdelivr.net/npm/@pod-os/elements/dist/elements/elements.css"
+      rel="stylesheet"
+    />
+    <script src="/templates/ImportHtml.js" defer></script>
   </head>
   <body>
-    <ion-content class="ion-padding">
-      <h1>ActivityPub</h1>
-      <p>
-        This server hosts ActivityPub actor(s) backed by a Solid pod.
-        Follow any handle from your fediverse account.
-      </p>
-      <ul id="actors">
-        <!-- one <li> per actor, emitted by scripts/generate-identity.ts -->
-      </ul>
-      <p>
-        <small
-          >For machine-readable actor documents, request
-          <code>Accept: application/activity+json</code>.</small
-        >
-      </p>
-    </ion-content>
+    <pos-app restore-previous-session>
+      <pos-router mode="pod">
+        <pos-resource uri="{{BASE_URL}}/">
+          <ion-content class="ion-padding">
+            <h1>ActivityPub</h1>
+            <p>
+              This server hosts ActivityPub actor(s) backed by a Solid pod.
+              Follow any handle from your fediverse account.
+            </p>
+            <ul id="actors">
+              <!-- one <li> per actor, emitted by scripts/generate-identity.ts -->
+            </ul>
+            <p>
+              <small
+                >For machine-readable actor documents, request
+                <code>Accept: application/activity+json</code>.</small
+              >
+            </p>
+            <import-html src="/templates/actor-controls.html"></import-html>
+          </ion-content>
+        </pos-resource>
+      </pos-router>
+    </pos-app>
+    <script type="module" src="/templates/actor-controls.js"></script>
   </body>
 </html>
