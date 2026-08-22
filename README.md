@@ -100,17 +100,16 @@ One route per configured actor, e.g. `/alice/inbox`. HTTP-signature-authenticate
    - `Delete` → ack and return (no persistence).
    - `Follow` → send a signed `Accept` (signed with the matched local actor's key) to the follower's inbox, and add the follower to the followers collection at `${SOLID_STORAGE_BASE_URL}${actorName}/followers/`.
    - `Undo` of `Follow` → remove the follower from `${actorName}/followers/`.
-   - `Accept` of `Follow` for this actor → add the wrapped `Follow.object` (the followed actor URI) to the following collection at `${SOLID_STORAGE_BASE_URL}${actorName}/following/`. Other Accept activities are acked without persistence.
+   - `Accept` of `Follow` for this actor (delivered to the per-actor `/actor/inbox` only) → add the wrapped `Follow.object` (the followed actor URI) to the following collection at `${SOLID_STORAGE_BASE_URL}${actorName}/following/`. Other Accept activities are acked without persistence.
    - `Follow`/`Undo` also maintain an `as:totalItems` literal on the followers collection root via a `solid:InsertDeletePatch` that swaps the old literal for the new one (`addToFollowers` increments after a successful per-page item PATCH; `removeFromFollowers` decrements after a successful remove). The first add patches from "no triple" to `1`; decrements never go below `0`. Concurrent mutations can drift the counter; a drift self-corrects on the next mutation.
    - Anything else → derive the next paged-inbox slot under `${SOLID_STORAGE_BASE_URL}${actorName}/inbox/` and persist via `solid:InsertDeletePatch`.
 
 #### Shared Inbox POST `/inbox`
 
-Single server-wide endpoint at `${BASE_URL}/inbox`, HTTP-signature-authenticated. Advertised as `endpoints.sharedInbox` in every actor's AS2 document so remote servers (Mastodon, etc.) can collapse per-follower deliveries — in particular `Delete` activities for account deletion, which arrive once per origin server instead of once per followed actor. The pipeline is identical to the per-actor route above (actor-`Delete` short-circuit, signature verification, Follow/Undo Follow/Accept of Follow/persist semantics) — the only piece the shared inbox adds is **target-actor resolution**, in this priority:
+Single server-wide endpoint at `${BASE_URL}/inbox`, HTTP-signature-authenticated. Advertised as `endpoints.sharedInbox` in every actor's AS2 document so remote servers (Mastodon, etc.) can collapse per-follower deliveries — in particular `Delete` activities for account deletion, which arrive once per origin server instead of once per followed actor. The pipeline is identical to the per-actor route above (actor-`Delete` short-circuit, signature verification, Follow/Undo Follow/persist semantics) — the only piece the shared inbox adds is **target-actor resolution**, in this priority:
 
 - `Follow`: `activity.object` must equal a configured `actor.url`.
 - `Undo` `Follow`: `activity.object.object` must equal a configured `actor.url`.
-- `Accept` of `Follow`: the wrapped `Follow.actor` must resolve to a configured `actor.url`; otherwise the Accept is acked without action.
 - Other activities: scan `to`/`cc`/`bto`/`bcc`/`audience` for the first value matching a configured `actor.url` or `actor.followersUrl`.
 
 No match → 422 (never silently drop into the wrong inbox; never persist when the target is ambiguous). GET on `/inbox` is not supported (POST-only, matching Mastodon's behavior).
