@@ -59,6 +59,19 @@ function parseActorNames(raw: string | undefined): string[] {
   return names
 }
 
+function copyTemplatesExcludingSpecs(srcDir: string, dstDir: string): void {
+  fs.mkdirSync(dstDir, { recursive: true })
+  for (const entry of fs.readdirSync(srcDir, { withFileTypes: true })) {
+    const srcPath = path.join(srcDir, entry.name)
+    const dstPath = path.join(dstDir, entry.name)
+    if (entry.isDirectory()) {
+      copyTemplatesExcludingSpecs(srcPath, dstPath)
+    } else if (!/\.spec\.(ts|tsx)$/.test(entry.name)) {
+      fs.copyFileSync(srcPath, dstPath)
+    }
+  }
+}
+
 async function generateIdentity() {
   console.log(`Generating identity files`)
   console.log(`BASE_URL: ${baseUrl}`)
@@ -197,7 +210,7 @@ async function generateIdentity() {
 
   const templatesSrc = path.join(staticUiDir, 'templates')
   const templatesDst = path.join(publicDir, 'templates')
-  fs.cpSync(templatesSrc, templatesDst, { recursive: true })
+  copyTemplatesExcludingSpecs(templatesSrc, templatesDst)
   console.log(`Copied: ${templatesSrc} -> ${templatesDst}`)
 
   console.log('Identity files generated successfully')
