@@ -7,7 +7,7 @@ interface MockSolidServerOptions {
   errorType?: 'unreachable' | '404' | '500'
 }
 
-type Collection = 'inbox' | 'outbox' | 'followers'
+type Collection = 'inbox' | 'outbox' | 'followers' | 'following'
 
 export class MockSolidServer {
   private server: http.Server | null = null
@@ -19,13 +19,18 @@ export class MockSolidServer {
     inbox: {},
     outbox: {},
     followers: {},
+    following: {},
   }
   private actorProfiles: Record<string, string> = {}
   private patchedInboxPages: Array<{ url: string; body: string }> = []
   private patchedOutboxPages: Array<{ url: string; body: string }> = []
-  private patchedFollowersPages: Array<{ url: string; body: string }> = []
+  private patchedCollectionPages: Record<string, Array<{ url: string; body: string }>> = {
+    followers: [],
+    following: [],
+  }
   private receivedActivities: Array<{ url: string; body: string }> = []
   private followerActorsByCollection: Record<string, string[]> = {}
+  private followedActorsByCollection: Record<string, string[]> = {}
   private followersTotalItems: Record<string, number> = {}
 
   constructor(options: MockSolidServerOptions) {
@@ -50,12 +55,14 @@ export class MockSolidServer {
       this.server = null
     }
     this.createdPages.clear()
-    this.collectionFirst = { inbox: {}, outbox: {}, followers: {} }
+    this.collectionFirst = { inbox: {}, outbox: {}, followers: {}, following: {} }
     this.actorProfiles = {}
     this.patchedInboxPages = []
     this.patchedOutboxPages = []
+    this.patchedCollectionPages = { followers: [], following: [] }
     this.receivedActivities = []
     this.followerActorsByCollection = {}
+    this.followedActorsByCollection = {}
     this.followersTotalItems = {}
   }
 
@@ -77,6 +84,16 @@ setFollowerActors(actors: string[], actorName: string = 'actor'): void {
   if (actors.length > 0 && !this.collectionFirst.followers[actorName]) {
     const pageUrl = `http://localhost:${this.port}/${actorName}/followers/pages/1`
     this.collectionFirst.followers[actorName] = pageUrl
+    this.createdPages.add(pageUrl)
+    this.followersTotalItems[actorName] = actors.length
+  }
+}
+
+setFollowedActors(actors: string[], actorName: string = 'actor'): void {
+  this.followedActorsByCollection[actorName] = actors
+  if (actors.length > 0 && !this.collectionFirst.following[actorName]) {
+    const pageUrl = `http://localhost:${this.port}/${actorName}/following/pages/1`
+    this.collectionFirst.following[actorName] = pageUrl
     this.createdPages.add(pageUrl)
     this.followersTotalItems[actorName] = actors.length
   }
@@ -107,7 +124,11 @@ setFollowerActors(actors: string[], actorName: string = 'actor'): void {
   }
 
   getPatchedFollowers(): Array<{ url: string; body: string }> {
-    return [...this.patchedFollowersPages]
+    return [...this.patchedCollectionPages.followers]
+  }
+
+  getPatchedFollowing(): Array<{ url: string; body: string }> {
+    return [...this.patchedCollectionPages.following]
   }
 
   getFollowersFirst(): string | null {
@@ -168,13 +189,27 @@ setFollowerActors(actors: string[], actorName: string = 'actor'): void {
       this.handlePatchPage(req, res, pathname, collection, actorName)
     } else if (req.method === 'GET' && pagePath?.startsWith('pages/')) {
       this.handleGetPage(req, res, pathname, actorName, collection)
-    } else if (req.method === 'HEAD' && isCollectionRoot && collection === 'followers') {
-      res.writeHead(200)
-      res.end()
+    } else if (req.method === 'HEAD' && isCollectionRoot && (collection === 'followers' || collection === 'following')) {
+      this.handleHeadCollectionRoot(req, res, pathname, actorName, collection)
     } else {
       res.writeHead(404)
       res.end('Not Found')
     }
+  }
+
+  private handleHeadCollectionRoot(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    pathname: string,
+    actorName: string,
+    collection: Collection
+  ): void {
+    void req
+    void pathname
+    void actorName
+    void collection
+    res.writeHead(200)
+    res.end()
   }
 
   private handleGetActor(req: http.IncomingMessage, res: http.ServerResponse): void {
@@ -241,7 +276,7 @@ setFollowerActors(actors: string[], actorName: string = 'actor'): void {
       body += `\n<${collectionUrl}> as:first <${first}>.`
     }
 
-    if (collection === 'followers' && actorName in this.followersTotalItems) {
+    if ((collection === 'followers' || collection === 'following') && actorName in this.followersTotalItems) {
       const n = this.followersTotalItems[actorName]
       body += `\n<${collectionUrl}> as:totalItems "${n}" .`
     }
@@ -296,7 +331,10 @@ setFollowerActors(actors: string[], actorName: string = 'actor'): void {
       } else if (collection === 'outbox') {
         this.patchedOutboxPages.push({ url: pageUrl, body })
       } else {
-        this.patchedFollowersPages.push({ url: pageUrl, body })
+        this.patchedCollectionPages[collection].push({ url: pageUrl, body })
+        if (collection === 'followers' || collection === 'following') {
+          this.followersTotalItems[actorName] = (this.followersTotalItems[actorName] || 0) + 1
+        }
       }
       res.writeHead(200)
       res.end('OK')
@@ -328,7 +366,7 @@ setFollowerActors(actors: string[], actorName: string = 'actor'): void {
     const collectionUrl = `http://localhost:${this.port}/${actorName}/${collection}/`
     const patches = collection === 'inbox' ? this.patchedInboxPages
       : collection === 'outbox' ? this.patchedOutboxPages
-      : this.patchedFollowersPages
+      : this.patchedCollectionPages[collection] ?? []
     const isFull = patches.filter(p => p.url === pageUrl).length >= 5
 
     let body = `@prefix as: <https://www.w3.org/ns/activitystreams#>.
@@ -341,6 +379,14 @@ setFollowerActors(actors: string[], actorName: string = 'actor'): void {
 
     if (collection === 'followers') {
       const actors = this.followerActorsByCollection[actorName] || []
+      if (actors.length > 0) {
+        const items = actors.map(actor =>
+          `<${pageUrl}> <https://www.w3.org/ns/activitystreams#items> <${actor}>.`
+        ).join('\n')
+        body += `\n\n${items}`
+      }
+    } else if (collection === 'following') {
+      const actors = this.followedActorsByCollection[actorName] || []
       if (actors.length > 0) {
         const items = actors.map(actor =>
           `<${pageUrl}> <https://www.w3.org/ns/activitystreams#items> <${actor}>.`
@@ -360,7 +406,7 @@ function parsePerActorPath(pathname: string): {
   pagePath: string | null
   isCollectionRoot: boolean
 } | null {
-  const match = pathname.match(/^\/([^/]+)\/(inbox|outbox|followers)(\/.*)?$/)
+  const match = pathname.match(/^\/([^/]+)\/(inbox|outbox|followers|following)(\/.*)?$/)
   if (!match) return null
   const actorName = match[1]
   const collection = match[2] as Collection
