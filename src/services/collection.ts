@@ -1,8 +1,47 @@
 import type { SolidFetch } from '../types.js'
 import { Parser, Store } from 'n3'
+import { derivePageUrl } from './derivePageUrl.js'
+import { buildInsertItemLinkPatch, buildUpdateLiteralPatch } from './buildPatch.js'
 import { parseFollowersRoot } from './rdfUtils.js'
+import { discoverMetaResourceUrl } from './solidHelpers.js'
 
 export type CollectionName = 'followers' | 'following'
+
+const AS_TOTALITEMS = 'https://www.w3.org/ns/activitystreams#totalItems'
+const XSD_NON_NEG_INT = 'http://www.w3.org/2001/XMLSchema#nonNegativeInteger'
+
+function totalItemsLiteralTurtle(subject: string, value: number): string {
+  return `<${subject}> <${AS_TOTALITEMS}> "${value}"^^<${XSD_NON_NEG_INT}> .`
+}
+
+async function incrementCollectionTotal(
+  collectionUrl: string,
+  fetch: SolidFetch
+): Promise<void> {
+  try {
+    const response = await fetch(collectionUrl, { headers: { accept: 'text/turtle' } })
+    const text = await response.text()
+    const parsed = await parseFollowersRoot(text, collectionUrl)
+    const current = parsed?.totalItems ?? 0
+    const next = current + 1
+    const oldTurtle = current === 0
+      ? ''
+      : totalItemsLiteralTurtle(collectionUrl, current)
+    const newTurtle = totalItemsLiteralTurtle(collectionUrl, next)
+    const patchBody = buildUpdateLiteralPatch(collectionUrl, AS_TOTALITEMS, oldTurtle, newTurtle)
+    const metaUrl = await discoverMetaResourceUrl(collectionUrl, fetch)
+    const patchResponse = await fetch(metaUrl, {
+      method: 'PATCH',
+      headers: { 'content-type': 'text/n3' },
+      body: patchBody
+    })
+    if (!patchResponse.ok) {
+      console.warn(`[inbox] totalItems PATCH failed for ${metaUrl}: ${patchResponse.status}`)
+    }
+  } catch (error) {
+    console.warn(`[inbox] Could not update totalItems on ${collectionUrl}: ${error}`)
+  }
+}
 
 const AS_CONTEXT = 'https://www.w3.org/ns/activitystreams'
 
@@ -225,4 +264,35 @@ function parsePage(turtle: string, pageUrl: string): PageItems {
   const items = itemsQuads.map(q => q.object.value)
 
   return { items, nextPageUrl }
+}
+
+export async function addToCollection(
+  collection: CollectionName,
+  item: string,
+  fetch: SolidFetch,
+  solidStorageBaseUrl: string,
+  actorName: string
+): Promise<void> {
+  const collectionUrl = `${solidStorageBaseUrl}${actorName}/${collection}/`
+
+  const pageUrl = await derivePageUrl(collectionUrl, fetch)
+
+  const patchBody = buildInsertItemLinkPatch(pageUrl, item)
+
+  const response = await fetch(pageUrl, {
+    method: 'PATCH',
+    headers: {
+      'content-type': 'text/n3',
+    },
+    body: patchBody,
+  })
+
+  if (!response.ok) {
+    const text = await response.text()
+    throw new Error(`Failed to add ${item} to ${actorName} ${collection}: ${response.status} ${text}`)
+  }
+
+  await incrementCollectionTotal(collectionUrl, fetch)
+
+  console.log(`[inbox] Added ${item} to ${actorName} ${collection} collection`)
 }
