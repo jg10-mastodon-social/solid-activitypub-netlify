@@ -195,6 +195,12 @@ Operators register an actor by adding a `solid:TypeRegistration` entry to their 
 
 After signing in, the actor-controls fragment renders two rows: one for `https://example.netlify.app/relay` (typed `Service`) and one for `https://example.netlify.app/alice` (typed `Person`). Each is a clickable link that navigates to the per-actor page.
 
+### Custom web components
+
+Web components shipped from `static-ui/templates/`, copied into `public/templates/` at build time.
+
+- [`<import-html>`](static-ui/templates/ImportHtml.js) — used in `actor-page.template.html` to inline Pod-OS fragment templates.
+
 ## Testing
 
 ```bash
