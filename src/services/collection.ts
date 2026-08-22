@@ -1,8 +1,8 @@
 import type { SolidFetch } from '../types.js'
 import { Parser, Store } from 'n3'
 import { derivePageUrl } from './derivePageUrl.js'
-import { buildInsertItemLinkPatch, buildUpdateLiteralPatch } from './buildPatch.js'
-import { parseFollowersRoot } from './rdfUtils.js'
+import { buildDeleteItemLinkPatch, buildInsertItemLinkPatch, buildUpdateLiteralPatch } from './buildPatch.js'
+import { parseCollectionTurtle, parseFollowersRoot } from './rdfUtils.js'
 import { discoverMetaResourceUrl } from './solidHelpers.js'
 
 export type CollectionName = 'followers' | 'following'
@@ -295,4 +295,164 @@ export async function addToCollection(
   await incrementCollectionTotal(collectionUrl, fetch)
 
   console.log(`[inbox] Added ${item} to ${actorName} ${collection} collection`)
+}
+
+async function decrementCollectionTotal(
+  collectionUrl: string,
+  fetch: SolidFetch
+): Promise<void> {
+  try {
+    const response = await fetch(collectionUrl, { headers: { accept: 'text/turtle' } })
+    const text = await response.text()
+    const parsed = await parseFollowersRoot(text, collectionUrl)
+    const current = parsed?.totalItems ?? 0
+    const next = Math.max(0, current - 1)
+    if (next === current) return
+    const oldTurtle = totalItemsLiteralTurtle(collectionUrl, current)
+    const newTurtle = totalItemsLiteralTurtle(collectionUrl, next)
+    const patchBody = buildUpdateLiteralPatch(collectionUrl, AS_TOTALITEMS, oldTurtle, newTurtle)
+    const metaUrl = await discoverMetaResourceUrl(collectionUrl, fetch)
+    const patchResponse = await fetch(metaUrl, {
+      method: 'PATCH',
+      headers: { 'content-type': 'text/n3' },
+      body: patchBody
+    })
+    if (!patchResponse.ok) {
+      console.warn(`[inbox] totalItems PATCH failed for ${metaUrl}: ${patchResponse.status}`)
+    }
+  } catch (error) {
+    console.warn(`[inbox] Could not update totalItems on ${collectionUrl}: ${error}`)
+  }
+}
+
+async function removeItemFromPage(
+  pageUrl: string,
+  item: string,
+  fetch: SolidFetch
+): Promise<boolean> {
+  const response = await fetch(pageUrl, {
+    method: 'GET',
+    headers: {
+      accept: 'text/turtle',
+    },
+  })
+
+  if (!response.ok) {
+    return false
+  }
+
+  const text = await response.text()
+  const parser = new Parser({ baseIRI: pageUrl })
+  const store = new Store()
+  const quads = parser.parse(text)
+  if (quads) {
+    store.addQuads(quads)
+  }
+
+  const itemQuads = store.getQuads(
+    pageUrl,
+    'https://www.w3.org/ns/activitystreams#items',
+    item,
+    null
+  )
+
+  if (itemQuads.length === 0) {
+    return false
+  }
+
+  const patchBody = buildDeleteItemLinkPatch(pageUrl, item)
+
+  const deleteResponse = await fetch(pageUrl, {
+    method: 'PATCH',
+    headers: {
+      'content-type': 'text/n3',
+    },
+    body: patchBody,
+  })
+
+  return deleteResponse.ok
+}
+
+async function getNextCollectionPageUrl(
+  pageUrl: string,
+  fetch: SolidFetch
+): Promise<string | null> {
+  const response = await fetch(pageUrl, {
+    method: 'GET',
+    headers: {
+      accept: 'text/turtle',
+    },
+  })
+
+  if (!response.ok) {
+    return null
+  }
+
+  const text = await response.text()
+  const parser = new Parser({ baseIRI: pageUrl })
+  const store = new Store()
+  const quads = parser.parse(text)
+  if (quads) {
+    store.addQuads(quads)
+  }
+
+  const nextQuads = store.getQuads(
+    pageUrl,
+    'https://www.w3.org/ns/activitystreams#next',
+    null,
+    null
+  )
+
+  return nextQuads.length > 0 ? nextQuads[0].object.value : null
+}
+
+export async function removeFromCollection(
+  collection: CollectionName,
+  item: string,
+  fetch: SolidFetch,
+  solidStorageBaseUrl: string,
+  actorName: string
+): Promise<void> {
+  const collectionUrl = `${solidStorageBaseUrl}${actorName}/${collection}/`
+
+  let currentPageUrl: string | null = null
+
+  try {
+    const response = await fetch(collectionUrl, {
+      method: 'GET',
+      headers: {
+        accept: 'text/turtle',
+      },
+    })
+
+    if (response.ok) {
+      const text = await response.text()
+      const parsed = await parseCollectionTurtle(text, collectionUrl)
+      if (parsed && parsed.first) {
+        currentPageUrl = parsed.first
+      }
+    }
+  } catch (error) {
+    console.warn(`[removeFromCollection] Could not fetch ${collection} collection: ${error}`)
+  }
+
+  if (!currentPageUrl) {
+    throw new Error(`Could not find first page of ${collection} collection`)
+  }
+
+  let pageUrl = currentPageUrl
+  while (pageUrl) {
+    const deleted = await removeItemFromPage(pageUrl, item, fetch)
+    if (deleted) {
+      await decrementCollectionTotal(collectionUrl, fetch)
+      console.log(`[inbox] Removed ${item} from ${actorName} ${collection} collection`)
+      return
+    }
+
+    const nextPageUrl: string | null = await getNextCollectionPageUrl(pageUrl, fetch)
+    if (!nextPageUrl) break
+    pageUrl = nextPageUrl
+  }
+
+  throw new Error(`Could not find ${item} in ${actorName} ${collection} collection`)
 }
