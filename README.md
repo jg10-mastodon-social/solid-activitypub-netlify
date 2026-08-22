@@ -197,7 +197,7 @@ npm run test:e2e           # Real `netlify dev` + a mock Solid server (boots bot
 │   ├── auth.ts              # DPoP token verification
 │   ├── config.ts            # Config loading (actorNames[], actorByPath map)
 │   ├── handlers/            # Inbox/outbox activity handlers (per-actor aware)
-│   ├── services/            # Solid-pod + RDF helpers (paging, patching, followers, actorDoc.ts)
+│   ├── services/            # Solid-pod + RDF helpers (paging, patching, followers, following, actorDoc.ts)
 │   ├── signing.ts           # Outgoing HTTP signature signing (per-actor key lookup)
 │   ├── solidFetch.ts        # DPoP-authenticated fetch to pod
 │   ├── ssrf.ts              # SSRF protection for remote actor key fetches
