@@ -164,10 +164,36 @@ Served by the `webfinger` Netlify function. Returns JRD JSON describing the matc
 
 A browser-friendly interface is shipped as static assets in `static-ui/` and copied into `public/` by `scripts/generate-identity.ts` on every build:
 
-- `GET /` — landing page (`public/index.html`) listing every actor in `ACTOR_NAME` with a `@name@domain` link to its per-actor page.
-- `GET /:actor` with `Accept: text/html` — per-actor page (`actor-page.template.html`) rendered by Pod-OS Elements. The page reads the actor JSON-LD at `${BASE_URL}/${actorName}` to display `as:name` and `as:summary`, then follows `as:outbox` to walk the paged outbox collection (the existing outbox GET endpoint already serves Turtle with public-URL rewriting). The page uses Ionic for layout and the `<import-html>` custom element (`public/templates/ImportHtml.js`) to inline Pod-OS fragment templates at `public/templates/discussion/{header,outbox}.html`.
+- `GET /` — landing page (`public/index.html`) that lists every actor in `ACTOR_NAME` with a `@name@domain` link to its per-actor page, and embeds `templates/actor-controls.html` so visitors can sign in with their WebID and see the actors they control.
+- `GET /:actor` with `Accept: text/html` — per-actor page (`actor-page.template.html`) rendered by Pod-OS Elements. The page reads the actor JSON-LD at `${BASE_URL}/${actorName}` to display `as:name` and `as:summary`, then follows `as:outbox` to walk the paged outbox collection (the existing outbox GET endpoint already serves Turtle with public-URL rewriting). The page uses Ionic for layout and the `<import-html>` custom element (`public/templates/ImportHtml.js`) to inline Pod-OS fragment templates at `public/templates/{actor-controls,discussion/{header,outbox}}.html`. The `<pos-app>` wrapper has the `restore-previous-session` attribute so visitors stay signed in across page reloads; the same `actor-controls` fragment is mounted at the top so authenticated visitors can navigate to other actors they control.
 
-UI sources live in `static-ui/` (tracked). Operators wanting to customise the landing page or per-actor template can edit those files; the next build overwrites the copies in `public/`.
+UI sources live in `static-ui/` (tracked). Operators wanting to customise the landing page, per-actor template, or login fragment can edit those files; the next build overwrites the copies in `public/`.
+
+#### Registering actors on the user's pod
+
+Operators register an actor by adding a `solid:TypeRegistration` entry to their WebID's public Type Index. The fragment matches the five ActivityPub Actor Types — `as:Service`, `as:Person`, `as:Group`, `as:Organization`, `as:Application`. Example for an operator with two actors — one bot (`Service`) and one human account (`Person`) — running on `${BASE_URL}`:
+
+```turtle
+@prefix solid: <http://www.w3.org/ns/solid/terms#>.
+@prefix as:    <https://www.w3.org/ns/activitystreams#>.
+
+<https://alice.example/webid#me>
+    solid:publicTypeIndex <https://alice.example/settings/publicTypeIndex.ttl>.
+
+<https://alice.example/settings/publicTypeIndex.ttl> a solid:TypeIndex.
+
+<#relay>
+    a solid:TypeRegistration ;
+    solid:forClass as:Service ;
+    solid:instance <https://example.netlify.app/relay>.
+
+<#alice>
+    a solid:TypeRegistration ;
+    solid:forClass as:Person ;
+    solid:instance <https://example.netlify.app/alice>.
+```
+
+After signing in, the actor-controls fragment renders two rows: one for `https://example.netlify.app/relay` (typed `Service`) and one for `https://example.netlify.app/alice` (typed `Person`). Each is a clickable link that navigates to the per-actor page.
 
 ## Testing
 
