@@ -228,7 +228,7 @@ async function handleActorGet(
 ): Promise<Response> {
   if (!actor) return new Response('Unknown actor', { status: 404, headers: corsHeaders })
 
-  if (wantsHtml(req.headers.get('Accept'))) {
+  if (!wantsAs2Json(req.headers.get('Accept'))) {
     try {
       const template = fs.readFileSync(actorPageTemplatePath, 'utf-8')
       const domain = config.baseUrl.replace(/^https?:\/\//, '')
