@@ -120,7 +120,10 @@ describe('actor-router GET /:actor integration', () => {
     vi.clearAllMocks()
 
     const { default: handler } = await import('../../netlify/functions/actor-router.mts')
-    const req = new Request('http://localhost/actor', { method: 'GET' })
+    const req = new Request('http://localhost/actor', {
+      method: 'GET',
+      headers: { 'Accept': 'application/activity+json' }
+    })
     const res = await handler(req, makeContext())
 
     expect(res.status).toBe(200)
@@ -153,7 +156,10 @@ describe('actor-router GET /:actor integration', () => {
     vi.clearAllMocks()
 
     const { default: handler } = await import('../../netlify/functions/actor-router.mts')
-    const req = new Request('http://localhost/actor', { method: 'GET' })
+    const req = new Request('http://localhost/actor', {
+      method: 'GET',
+      headers: { 'Accept': 'application/activity+json' }
+    })
     const res = await handler(req, makeContext())
 
     expect(res.status).toBe(200)
@@ -192,7 +198,10 @@ describe('actor-router GET /:actor integration', () => {
     vi.clearAllMocks()
 
     const { default: handler } = await import('../../netlify/functions/actor-router.mts')
-    const req = new Request('http://localhost/actor', { method: 'GET' })
+    const req = new Request('http://localhost/actor', {
+      method: 'GET',
+      headers: { 'Accept': 'application/activity+json' }
+    })
     const res = await handler(req, makeContext())
 
     expect(res.status).toBe(200)
