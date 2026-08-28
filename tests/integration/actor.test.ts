@@ -242,6 +242,7 @@ it('returns HTML for GET /:actor when Accept includes text/html', async () => {
       expect(body).toContain('<pos-app restore-previous-session>')
       expect(body).toContain('<import-html src="/templates/actor-controls.html">')
       expect(body).toContain('src="/templates/actor-controls.js"')
+      expect(body).toContain('src="/templates/update-location.js"')
     })
 
   it('returns 404 for GET /unknown with Accept: text/html (HTML branch does not bypass actor resolution)', async () => {

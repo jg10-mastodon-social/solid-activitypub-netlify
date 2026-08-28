@@ -223,6 +223,7 @@ describe('generate-identity', () => {
     const actorPageTemplatePath = path.join(publicDir, 'actor-page.template.html')
     const templatesDir = path.join(publicDir, 'templates')
     const importHtmlPath = path.join(templatesDir, 'ImportHtml.js')
+    const updateLocationPath = path.join(templatesDir, 'update-location.js')
     const outboxFragmentPath = path.join(templatesDir, 'discussion', 'outbox.html')
     const headerFragmentPath = path.join(templatesDir, 'discussion', 'header.html')
 
@@ -287,6 +288,28 @@ describe('generate-identity', () => {
       expect(fs.existsSync(importHtmlPath)).toBe(true)
       const content = fs.readFileSync(importHtmlPath, 'utf-8')
       expect(content).toContain('import-html')
+    })
+
+    it('copies public/templates/update-location.js', async () => {
+      await runScript()
+
+      expect(fs.existsSync(updateLocationPath)).toBe(true)
+      const content = fs.readFileSync(updateLocationPath, 'utf-8')
+      expect(content).toContain('pod-os:route-changed')
+    })
+
+    it('references update-location.js in public/index.html', async () => {
+      await runScript()
+
+      const content = fs.readFileSync(landingPath, 'utf-8')
+      expect(content).toContain('src="/templates/update-location.js"')
+    })
+
+    it('references update-location.js in public/actor-page.template.html', async () => {
+      await runScript()
+
+      const content = fs.readFileSync(actorPageTemplatePath, 'utf-8')
+      expect(content).toContain('src="/templates/update-location.js"')
     })
 
     it('copies public/templates/discussion/outbox.html and header.html', async () => {
