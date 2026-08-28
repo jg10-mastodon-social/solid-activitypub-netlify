@@ -2,7 +2,7 @@
   <p slot="default">Sign in with your WebID to list the actors you control.</p>
   <div slot="if-logged-in">
     <h3>Actors you control</h3>
-    <pos-resource id="webid-loader">
+    <webid-resource id="webid-loader">
       <pos-list rel="http://www.w3.org/ns/solid/terms#privateTypeIndex" fetch>
         <template>
           <pos-list if-typeof="http://www.w3.org/ns/solid/terms#TypeRegistration">
@@ -83,6 +83,6 @@
           </pos-list>
         </template>
       </pos-list>
-    </pos-resource>
+    </webid-resource>
   </div>
 </pos-login>

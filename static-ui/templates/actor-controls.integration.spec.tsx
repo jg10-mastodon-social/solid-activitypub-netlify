@@ -2,6 +2,7 @@ import { vi, describe, it, expect, beforeEach } from "vitest";
 import { render } from "@stencil/vitest";
 import { readFileSync } from "fs";
 import { join } from "path";
+import "../../static-ui/templates/webid-resource.js";
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
@@ -62,7 +63,8 @@ function withoutFragment(url: string): string {
 }
 
 function setLoaderUri(root: Element): void {
-  const loader = root.querySelector("#webid-loader") as HTMLElement;
+  const webidResource = root.querySelector("webid-resource");
+  const loader = webidResource?.querySelector("pos-resource") as HTMLElement;
   loader.setAttribute("uri", WEBID);
 }
 
@@ -109,16 +111,16 @@ describe("actor-controls.html integration", () => {
     expect(FRAGMENT_HTML.length).toBeGreaterThan(0);
   });
 
-  it("accepts the webid URI when set directly on the loader", async () => {
+  it("accepts the webid URI when set directly on the inner pos-resource", async () => {
     const { root, waitForChanges } = await render(`<pos-app><pos-router mode="pod">${FRAGMENT_HTML}</pos-router></pos-app>`);
     await waitForChanges();
 
     setLoaderUri(root);
     await waitForChanges();
 
-    const loader = root.querySelector("#webid-loader");
-    expect(loader).not.toBeNull();
-    expect(loader?.getAttribute("uri")).toBe(WEBID);
+    const inner = root.querySelector("webid-resource")?.querySelector("pos-resource");
+    expect(inner).not.toBeNull();
+    expect(inner?.getAttribute("uri")).toBe(WEBID);
   });
 
   it("renders a row for each registered AS Actor Type with label and type badges", async () => {
