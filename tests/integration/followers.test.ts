@@ -155,6 +155,31 @@ describe('actor-router followers GET AS2 JSON', () => {
     expect(mockSerializeCollection).not.toHaveBeenCalled()
   })
 
+  it('rewrites relative URIs in proxied Turtle body to absolute public URLs', async () => {
+    const fetchFn = (await import('../../src/solidFetch.js')).createSolidFetch as unknown as ReturnType<typeof vi.fn>
+    const innerFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve('<> a <https://www.w3.org/ns/activitystreams#OrderedCollection> ; <https://www.w3.org/ns/activitystreams#first> <pages/1> .'),
+      headers: new Headers({ 'content-type': 'text/turtle' })
+    })
+    fetchFn.mockResolvedValueOnce(innerFetch)
+
+    const { default: handler } = await import('../../netlify/functions/actor-router.mts')
+    const req = new Request('http://localhost/actor/followers', {
+      method: 'GET',
+      headers: { accept: 'text/turtle' }
+    })
+
+    const res = await handler(req, makeContext())
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-type')).toMatch(/text\/turtle/)
+    expect(mockSerializeCollection).not.toHaveBeenCalled()
+    const body = await res.text()
+    expect(body).toContain('<http://localhost:9999/actor/followers/pages/1>')
+    expect(body).not.toMatch(/<pages\/1>/)
+  })
+
   it('proxies Turtle when Accept is absent (back-compat, no auth required)', async () => {
     const fetchFn = (await import('../../src/solidFetch.js')).createSolidFetch as unknown as ReturnType<typeof vi.fn>
     const innerFetch = vi.fn().mockResolvedValue({

@@ -13,6 +13,7 @@ import { serializeFollowersCollection } from '../../src/services/serializeFollow
 import { serializeFollowersPage } from '../../src/services/serializeFollowersPage.js'
 import { serializeFollowingCollection } from '../../src/services/serializeFollowingCollection.js'
 import { serializeFollowingPage } from '../../src/services/serializeFollowingPage.js'
+import { rewriteBody } from '../../src/services/rewriteBody.js'
 import { buildActorSkeleton, applyProfile, parseProfileTurtle, getPublicKeyPem } from '../../src/services/actorDoc.js'
 
 const routerFilename = fileURLToPath(import.meta.url)
@@ -80,18 +81,6 @@ function resolvePodTarget(
   if (!page) return base
   const hasTrailingSlash = pathname.endsWith('/')
   return `${base}${page}${hasTrailingSlash ? '/' : ''}`
-}
-
-function rewriteBody(
-  body: string,
-  solidStorageBaseUrl: string,
-  baseUrl: string,
-  actorName: string,
-  collection: Collection
-): string {
-  const podBase = `${solidStorageBaseUrl}${actorName}/${collection}`.replace(/\/$/, '')
-  const publicBase = `${baseUrl}/${actorName}/${collection}`
-  return body.replaceAll(podBase, publicBase)
 }
 
 function wantsAs2Json(acceptHeader: string | null): boolean {
@@ -205,7 +194,7 @@ async function handleGet(
     })
     const contentType = podResponse.headers.get('Content-Type') || 'text/turtle'
     const body = await podResponse.text()
-    const rewrittenBody = rewriteBody(body, config.solidStorageBaseUrl, config.baseUrl, actorName, collection)
+    const rewrittenBody = rewriteBody(body, config.solidStorageBaseUrl, config.baseUrl, actorName, collection, targetUrl)
     return new Response(rewrittenBody, {
       status: podResponse.status,
       headers: { ...corsHeaders, 'Content-Type': contentType }
