@@ -8,18 +8,22 @@ export function rewriteBody(
   baseUrl: string,
   actorName: string,
   collection: Collection,
-  podResourceUrl?: string
+  podResourceUrl?: string,
+  stripTrailingSlash = false
 ): string {
   const podBase = `${solidStorageBaseUrl}${actorName}/${collection}`.replace(/\/$/, '')
   const publicBase = `${baseUrl}/${actorName}/${collection}`
   const podBaseIri = podResourceUrl ?? `${solidStorageBaseUrl}${actorName}/${collection}/`
+
+  const finalize = (output: string): string =>
+    stripTrailingSlash ? output.replaceAll(`<${publicBase}/>`, `<${publicBase}>`) : output
 
   try {
     const parser = new Parser({ baseIRI: podBaseIri })
     const store = new Store()
     const quads = parser.parse(body)
     if (!quads || quads.length === 0) {
-      return body.replaceAll(podBase, publicBase)
+      return finalize(body.replaceAll(podBase, publicBase))
     }
     for (const q of quads) store.addQuads([q])
 
@@ -38,8 +42,8 @@ export function rewriteBody(
         : q.object
       rewritten.push(DataFactory.quad(subj, pred, obj, q.graph))
     }
-    return writer.quadsToString(rewritten)
+    return finalize(writer.quadsToString(rewritten))
   } catch {
-    return body.replaceAll(podBase, publicBase)
+    return finalize(body.replaceAll(podBase, publicBase))
   }
 }

@@ -246,7 +246,8 @@ async function handleGet(
     })
     const contentType = podResponse.headers.get('Content-Type') || 'text/turtle'
     const body = await podResponse.text()
-    const rewrittenBody = rewriteBody(body, config.solidStorageBaseUrl, config.baseUrl, actorName, collection, targetUrl)
+    const stripTrailingSlash = !requestPath.endsWith('/')
+    const rewrittenBody = rewriteBody(body, config.solidStorageBaseUrl, config.baseUrl, actorName, collection, targetUrl, stripTrailingSlash)
     return new Response(rewrittenBody, {
       status: podResponse.status,
       headers: { ...corsHeaders, 'Content-Type': contentType }

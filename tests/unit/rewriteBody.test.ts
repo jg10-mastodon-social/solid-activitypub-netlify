@@ -58,6 +58,44 @@ describe('rewriteBody', () => {
     })
   })
 
+  describe('stripTrailingSlash', () => {
+    it('strips the trailing slash from the public collection URL when stripTrailingSlash is true', () => {
+      const body = '<http://localhost:9998/alice/outbox/> a <https://www.w3.org/ns/activitystreams#OrderedCollection> .'
+      const out = rewriteBody(
+        body,
+        solidStorageBaseUrl,
+        baseUrl,
+        actorName,
+        'outbox',
+        'http://localhost:9998/alice/outbox/',
+        true
+      )
+      expect(out).toContain('<http://localhost:9999/alice/outbox>')
+      expect(out).not.toContain('<http://localhost:9999/alice/outbox/>')
+    })
+
+    it('does not strip the trailing slash from sub-paths (e.g. /pages/1) when stripTrailingSlash is true', () => {
+      const body = '<http://localhost:9998/alice/outbox/> a <https://www.w3.org/ns/activitystreams#OrderedCollection> ; <https://www.w3.org/ns/activitystreams#first> <pages/1> .'
+      const out = rewriteBody(
+        body,
+        solidStorageBaseUrl,
+        baseUrl,
+        actorName,
+        'outbox',
+        'http://localhost:9998/alice/outbox/',
+        true
+      )
+      expect(out).toContain('<http://localhost:9999/alice/outbox/pages/1>')
+      expect(out).not.toContain('<http://localhost:9999/alice/outboxpages/1>')
+    })
+
+    it('keeps the trailing slash when stripTrailingSlash is false (default)', () => {
+      const body = '<http://localhost:9998/alice/outbox/> a <https://www.w3.org/ns/activitystreams#OrderedCollection> .'
+      const out = rewriteBody(body, solidStorageBaseUrl, baseUrl, actorName, 'outbox')
+      expect(out).toContain('<http://localhost:9999/alice/outbox/>')
+    })
+  })
+
   describe('fallback behaviour', () => {
     it('falls back to substring replacement when the body is not parseable Turtle', () => {
       const body = '<not valid turtle >>>>'
