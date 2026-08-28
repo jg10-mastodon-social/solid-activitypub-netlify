@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll } from 'vitest'
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
 import type { Context } from '@netlify/functions'
 
 vi.mock('../../src/base-url.js', () => ({
@@ -6,6 +6,9 @@ vi.mock('../../src/base-url.js', () => ({
 }))
 
 const mockValidateActivityActor = vi.fn().mockReturnValue(true)
+
+const mockSerializeOutboxCollection = vi.fn()
+const mockSerializeOutboxPage = vi.fn()
 
 vi.mock('../../src/auth.js', () => ({
   verifyDpopToken: vi.fn().mockResolvedValue({
@@ -51,6 +54,14 @@ beforeAll(() => {
 
 vi.mock('@soid/core', () => ({
   getAuthenticatedFetch: vi.fn()
+}))
+
+vi.mock('../../src/services/serializeOutboxCollection.js', () => ({
+  serializeOutboxCollection: mockSerializeOutboxCollection
+}))
+
+vi.mock('../../src/services/serializeOutboxPage.js', () => ({
+  serializeOutboxPage: mockSerializeOutboxPage
 }))
 
 function makeContext(overrides: Partial<Context> = {}): Context {
@@ -195,5 +206,65 @@ describe('actor-router outbox integration tests', () => {
     const res = await handler(req, makeContext())
 
     expect(res.status).toBe(403)
+  })
+})
+
+describe('actor-router outbox GET AS2 JSON', () => {
+  beforeEach(() => {
+    mockSerializeOutboxCollection.mockReset()
+    mockSerializeOutboxPage.mockReset()
+  })
+
+  it('returns AS2 JSON OrderedCollection when Accept is application/activity+json', async () => {
+    mockSerializeOutboxCollection.mockResolvedValueOnce(
+      new Response(JSON.stringify({
+        '@context': 'https://www.w3.org/ns/activitystreams',
+        id: 'http://localhost:9999/actor/outbox',
+        type: 'OrderedCollection',
+        totalItems: 0,
+        first: 'http://localhost:9999/actor/outbox/pages/1'
+      }), { status: 200, headers: { 'Content-Type': 'application/activity+json' } })
+    )
+
+    const { default: handler } = await import('../../netlify/functions/actor-router.mts')
+    const req = new Request('http://localhost/actor/outbox', {
+      method: 'GET',
+      headers: { accept: 'application/activity+json' }
+    })
+    const res = await handler(req, makeContext())
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-type')).toBe('application/activity+json')
+    const body = await res.json()
+    expect(body.id).toBe('http://localhost:9999/actor/outbox')
+    expect(body.type).toBe('OrderedCollection')
+    expect(mockSerializeOutboxCollection).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns AS2 JSON OrderedCollectionPage for a page path', async () => {
+    mockSerializeOutboxPage.mockResolvedValueOnce(
+      new Response(JSON.stringify({
+        '@context': 'https://www.w3.org/ns/activitystreams',
+        id: 'http://localhost:9999/actor/outbox/pages/1',
+        type: 'OrderedCollectionPage',
+        partOf: 'http://localhost:9999/actor/outbox',
+        orderedItems: ['https://other.example/activity/1']
+      }), { status: 200, headers: { 'Content-Type': 'application/activity+json' } })
+    )
+
+    const { default: handler } = await import('../../netlify/functions/actor-router.mts')
+    const req = new Request('http://localhost/actor/outbox/pages/1', {
+      method: 'GET',
+      headers: { accept: 'application/activity+json' }
+    })
+    const ctx = makeContext({
+      params: { actor: 'actor', page: 'pages/1' },
+      url: new URL('http://localhost/actor/outbox/pages/1')
+    })
+    const res = await handler(req, ctx)
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.type).toBe('OrderedCollectionPage')
+    expect(body.partOf).toBe('http://localhost:9999/actor/outbox')
+    expect(mockSerializeOutboxPage).toHaveBeenCalledTimes(1)
   })
 })

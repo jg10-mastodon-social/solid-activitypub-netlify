@@ -13,6 +13,10 @@ import { serializeFollowersCollection } from '../../src/services/serializeFollow
 import { serializeFollowersPage } from '../../src/services/serializeFollowersPage.js'
 import { serializeFollowingCollection } from '../../src/services/serializeFollowingCollection.js'
 import { serializeFollowingPage } from '../../src/services/serializeFollowingPage.js'
+import { serializeInboxCollection } from '../../src/services/serializeInboxCollection.js'
+import { serializeInboxPage } from '../../src/services/serializeInboxPage.js'
+import { serializeOutboxCollection } from '../../src/services/serializeOutboxCollection.js'
+import { serializeOutboxPage } from '../../src/services/serializeOutboxPage.js'
 import { rewriteBody } from '../../src/services/rewriteBody.js'
 import { buildActorSkeleton, applyProfile, parseProfileTurtle, getPublicKeyPem } from '../../src/services/actorDoc.js'
 
@@ -169,6 +173,54 @@ async function handleGet(
         const as2Response = page
           ? await serializeFollowingPage(fetchFn, targetUrl, podRootUrl, publicRootUrl)
           : await serializeFollowingCollection(fetchFn, podRootUrl, publicRootUrl)
+        const headers = new Headers(as2Response.headers)
+        for (const [k, v] of Object.entries(corsHeaders)) {
+          headers.set(k, v)
+        }
+        return new Response(as2Response.body, {
+          status: as2Response.status,
+          headers
+        })
+      } catch (error) {
+        console.error(`[router] GET ${collection} AS2 error: ${error}`)
+        return new Response(error instanceof Error ? error.message : 'Bad Gateway', {
+          status: 502,
+          headers: corsHeaders
+        })
+      }
+    }
+
+    if (collection === 'inbox') {
+      const publicRootUrl = `${config.baseUrl}/${actorName}/inbox`
+      const podRootUrl = `${config.solidStorageBaseUrl}${actorName}/inbox/`
+      try {
+        const as2Response = page
+          ? await serializeInboxPage(fetchFn, targetUrl, podRootUrl, publicRootUrl)
+          : await serializeInboxCollection(fetchFn, podRootUrl, publicRootUrl)
+        const headers = new Headers(as2Response.headers)
+        for (const [k, v] of Object.entries(corsHeaders)) {
+          headers.set(k, v)
+        }
+        return new Response(as2Response.body, {
+          status: as2Response.status,
+          headers
+        })
+      } catch (error) {
+        console.error(`[router] GET ${collection} AS2 error: ${error}`)
+        return new Response(error instanceof Error ? error.message : 'Bad Gateway', {
+          status: 502,
+          headers: corsHeaders
+        })
+      }
+    }
+
+    if (collection === 'outbox') {
+      const publicRootUrl = `${config.baseUrl}/${actorName}/outbox`
+      const podRootUrl = `${config.solidStorageBaseUrl}${actorName}/outbox/`
+      try {
+        const as2Response = page
+          ? await serializeOutboxPage(fetchFn, targetUrl, podRootUrl, publicRootUrl)
+          : await serializeOutboxCollection(fetchFn, podRootUrl, publicRootUrl)
         const headers = new Headers(as2Response.headers)
         for (const [k, v] of Object.entries(corsHeaders)) {
           headers.set(k, v)

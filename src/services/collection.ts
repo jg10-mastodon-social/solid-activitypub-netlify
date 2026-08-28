@@ -5,7 +5,7 @@ import { buildDeleteItemLinkPatch, buildInsertItemLinkPatch, buildUpdateLiteralP
 import { parseCollectionTurtle, parseFollowersRoot } from './rdfUtils.js'
 import { discoverMetaResourceUrl } from './solidHelpers.js'
 
-export type CollectionName = 'followers' | 'following'
+export type CollectionName = 'inbox' | 'outbox' | 'followers' | 'following'
 
 const AS_TOTALITEMS = 'https://www.w3.org/ns/activitystreams#totalItems'
 const XSD_NON_NEG_INT = 'http://www.w3.org/2001/XMLSchema#nonNegativeInteger'

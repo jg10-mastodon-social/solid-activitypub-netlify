@@ -5,6 +5,9 @@ const mockVerifyIncomingActivity = vi.fn()
 const mockHandleInboxActivity = vi.fn()
 const mockHandleSharedInboxActivity = vi.fn()
 
+const mockSerializeInboxCollection = vi.fn()
+const mockSerializeInboxPage = vi.fn()
+
 vi.mock('../../src/base-url.js', () => ({
   baseUrl: 'http://localhost:9999'
 }))
@@ -43,11 +46,22 @@ vi.mock('../../src/handlers/outbox.js', () => ({
 }))
 
 vi.mock('../../src/auth.js', () => ({
-  verifyDpopToken: vi.fn()
+  verifyDpopToken: vi.fn().mockResolvedValue({
+    success: true,
+    payload: { webid: 'http://localhost:9999/webid#me', client_id: 'client1', iss: 'https://issuer.example', iat: 0, exp: 0 }
+  })
 }))
 
 vi.mock('@soid/core', () => ({
   getAuthenticatedFetch: vi.fn()
+}))
+
+vi.mock('../../src/services/serializeInboxCollection.js', () => ({
+  serializeInboxCollection: mockSerializeInboxCollection
+}))
+
+vi.mock('../../src/services/serializeInboxPage.js', () => ({
+  serializeInboxPage: mockSerializeInboxPage
 }))
 
 beforeAll(() => {
@@ -321,5 +335,65 @@ describe('actor-router shared inbox POST /inbox', () => {
     const res = await handler(req, ctx)
 
     expect(res.status).toBe(405)
+  })
+})
+
+describe('actor-router inbox GET AS2 JSON', () => {
+  beforeEach(() => {
+    mockSerializeInboxCollection.mockReset()
+    mockSerializeInboxPage.mockReset()
+  })
+
+  it('returns AS2 JSON OrderedCollection when Accept is application/activity+json', async () => {
+    mockSerializeInboxCollection.mockResolvedValueOnce(
+      new Response(JSON.stringify({
+        '@context': 'https://www.w3.org/ns/activitystreams',
+        id: 'http://localhost:9999/actor/inbox',
+        type: 'OrderedCollection',
+        totalItems: 0,
+        first: 'http://localhost:9999/actor/inbox/pages/1'
+      }), { status: 200, headers: { 'Content-Type': 'application/activity+json' } })
+    )
+
+    const { default: handler } = await import('../../netlify/functions/actor-router.mts')
+    const req = new Request('http://localhost/actor/inbox', {
+      method: 'GET',
+      headers: { accept: 'application/activity+json' }
+    })
+    const res = await handler(req, makeContext())
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-type')).toBe('application/activity+json')
+    const body = await res.json()
+    expect(body.id).toBe('http://localhost:9999/actor/inbox')
+    expect(body.type).toBe('OrderedCollection')
+    expect(mockSerializeInboxCollection).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns AS2 JSON OrderedCollectionPage for a page path', async () => {
+    mockSerializeInboxPage.mockResolvedValueOnce(
+      new Response(JSON.stringify({
+        '@context': 'https://www.w3.org/ns/activitystreams',
+        id: 'http://localhost:9999/actor/inbox/pages/1',
+        type: 'OrderedCollectionPage',
+        partOf: 'http://localhost:9999/actor/inbox',
+        orderedItems: ['https://other.example/activity/1']
+      }), { status: 200, headers: { 'Content-Type': 'application/activity+json' } })
+    )
+
+    const { default: handler } = await import('../../netlify/functions/actor-router.mts')
+    const req = new Request('http://localhost/actor/inbox/pages/1', {
+      method: 'GET',
+      headers: { accept: 'application/activity+json' }
+    })
+    const ctx = makeContext({
+      params: { actor: 'actor', page: 'pages/1' },
+      url: new URL('http://localhost/actor/inbox/pages/1')
+    })
+    const res = await handler(req, ctx)
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.type).toBe('OrderedCollectionPage')
+    expect(body.partOf).toBe('http://localhost:9999/actor/inbox')
+    expect(mockSerializeInboxPage).toHaveBeenCalledTimes(1)
   })
 })
