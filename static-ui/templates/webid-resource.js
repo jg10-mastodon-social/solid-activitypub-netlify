@@ -12,16 +12,18 @@
  *   2. Moves its light-DOM children into the inner element so they are
  *      projected into `<pos-resource>`'s default `<slot>` exactly as
  *      they would be if written directly inside a `<pos-resource>`.
- *   3. Waits for the nearest `<pos-app>` to be defined, dispatches
- *      `pod-os:init` to obtain the `os` instance, and subscribes to
- *      `os.observeSession()`.
+ *   3. Dispatches `pod-os:init` on itself to obtain the `os` instance
+ *      and subscribes to `os.observeSession()`. Each session emission
+ *      writes `uri` to the inner element; the late consumer-notification
+ *      broadcast on `<pos-resource>` (`this.consumers.forEach(...)`)
+ *      updates the children once the fetch resolves.
  *
  *   On every session emission the inner `<pos-resource>`'s `uri` attribute
  *   is set to `session.webId` when logged in, or removed when logged out.
  *   The subscription is torn down on `disconnectedCallback`.
  *
- *   The element silently does nothing if no `<pos-app>` is present in the
- *   document or if the `pod-os:init` round-trip returns no `os` instance.
+ *   The element silently does nothing if the `pod-os:init` round-trip
+ *   returns no `os` instance.
  *
  * @example
  *   <pos-app restore-previous-session>
@@ -34,10 +36,6 @@
  *
  * @slot - Default slot. Children are projected into the inner
  *   `<pos-resource>`'s default slot.
- *
- * @dependency pos-app - Required. The element queries
- *   `document.querySelector("pos-app")` and dispatches `pod-os:init`
- *   (bubbles, composed, cancelable) to obtain the `os` instance.
  *
  * @dependency pos-resource - Required. The inner element is created via
  *   `document.createElement("pos-resource")` and must be defined by the
@@ -62,14 +60,8 @@ export class WebidResource extends HTMLElement {
     while (this.firstChild) inner.appendChild(this.firstChild);
     this.appendChild(inner);
 
-    await customElements.whenDefined("pos-app");
-    if (!this.isConnected) return;
-
-    const posApp = document.querySelector("pos-app");
-    if (!posApp) return;
-
     const os = await new Promise(resolve => {
-      posApp.dispatchEvent(new CustomEvent("pod-os:init", {
+      this.dispatchEvent(new CustomEvent("pod-os:init", {
         bubbles: true,
         composed: true,
         cancelable: true,

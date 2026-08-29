@@ -64,6 +64,17 @@ function makePosAppWithMockOs(): { posApp: PosAppStub; emit: (session: MockSessi
   return { posApp, emit, subscription, os };
 }
 
+// webid-resource dispatches `pod-os:init` on itself, not on <pos-app>, so
+// the mock must intercept on the webid-resource element directly.
+function makeMockOsInterceptor(wrapper: WebidResource): { emit: (session: MockSession) => void; subscription: MockSubscription; os: MockOs } {
+  const { os, emit, subscription } = makeMockOs();
+  wrapper.addEventListener("pod-os:init", (event) => {
+    (event as CustomEvent).detail(os);
+    event.stopImmediatePropagation();
+  });
+  return { emit, subscription, os };
+}
+
 // happy-dom does not upgrade an element created with `createElement` until
 // something triggers the upgrade (e.g. an `instanceof` check, a property
 // access on the prototype, or an upgrade hint). Force the upgrade before
@@ -112,9 +123,12 @@ describe("webid-resource custom element", () => {
   });
 
   it("sets uri on the inner <pos-resource> when the session reports a logged-in webId", async () => {
-    const { emit } = makePosAppWithMockOs();
     const wrapper = createWebidResource();
     wrapper.appendChild(document.createElement("span"));
+    // Install the pod-os:init interceptor BEFORE the wrapper is connected,
+    // so webid-resource's _init picks up the mock os when it dispatches
+    // pod-os:init on itself in connectedCallback.
+    const { emit } = makeMockOsInterceptor(wrapper);
     document.body.appendChild(wrapper);
     await new Promise(resolve => setTimeout(resolve, 100));
     const inner = wrapper.querySelector("pos-resource") as PosResourceStub;
@@ -126,9 +140,9 @@ describe("webid-resource custom element", () => {
   });
 
   it("removes uri from the inner <pos-resource> when the session reports logged-out", async () => {
-    const { emit } = makePosAppWithMockOs();
     const wrapper = createWebidResource();
     wrapper.appendChild(document.createElement("span"));
+    const { emit } = makeMockOsInterceptor(wrapper);
     document.body.appendChild(wrapper);
     await new Promise(resolve => setTimeout(resolve, 100));
     const inner = wrapper.querySelector("pos-resource") as PosResourceStub;
@@ -140,9 +154,9 @@ describe("webid-resource custom element", () => {
   });
 
   it("updates uri on the inner <pos-resource> when webId changes after a logged-out state", async () => {
-    const { emit } = makePosAppWithMockOs();
     const wrapper = createWebidResource();
     wrapper.appendChild(document.createElement("span"));
+    const { emit } = makeMockOsInterceptor(wrapper);
     document.body.appendChild(wrapper);
     await new Promise(resolve => setTimeout(resolve, 100));
     const inner = wrapper.querySelector("pos-resource") as PosResourceStub;
@@ -155,9 +169,9 @@ describe("webid-resource custom element", () => {
   });
 
   it("does nothing on logged-in emission when webId is missing", async () => {
-    const { emit } = makePosAppWithMockOs();
     const wrapper = createWebidResource();
     wrapper.appendChild(document.createElement("span"));
+    const { emit } = makeMockOsInterceptor(wrapper);
     document.body.appendChild(wrapper);
     await new Promise(resolve => setTimeout(resolve, 100));
     const inner = wrapper.querySelector("pos-resource") as PosResourceStub;
@@ -171,9 +185,9 @@ describe("webid-resource custom element", () => {
   });
 
   it("unsubscribes from the session on disconnect", async () => {
-    const { subscription } = makePosAppWithMockOs();
     const wrapper = createWebidResource();
     wrapper.appendChild(document.createElement("span"));
+    const { subscription } = makeMockOsInterceptor(wrapper);
     document.body.appendChild(wrapper);
     await new Promise(resolve => setTimeout(resolve, 100));
     wrapper.remove();
@@ -194,12 +208,15 @@ describe("webid-resource custom element", () => {
   });
 
   it("does not throw and does not set uri when pod-os:init returns undefined", async () => {
-    const posApp = document.createElement("pos-app") as PosAppStub;
-    document.body.appendChild(posApp);
     const wrapper = createWebidResource();
     const child = document.createElement("span");
     wrapper.appendChild(child);
     document.body.appendChild(wrapper);
+    // Stub pod-os:init to call detail(undefined) so os comes back falsy.
+    wrapper.addEventListener("pod-os:init", (event) => {
+      (event as CustomEvent).detail(undefined);
+      event.stopImmediatePropagation();
+    });
     await new Promise(resolve => setTimeout(resolve, 100));
     const inner = wrapper.querySelector("pos-resource");
     expect(inner).not.toBeNull();
