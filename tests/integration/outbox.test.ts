@@ -267,4 +267,25 @@ describe('actor-router outbox GET AS2 JSON', () => {
     expect(body.partOf).toBe('http://localhost:9999/actor/outbox')
     expect(mockSerializeOutboxPage).toHaveBeenCalledTimes(1)
   })
+
+  it('serves Turtle when Accept follows the rdflib.js default (Turtle q=1.0, ld+json q=0.9)', async () => {
+    const fetchFn = (await import('../../src/solidFetch.js')).createSolidFetch as unknown as ReturnType<typeof vi.fn>
+    const innerFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve('<http://localhost:9998/actor/outbox/> a <https://www.w3.org/ns/activitystreams#OrderedCollection> .'),
+      headers: new Headers({ 'content-type': 'text/turtle' })
+    })
+    fetchFn.mockResolvedValueOnce(innerFetch)
+
+    const { default: handler } = await import('../../netlify/functions/actor-router.mts')
+    const req = new Request('http://localhost/actor/outbox', {
+      method: 'GET',
+      headers: { accept: 'application/ld+json;q=0.9, text/turtle' }
+    })
+    const res = await handler(req, makeContext())
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-type')).toMatch(/text\/turtle/)
+    expect(mockSerializeOutboxCollection).not.toHaveBeenCalled()
+  })
 })

@@ -18,6 +18,7 @@ import { serializeInboxPage } from '../../src/services/serializeInboxPage.js'
 import { serializeOutboxCollection } from '../../src/services/serializeOutboxCollection.js'
 import { serializeOutboxPage } from '../../src/services/serializeOutboxPage.js'
 import { rewriteBody } from '../../src/services/rewriteBody.js'
+import { wantsAs2Json } from './wantsAs2Json.js'
 import { buildActorSkeleton, applyProfile, parseProfileTurtle, getPublicKeyPem } from '../../src/services/actorDoc.js'
 
 const routerFilename = fileURLToPath(import.meta.url)
@@ -85,13 +86,6 @@ function resolvePodTarget(
   if (!page) return base
   const hasTrailingSlash = pathname.endsWith('/')
   return `${base}${page}${hasTrailingSlash ? '/' : ''}`
-}
-
-function wantsAs2Json(acceptHeader: string | null): boolean {
-  if (!acceptHeader) return false
-  const lowered = acceptHeader.toLowerCase()
-  return lowered.includes('application/activity+json') ||
-    lowered.includes('application/ld+json')
 }
 
 function wantsHtml(acceptHeader: string | null): boolean {
