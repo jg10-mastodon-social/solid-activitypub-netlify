@@ -3,86 +3,92 @@
   <div slot="if-logged-in">
     <h3>Actors you control</h3>
     <webid-resource id="webid-loader">
-      <pos-list rel="http://www.w3.org/ns/solid/terms#privateTypeIndex" fetch>
-        <template>
-          <pos-list if-typeof="http://www.w3.org/ns/solid/terms#TypeRegistration">
-            <template>
-              <pos-switch>
-                <pos-case if-property="http://www.w3.org/ns/solid/terms#forClass" every-value-eq="https://www.w3.org/ns/activitystreams#Service">
+      <pos-switch>
+        <pos-case if-property="http://www.w3.org/ns/solid/terms#privateTypeIndex">
+          <template>
+            <pos-list rel="http://www.w3.org/ns/solid/terms#privateTypeIndex" fetch>
+              <template>
+                <pos-list if-typeof="http://www.w3.org/ns/solid/terms#TypeRegistration">
                   <template>
-                    <pos-list rel="http://www.w3.org/ns/solid/terms#instance" fetch>
-                      <template>
-                        <li>
-                          <pos-rich-link>
-                            <pos-label></pos-label>
-                          </pos-rich-link>
-                          <pos-type-badges></pos-type-badges>
-                        </li>
-                      </template>
-                    </pos-list>
+                    <pos-switch>
+                      <pos-case if-property="http://www.w3.org/ns/solid/terms#forClass" every-value-eq="https://www.w3.org/ns/activitystreams#Service">
+                        <template>
+                          <pos-list rel="http://www.w3.org/ns/solid/terms#instance" fetch>
+                            <template>
+                              <li>
+                                <pos-rich-link>
+                                  <pos-label></pos-label>
+                                </pos-rich-link>
+                                <pos-type-badges></pos-type-badges>
+                              </li>
+                            </template>
+                          </pos-list>
+                        </template>
+                      </pos-case>
+                      <pos-case if-property="http://www.w3.org/ns/solid/terms#forClass" every-value-eq="https://www.w3.org/ns/activitystreams#Person">
+                        <template>
+                          <pos-list rel="http://www.w3.org/ns/solid/terms#instance" fetch>
+                            <template>
+                              <li>
+                                <pos-rich-link>
+                                  <pos-label></pos-label>
+                                </pos-rich-link>
+                                <pos-type-badges></pos-type-badges>
+                              </li>
+                            </template>
+                          </pos-list>
+                        </template>
+                      </pos-case>
+                      <pos-case if-property="http://www.w3.org/ns/solid/terms#forClass" every-value-eq="https://www.w3.org/ns/activitystreams#Group">
+                        <template>
+                          <pos-list rel="http://www.w3.org/ns/solid/terms#instance" fetch>
+                            <template>
+                              <li>
+                                <pos-rich-link>
+                                  <pos-label></pos-label>
+                                </pos-rich-link>
+                                <pos-type-badges></pos-type-badges>
+                              </li>
+                            </template>
+                          </pos-list>
+                        </template>
+                      </pos-case>
+                      <pos-case if-property="http://www.w3.org/ns/solid/terms#forClass" every-value-eq="https://www.w3.org/ns/activitystreams#Organization">
+                        <template>
+                          <pos-list rel="http://www.w3.org/ns/solid/terms#instance" fetch>
+                            <template>
+                              <li>
+                                <pos-rich-link>
+                                  <pos-label></pos-label>
+                                </pos-rich-link>
+                                <pos-type-badges></pos-type-badges>
+                              </li>
+                            </template>
+                          </pos-list>
+                        </template>
+                      </pos-case>
+                      <pos-case if-property="http://www.w3.org/ns/solid/terms#forClass" every-value-eq="https://www.w3.org/ns/activitystreams#Application">
+                        <template>
+                          <pos-list rel="http://www.w3.org/ns/solid/terms#instance" fetch>
+                            <template>
+                              <li>
+                                <pos-rich-link>
+                                  <pos-label></pos-label>
+                                </pos-rich-link>
+                                <pos-type-badges></pos-type-badges>
+                              </li>
+                            </template>
+                          </pos-list>
+                        </template>
+                      </pos-case>
+                    </pos-switch>
                   </template>
-                </pos-case>
-                <pos-case if-property="http://www.w3.org/ns/solid/terms#forClass" every-value-eq="https://www.w3.org/ns/activitystreams#Person">
-                  <template>
-                    <pos-list rel="http://www.w3.org/ns/solid/terms#instance" fetch>
-                      <template>
-                        <li>
-                          <pos-rich-link>
-                            <pos-label></pos-label>
-                          </pos-rich-link>
-                          <pos-type-badges></pos-type-badges>
-                        </li>
-                      </template>
-                    </pos-list>
-                  </template>
-                </pos-case>
-                <pos-case if-property="http://www.w3.org/ns/solid/terms#forClass" every-value-eq="https://www.w3.org/ns/activitystreams#Group">
-                  <template>
-                    <pos-list rel="http://www.w3.org/ns/solid/terms#instance" fetch>
-                      <template>
-                        <li>
-                          <pos-rich-link>
-                            <pos-label></pos-label>
-                          </pos-rich-link>
-                          <pos-type-badges></pos-type-badges>
-                        </li>
-                      </template>
-                    </pos-list>
-                  </template>
-                </pos-case>
-                <pos-case if-property="http://www.w3.org/ns/solid/terms#forClass" every-value-eq="https://www.w3.org/ns/activitystreams#Organization">
-                  <template>
-                    <pos-list rel="http://www.w3.org/ns/solid/terms#instance" fetch>
-                      <template>
-                        <li>
-                          <pos-rich-link>
-                            <pos-label></pos-label>
-                          </pos-rich-link>
-                          <pos-type-badges></pos-type-badges>
-                        </li>
-                      </template>
-                    </pos-list>
-                  </template>
-                </pos-case>
-                <pos-case if-property="http://www.w3.org/ns/solid/terms#forClass" every-value-eq="https://www.w3.org/ns/activitystreams#Application">
-                  <template>
-                    <pos-list rel="http://www.w3.org/ns/solid/terms#instance" fetch>
-                      <template>
-                        <li>
-                          <pos-rich-link>
-                            <pos-label></pos-label>
-                          </pos-rich-link>
-                          <pos-type-badges></pos-type-badges>
-                        </li>
-                      </template>
-                    </pos-list>
-                  </template>
-                </pos-case>
-              </pos-switch>
-            </template>
-          </pos-list>
-        </template>
-      </pos-list>
+                </pos-list>
+              </template>
+            </pos-list>
+          </template>
+        </pos-case>
+      </pos-switch>
     </webid-resource>
   </div>
 </pos-login>
