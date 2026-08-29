@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { wantsAs2Json } from '../../netlify/functions/wantsAs2Json.js'
+import { wantsAs2Json } from '../../src/wantsAs2Json.js'
 
-describe('wantsAs2Json', () => {
+describe('wantsAs2Json vs turtle (default)', () => {
   it.each([
     [null, false],
     ['', false],
@@ -27,5 +27,36 @@ describe('wantsAs2Json', () => {
     ['application/ld+json;q=0, text/turtle', false],
   ])('wantsAs2Json(%j) === %s', (header, expected) => {
     expect(wantsAs2Json(header as string | null)).toBe(expected)
+  })
+})
+
+describe('wantsAs2Json vs html', () => {
+  it.each([
+    // null/empty → false (default to HTML)
+    [null, false],
+    ['', false],
+    // explicit JSON
+    ['application/activity+json', true],
+    ['application/ld+json', true],
+    // browser default
+    ['text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8', false],
+    // PodOS shape: text/turtle, application/ld+json, text/html → JSON (ld+json beats html on order)
+    ['text/turtle, application/ld+json, text/html', true],
+    // html-only → HTML
+    ['text/html', false],
+    // application/xhtml+xml counts as HTML
+    ['application/xhtml+xml', false],
+    // tied q, html earlier → HTML
+    ['text/html, application/activity+json', false],
+    // tied q, JSON earlier → JSON
+    ['application/activity+json, text/html', true],
+    // explicit q override: html beats ld+json
+    ['application/ld+json;q=0.5, text/html;q=0.9', false],
+    // explicit q override: ld+json beats html
+    ['application/ld+json;q=0.95, text/html;q=0.5', true],
+    // malformed q falls back to 1.0
+    ['application/ld+json;q=abc, text/html', true],
+  ])('wantsAs2Json(%j, "html") === %s', (header, expected) => {
+    expect(wantsAs2Json(header as string | null, 'html')).toBe(expected)
   })
 })

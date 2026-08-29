@@ -2,6 +2,14 @@ type AcceptEntry = { type: string; q: number; order: number }
 
 const AS2_JSON_TYPES = new Set(['application/activity+json', 'application/ld+json'])
 const TURTLE_TYPES = new Set(['text/turtle', 'text/n3'])
+const HTML_TYPES = new Set(['text/html', 'application/xhtml+xml'])
+
+const OPPOSING_FAMILIES = {
+  turtle: TURTLE_TYPES,
+  html: HTML_TYPES
+} as const
+
+export type OpposingFormat = keyof typeof OPPOSING_FAMILIES
 
 export function parseAcceptHeader(header: string): AcceptEntry[] {
   return header.split(',').map((part, idx) => {
@@ -34,13 +42,13 @@ function bestMatch(parsed: AcceptEntry[], family: Set<string>): AcceptEntry | nu
   return best
 }
 
-export function wantsAs2Json(acceptHeader: string | null): boolean {
+export function wantsAs2Json(acceptHeader: string | null, vs: OpposingFormat = 'turtle'): boolean {
   if (!acceptHeader) return false
   const parsed = parseAcceptHeader(acceptHeader)
   const as2 = bestMatch(parsed, AS2_JSON_TYPES)
-  const turtle = bestMatch(parsed, TURTLE_TYPES)
-  if (!as2 && !turtle) return false
+  const opposing = bestMatch(parsed, OPPOSING_FAMILIES[vs])
+  if (!as2 && !opposing) return false
   if (!as2) return false
-  if (!turtle) return true
-  return as2.q > turtle.q || (as2.q === turtle.q && as2.order < turtle.order)
+  if (!opposing) return true
+  return as2.q > opposing.q || (as2.q === opposing.q && as2.order < opposing.order)
 }

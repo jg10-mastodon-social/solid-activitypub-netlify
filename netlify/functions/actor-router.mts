@@ -18,7 +18,7 @@ import { serializeInboxPage } from '../../src/services/serializeInboxPage.js'
 import { serializeOutboxCollection } from '../../src/services/serializeOutboxCollection.js'
 import { serializeOutboxPage } from '../../src/services/serializeOutboxPage.js'
 import { rewriteBody } from '../../src/services/rewriteBody.js'
-import { wantsAs2Json } from './wantsAs2Json.js'
+import { wantsAs2Json } from '../../src/wantsAs2Json.js'
 import { buildActorSkeleton, applyProfile, parseProfileTurtle, getPublicKeyPem } from '../../src/services/actorDoc.js'
 
 const routerFilename = fileURLToPath(import.meta.url)
@@ -264,7 +264,7 @@ async function handleActorGet(
 ): Promise<Response> {
   if (!actor) return new Response('Unknown actor', { status: 404, headers: corsHeaders })
 
-  if (!wantsAs2Json(req.headers.get('Accept'))) {
+  if (!wantsAs2Json(req.headers.get('Accept'), 'html')) {
     try {
       const template = fs.readFileSync(actorPageTemplatePath, 'utf-8')
       const domain = config.baseUrl.replace(/^https?:\/\//, '')
