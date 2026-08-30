@@ -208,6 +208,11 @@ async function generateIdentity() {
   fs.copyFileSync(actorPageTemplateSrc, actorPageTemplateDst)
   console.log(`Written: ${actorPageTemplateDst}`)
 
+  const componentsSrc = path.join(staticUiDir, 'components')
+  const componentsDst = path.join(publicDir, 'components')
+  fs.cpSync(componentsSrc, componentsDst, { recursive: true })
+  console.log(`Copied: ${componentsSrc} -> ${componentsDst}`)
+
   const templatesSrc = path.join(staticUiDir, 'templates')
   const templatesDst = path.join(publicDir, 'templates')
   copyTemplatesExcludingSpecs(templatesSrc, templatesDst)
