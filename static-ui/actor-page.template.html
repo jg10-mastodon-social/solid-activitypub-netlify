@@ -29,10 +29,10 @@
     <script src="/templates/ImportHtml.js" defer></script>
   </head>
   <body>
-    <pos-app restore-previous-session>
-      <pos-router mode="pod">
-        <pos-resource uri="{{BASE_URL}}/{{ACTOR_NAME}}">
-          <ion-content class="ion-padding">
+    <ion-content class="ion-padding">
+      <pos-app restore-previous-session>
+        <pos-router mode="pod">
+          <pos-resource uri="{{BASE_URL}}/{{ACTOR_NAME}}">
             <h1>
               <pos-value
                 predicate="https://www.w3.org/ns/activitystreams#name"
@@ -54,20 +54,33 @@
                 ></import-html>
               </template>
             </pos-list>
+          </pos-resource>
+          <div>
             <pos-login>
-              <p slot="default">
-                Sign in with your WebID to list the actors you control.
-              </p>
               <div slot="if-logged-in">
+                <h3>Inbox</h3>
+                <pos-resource uri="{{BASE_URL}}/{{ACTOR_NAME}}">
+                  <pos-switch>
+                    <pos-case if-property="http://www.w3.org/ns/ldp#inbox">
+                      <template>
+                        <pos-list rel="http://www.w3.org/ns/ldp#inbox" fetch>
+                          <template>
+                            <import-html
+                              src="/templates/discussion/inbox.html"
+                            ></import-html>
+                          </template>
+                        </pos-list>
+                      </template>
+                    </pos-case>
+                  </pos-switch>
+                </pos-resource>
                 <import-html src="/templates/actor-controls.html"></import-html>
-		<h3>Inbox</h3>
-                <import-html src="/templates/discussion/inbox.html"></import-html>
               </div>
             </pos-login>
-          </ion-content>
-        </pos-resource>
-      </pos-router>
-    </pos-app>
+          </div>
+        </pos-router>
+      </pos-app>
+    </ion-content>
     <script type="module" src="/templates/webid-resource.js"></script>
     <script type="module" src="/templates/update-location.js"></script>
     <script type="module" src="/components/Boost.js"></script>
