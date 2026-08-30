@@ -54,7 +54,14 @@
                 ></import-html>
               </template>
             </pos-list>
-            <import-html src="/templates/actor-controls.html"></import-html>
+            <pos-login>
+              <p slot="default">
+                Sign in with your WebID to list the actors you control.
+              </p>
+              <div slot="if-logged-in">
+                <import-html src="/templates/actor-controls.html"></import-html>
+              </div>
+            </pos-login>
           </ion-content>
         </pos-resource>
       </pos-router>
