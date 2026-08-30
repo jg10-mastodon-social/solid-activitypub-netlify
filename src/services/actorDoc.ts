@@ -50,8 +50,7 @@ export function buildActorSkeleton(
       id: actor.keyId,
       owner: actor.url,
       publicKeyPem
-    },
-    manuallyApprovesFollowers: false
+    }
   }
 }
 
