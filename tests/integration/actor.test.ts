@@ -240,7 +240,7 @@ it('returns HTML for GET /:actor when Accept includes text/html', async () => {
       expect(body).toContain('pos-value')
       expect(body).toContain('activitystreams#outbox')
       expect(body).toContain('<pos-app restore-previous-session>')
-      expect(body).toContain('<import-html src="/templates/actor-controls.html">')
+      expect(body).toContain('<import-html src="/templates/actor-controls/actor-controls.html">')
       expect(body).toContain('src="/components/webid-resource.js"')
       expect(body).toContain('src="/templates/update-location.js"')
     })
