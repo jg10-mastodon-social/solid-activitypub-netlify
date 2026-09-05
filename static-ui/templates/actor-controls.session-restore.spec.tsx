@@ -4,7 +4,7 @@ import { render } from "@stencil/vitest";
 import { BehaviorSubject } from "rxjs";
 import { PodOS, type PodOsSession } from "@pod-os/core";
 import sessionStore from "@pod-os/elements/dist/collection/store/session.js";
-import "../../static-ui/templates/webid-resource.js";
+import "../../static-ui/components/webid-resource.js";
 import { readFileSync } from "fs";
 import { join } from "path";
 
