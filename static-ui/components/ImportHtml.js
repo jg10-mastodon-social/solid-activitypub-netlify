@@ -20,7 +20,7 @@
  *
  * Wiring: registered on module load via the trailing `customElements.define`
  * call. Typically loaded as a deferred script — e.g.
- * `<script src="/templates/ImportHtml.js" defer></script>` — from any page
+ * `<script src="/components/ImportHtml.js" defer></script>` — from any page
  * that uses the element.
  */
 class ImportHtml extends HTMLElement {

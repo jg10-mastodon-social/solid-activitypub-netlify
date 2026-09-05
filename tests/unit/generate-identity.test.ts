@@ -222,7 +222,8 @@ describe('generate-identity', () => {
     const landingPath = path.join(publicDir, 'index.html')
     const actorPageTemplatePath = path.join(publicDir, 'actor-page.template.html')
     const templatesDir = path.join(publicDir, 'templates')
-    const importHtmlPath = path.join(templatesDir, 'ImportHtml.js')
+    const componentsDir = path.join(publicDir, 'components')
+    const importHtmlPath = path.join(componentsDir, 'ImportHtml.js')
     const updateLocationPath = path.join(templatesDir, 'update-location.js')
     const outboxFragmentPath = path.join(templatesDir, 'discussion', 'outbox.html')
     const headerFragmentPath = path.join(templatesDir, 'discussion', 'header.html')
@@ -284,7 +285,7 @@ describe('generate-identity', () => {
       expect(content).toContain('{{DOMAIN}}')
     })
 
-    it('copies public/templates/ImportHtml.js', async () => {
+    it('copies public/components/ImportHtml.js', async () => {
       await runScript()
 
       expect(fs.existsSync(importHtmlPath)).toBe(true)

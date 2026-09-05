@@ -165,7 +165,7 @@ Served by the `webfinger` Netlify function. Returns JRD JSON describing the matc
 A browser-friendly interface is shipped as static assets in `static-ui/` and copied into `public/` by `scripts/generate-identity.ts` on every build:
 
 - `GET /` — landing page (`public/index.html`) that lists every actor in `ACTOR_NAME` with a `@name@domain` link to its per-actor page, and embeds `templates/actor-controls.html` so visitors can sign in with their WebID and see the actors they control.
-- `GET /:actor` with `Accept: text/html` — per-actor page (`actor-page.template.html`) rendered by Pod-OS Elements. The page reads the actor JSON-LD at `${BASE_URL}/${actorName}` to display `as:name` and `as:summary`, then follows `as:outbox` to walk the paged outbox collection (the existing outbox GET endpoint already serves Turtle with public-URL rewriting). The page uses Ionic for layout and the `<import-html>` custom element (`public/templates/ImportHtml.js`) to inline Pod-OS fragment templates at `public/templates/{actor-controls,discussion/{header,outbox}}.html`. The `<pos-app>` wrapper has the `restore-previous-session` attribute so visitors stay signed in across page reloads; the same `actor-controls` fragment is mounted at the top so authenticated visitors can navigate to other actors they control.
+- `GET /:actor` with `Accept: text/html` — per-actor page (`actor-page.template.html`) rendered by Pod-OS Elements. The page reads the actor JSON-LD at `${BASE_URL}/${actorName}` to display `as:name` and `as:summary`, then follows `as:outbox` to walk the paged outbox collection (the existing outbox GET endpoint already serves Turtle with public-URL rewriting). The page uses Ionic for layout and the `<import-html>` custom element (`public/components/ImportHtml.js`) to inline Pod-OS fragment templates at `public/templates/{actor-controls,discussion/{header,outbox}}.html`. The `<pos-app>` wrapper has the `restore-previous-session` attribute so visitors stay signed in across page reloads; the same `actor-controls` fragment is mounted at the top so authenticated visitors can navigate to other actors they control.
 
 UI sources live in `static-ui/` (tracked). Operators wanting to customise the landing page, per-actor template, or login fragment can edit those files; the next build overwrites the copies in `public/`.
 
@@ -197,9 +197,9 @@ After signing in, the actor-controls fragment renders two rows: one for `https:/
 
 ### Custom web components
 
-Web components shipped from `static-ui/templates/`, copied into `public/templates/` at build time.
+Web components shipped from `static-ui/components/`, copied into `public/components/` at build time.
 
-- [`<import-html>`](static-ui/templates/ImportHtml.js) — used in `actor-page.template.html` to inline Pod-OS fragment templates.
+- [`<import-html>`](static-ui/components/ImportHtml.js) — used in `actor-page.template.html` to inline Pod-OS fragment templates.
 
 ## Testing
 
