@@ -248,7 +248,7 @@ describe('generate-identity', () => {
       expect(landingContent).toContain('<pos-router mode="pod">')
       expect(landingContent).toContain('<pos-resource uri="http://localhost:9999/">')
       expect(landingContent).toContain('<import-html src="/templates/actor-controls/actor-controls.html">')
-      expect(landingContent).toContain('src="/components/webid-resource.js"')
+      expect(landingContent).toContain('src="/components/WebidResource.js"')
       expect(landingContent).toContain('<ul id="actors">')
       expect(landingContent).not.toContain('{{')
 
@@ -264,7 +264,7 @@ describe('generate-identity', () => {
       expect(fragmentContent).toContain('https://www.w3.org/ns/activitystreams#Organization')
       expect(fragmentContent).toContain('https://www.w3.org/ns/activitystreams#Application')
 
-      const jsPath = path.join(publicDir, 'components', 'webid-resource.js')
+      const jsPath = path.join(publicDir, 'components', 'WebidResource.js')
       expect(fs.existsSync(jsPath)).toBe(true)
     })
 

@@ -2,7 +2,7 @@ import { vi, describe, it, expect, beforeEach } from "vitest";
 import { render } from "@stencil/vitest";
 import { readFileSync } from "fs";
 import { join } from "path";
-import "../../static-ui/components/webid-resource.js";
+import "../../static-ui/components/WebidResource.js";
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);

@@ -32,7 +32,7 @@ class PosAppStub extends HTMLElement {
 customElements.define("pos-resource", PosResourceStub);
 customElements.define("pos-app", PosAppStub);
 
-import { WebidResource } from "../../static-ui/components/webid-resource.js";
+import { WebidResource } from "../../static-ui/components/WebidResource.js";
 
 beforeEach(() => {
   document.body.innerHTML = "";
