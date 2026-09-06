@@ -16,15 +16,15 @@ interface MockOs {
 
 class PosResourceStub extends HTMLElement {}
 class PosAppStub extends HTMLElement {
+  private _mockOs: MockOs | null = null;
   constructor() {
     super();
-    this._mockOs = null;
-    this.addEventListener("pod-os:init", (event) => {
-      const detail = event.detail;
+    this.addEventListener("pod-os:init", (event: Event) => {
+      const detail = (event as CustomEvent).detail as (os: MockOs | null) => void;
       detail(this._mockOs);
     });
   }
-  setMockOs(os) {
+  setMockOs(os: MockOs | null) {
     this._mockOs = os;
   }
 }
@@ -32,6 +32,7 @@ class PosAppStub extends HTMLElement {
 customElements.define("pos-resource", PosResourceStub);
 customElements.define("pos-app", PosAppStub);
 
+// @ts-expect-error vendored component has no type declarations
 import { WebidResource } from "../../static-ui/components/WebidResource.js";
 
 beforeEach(() => {
@@ -68,7 +69,7 @@ function makePosAppWithMockOs(): { posApp: PosAppStub; emit: (session: MockSessi
 // the mock must intercept on the webid-resource element directly.
 function makeMockOsInterceptor(wrapper: WebidResource): { emit: (session: MockSession) => void; subscription: MockSubscription; os: MockOs } {
   const { os, emit, subscription } = makeMockOs();
-  wrapper.addEventListener("pod-os:init", (event) => {
+  wrapper.addEventListener("pod-os:init", (event: Event) => {
     (event as CustomEvent).detail(os);
     event.stopImmediatePropagation();
   });
@@ -213,7 +214,7 @@ describe("webid-resource custom element", () => {
     wrapper.appendChild(child);
     document.body.appendChild(wrapper);
     // Stub pod-os:init to call detail(undefined) so os comes back falsy.
-    wrapper.addEventListener("pod-os:init", (event) => {
+    wrapper.addEventListener("pod-os:init", (event: Event) => {
       (event as CustomEvent).detail(undefined);
       event.stopImmediatePropagation();
     });
