@@ -59,6 +59,48 @@ function parseActorNames(raw: string | undefined): string[] {
   return names
 }
 
+function loadExistingObjectLiteral(filePath: string): Record<string, unknown> {
+  if (!fs.existsSync(filePath)) return {}
+  const src = fs.readFileSync(filePath, 'utf-8')
+  const eqIdx = src.indexOf('=')
+  if (eqIdx === -1) return {}
+  const startIdx = src.indexOf('{', eqIdx)
+  if (startIdx === -1) return {}
+
+  let depth = 0
+  let quote: '"' | "'" | '`' | null = null
+  let endIdx = -1
+  for (let i = startIdx; i < src.length; i++) {
+    const ch = src[i]
+    if (quote) {
+      if (ch === '\\') { i++; continue }
+      if (ch === quote) quote = null
+      continue
+    }
+    if (ch === '"' || ch === "'" || ch === '`') {
+      quote = ch as '"' | "'" | '`'
+      continue
+    }
+    if (ch === '{') depth++
+    else if (ch === '}') {
+      depth--
+      if (depth === 0) { endIdx = i; break }
+    }
+  }
+
+  if (endIdx === -1 || depth !== 0) {
+    console.warn(`Could not locate object literal in ${filePath}; starting with empty map.`)
+    return {}
+  }
+
+  try {
+    return JSON.parse(src.slice(startIdx, endIdx + 1)) as Record<string, unknown>
+  } catch (err) {
+    console.warn(`Could not parse existing ${filePath} (${(err as Error).message}); starting with empty map.`)
+    return {}
+  }
+}
+
 function copyTemplatesExcludingSpecs(srcDir: string, dstDir: string): void {
   fs.mkdirSync(dstDir, { recursive: true })
   for (const entry of fs.readdirSync(srcDir, { withFileTypes: true })) {
@@ -156,16 +198,34 @@ async function generateIdentity() {
   console.log('Generating actor documents, keys, and webfinger data')
   const actorNames = parseActorNames(process.env.ACTOR_NAME)
   const domain = (baseUrl as string).replace(/^https?:\/\//, '')
-  const actorKeys: Record<string, Record<string, unknown>> = {}
-  const webfingerEntries: Record<string, unknown> = {}
+
+  // Reuse existing per-actor signing keys when present so that remote servers
+  // don't invalidate cached HTTP signatures across deploys. Only keys for
+  // newly-listed actor names are generated.
+  const existingActorKeys = loadExistingObjectLiteral(actorKeysPath) as Record<string, Record<string, unknown>>
+  const actorKeys: Record<string, Record<string, unknown>> = { ...existingActorKeys }
+
+  // Build fresh webfinger entries for the currently-configured actors so URLs
+  // track the current BASE_URL. Entries from the previous file that point at
+  // actors no longer present in ACTOR_NAME are preserved unchanged.
+  const existingWebfingerEntries = loadExistingObjectLiteral(webfingerDataPath)
+  const webfingerEntries: Record<string, unknown> = { ...existingWebfingerEntries }
+
+  let reusedActorCount = 0
+  let generatedActorCount = 0
 
   for (const actorName of actorNames) {
-    const { privateKey: actorPrivateKey } = await generateKeyPair('RS256')
-    const actorPrivateJwk = await exportJWK(actorPrivateKey)
-
     const actorUrl = `${baseUrl}/${actorName}`
 
-    actorKeys[actorName] = actorPrivateJwk
+    if (actorKeys[actorName]) {
+      console.log(`actor-keys: reusing existing key for "${actorName}"`)
+      reusedActorCount++
+    } else {
+      const { privateKey: actorPrivateKey } = await generateKeyPair('RS256')
+      const actorPrivateJwk = await exportJWK(actorPrivateKey)
+      actorKeys[actorName] = actorPrivateJwk
+      generatedActorCount++
+    }
 
     const resource = `acct:${actorName}@${domain}`
     webfingerEntries[resource] = {
@@ -180,6 +240,8 @@ async function generateIdentity() {
       ]
     }
   }
+
+  console.log(`actor-keys: ${reusedActorCount} reused, ${generatedActorCount} newly generated`)
 
   fs.writeFileSync(actorKeysPath, `export const actorKeys: Record<string, Record<string, unknown>> = ${JSON.stringify(actorKeys, null, 2)}\n`)
   console.log(`Written: ${actorKeysPath}`)

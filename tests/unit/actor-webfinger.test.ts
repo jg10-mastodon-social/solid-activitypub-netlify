@@ -84,6 +84,49 @@ describe('actor and webfinger', () => {
       expect(content).toContain('"alice"')
       expect(content).toContain('"bob"')
     })
+
+    it('preserves existing actor keys when actor name already exists', async () => {
+      const seedKey = { kty: 'RSA', e: 'AQAB', n: 'seeded-n-value', d: 'seeded-d', p: 'seeded-p', q: 'seeded-q', dp: 'seeded-dp', dq: 'seeded-dq', qi: 'seeded-qi' }
+      const seedContent = `export const actorKeys: Record<string, Record<string, unknown>> = ${JSON.stringify({ alice: seedKey }, null, 2)}\n`
+      fs.writeFileSync(actorKeysPath, seedContent)
+
+      await runScript(undefined, 'production', 'alice')
+
+      const content = fs.readFileSync(actorKeysPath, 'utf-8')
+      expect(content).toContain('"alice"')
+      expect(content).toContain('"n": "seeded-n-value"')
+      expect(content).toContain('"d": "seeded-d"')
+      expect(content).toContain('"p": "seeded-p"')
+      expect(content).toContain('"q": "seeded-q"')
+      expect(content).toContain('"qi": "seeded-qi"')
+    })
+
+    it('generates a fresh key for a newly-added actor name', async () => {
+      const seedKey = { kty: 'RSA', e: 'AQAB', n: 'seeded-n-value', d: 'seeded-d', p: 'seeded-p', q: 'seeded-q', dp: 'seeded-dp', dq: 'seeded-dq', qi: 'seeded-qi' }
+      const seedContent = `export const actorKeys: Record<string, Record<string, unknown>> = ${JSON.stringify({ alice: seedKey }, null, 2)}\n`
+      fs.writeFileSync(actorKeysPath, seedContent)
+
+      await runScript(undefined, 'production', 'alice,bob')
+
+      const content = fs.readFileSync(actorKeysPath, 'utf-8')
+      expect(content).toContain('"alice"')
+      expect(content).toContain('"bob"')
+      expect(content).toContain('"n": "seeded-n-value"')
+      expect(content).not.toContain('"n": "seeded-bob"')
+    })
+
+    it('keeps actor keys for names no longer listed in ACTOR_NAME', async () => {
+      const seedKey = { kty: 'RSA', e: 'AQAB', n: 'seeded-n-value', d: 'seeded-d', p: 'seeded-p', q: 'seeded-q', dp: 'seeded-dp', dq: 'seeded-dq', qi: 'seeded-qi' }
+      const seedContent = `export const actorKeys: Record<string, Record<string, unknown>> = ${JSON.stringify({ retired: seedKey }, null, 2)}\n`
+      fs.writeFileSync(actorKeysPath, seedContent)
+
+      await runScript(undefined, 'production', 'alice')
+
+      const content = fs.readFileSync(actorKeysPath, 'utf-8')
+      expect(content).toContain('"alice"')
+      expect(content).toContain('"retired"')
+      expect(content).toContain('"n": "seeded-n-value"')
+    })
   })
 
   describe('webfinger data', () => {
@@ -110,6 +153,31 @@ describe('actor and webfinger', () => {
       const content = fs.readFileSync(webfingerDataPath, 'utf-8')
       expect(content).toContain('https://example.com/myactor')
       expect(content).toContain('application/activity+json')
+    })
+
+    it('regenerates webfinger entries for currently-configured actors under current BASE_URL', async () => {
+      const seedEntry = { subject: 'acct:alice@example.com', aliases: ['https://old.example/alice'], links: [{ rel: 'self', type: 'application/activity+json', href: 'https://old.example/alice' }] }
+      const seedContent = `export const webfingerEntries: Record<string, unknown> = ${JSON.stringify({ 'acct:alice@example.com': seedEntry }, null, 2)}\n`
+      fs.writeFileSync(webfingerDataPath, seedContent)
+
+      await runScript(undefined, 'production', 'alice')
+
+      const content = fs.readFileSync(webfingerDataPath, 'utf-8')
+      expect(content).toContain('acct:alice@example.com')
+      expect(content).toContain('https://example.com/alice')
+      expect(content).not.toContain('https://old.example/alice')
+    })
+
+    it('preserves webfinger entries for actors no longer in ACTOR_NAME', async () => {
+      const seedEntry = { subject: 'acct:retired@old.example', aliases: ['https://old.example/retired'], links: [{ rel: 'self', type: 'application/activity+json', href: 'https://old.example/retired' }] }
+      const seedContent = `export const webfingerEntries: Record<string, unknown> = ${JSON.stringify({ 'acct:retired@old.example': seedEntry }, null, 2)}\n`
+      fs.writeFileSync(webfingerDataPath, seedContent)
+
+      await runScript(undefined, 'production', 'alice')
+
+      const content = fs.readFileSync(webfingerDataPath, 'utf-8')
+      expect(content).toContain('acct:retired@old.example')
+      expect(content).toContain('acct:alice@example.com')
     })
   })
 
