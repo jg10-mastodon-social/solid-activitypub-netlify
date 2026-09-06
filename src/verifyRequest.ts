@@ -155,12 +155,18 @@ export async function verifyIncomingActivity(
     const status = e instanceof Error && typeof (e as Error & { actorFetchStatus?: number }).actorFetchStatus === 'number'
       ? (e as Error & { actorFetchStatus?: number }).actorFetchStatus
       : undefined
+    const bodySnippet = e instanceof Error && typeof (e as Error & { actorFetchBody?: string }).actorFetchBody === 'string'
+      ? (e as Error & { actorFetchBody?: string }).actorFetchBody
+      : undefined
+    const cause = bodySnippet && bodySnippet.length > 0
+      ? `${underlyingMessage} body=${bodySnippet}`
+      : underlyingMessage
     throw new HttpSignatureError('Failed to fetch actor key', 502, {
       code: 'actor_fetch_failed',
       keyId: parsed.keyId,
       actorUrl,
       actorFetchStatus: status,
-      cause: underlyingMessage
+      cause
     })
   }
 

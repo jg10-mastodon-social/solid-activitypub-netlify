@@ -226,6 +226,43 @@ describe('fetchActorPublicKey', () => {
     await expect(fetchActorPublicKey('https://example.com/actor', mockFetch)).rejects.toThrow('Failed to fetch actor')
   })
 
+  it('attaches actorFetchBody snippet when actor fetch returns !ok with a body', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 502,
+      statusText: 'Bad Gateway',
+      text: () => Promise.resolve('<html><body>Bad Gateway</body></html>')
+    })
+    const { fetchActorPublicKey } = await import('../../src/verifyHttpSignature.js')
+    try {
+      await fetchActorPublicKey('https://example.com/actor', mockFetch)
+      throw new Error('expected throw')
+    } catch (e) {
+      expect((e as Error & { actorFetchStatus?: number }).actorFetchStatus).toBe(502)
+      const body = (e as Error & { actorFetchBody?: string }).actorFetchBody
+      expect(typeof body).toBe('string')
+      expect(body).toContain('Bad Gateway')
+      expect(body!.length).toBeLessThanOrEqual(200)
+    }
+  })
+
+  it('falls back to empty body when actor fetch returns !ok with no readable body', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      statusText: 'Internal Server Error',
+      text: () => Promise.reject(new Error('stream broken'))
+    })
+    const { fetchActorPublicKey } = await import('../../src/verifyHttpSignature.js')
+    try {
+      await fetchActorPublicKey('https://example.com/actor', mockFetch)
+      throw new Error('expected throw')
+    } catch (e) {
+      expect((e as Error & { actorFetchStatus?: number }).actorFetchStatus).toBe(500)
+      expect((e as Error & { actorFetchBody?: string }).actorFetchBody).toBe('')
+    }
+  })
+
   it('should throw when actor has no publicKey', async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,

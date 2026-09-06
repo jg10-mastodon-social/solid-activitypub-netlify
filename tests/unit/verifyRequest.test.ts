@@ -835,6 +835,39 @@ describe('verifyIncomingActivity', () => {
       }
     })
 
+    it('code=actor_fetch_failed: propagates actor-fetch body snippet via cause', async () => {
+      const { verifyIncomingActivity } = await import('../../src/verifyRequest.js')
+      const { createHash } = await import('node:crypto')
+      const activity = { type: 'Create', actor: 'https://other.example/actor' }
+      const body = JSON.stringify(activity)
+      const raw = new TextEncoder().encode(body)
+      const digest = 'SHA-256=' + createHash('sha256').update(raw).digest('base64')
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 502,
+        statusText: 'Bad Gateway',
+        text: () => Promise.resolve('<html><body>upstream timed out</body></html>')
+      })
+      const req = new Request('https://example.com/inbox', {
+        method: 'POST',
+        headers: {
+          'Signature': 'keyId="https://other.example/actor#main-key",algorithm="rsa-sha256",headers="(request-target) host date digest content-type",signature="abc"',
+          'Date': new Date().toUTCString(),
+          'Digest': digest,
+          'Content-Type': 'application/activity+json'
+        },
+        body
+      })
+      try {
+        await verifyIncomingActivity(req, activity, raw, mockFetch)
+        throw new Error('expected throw')
+      } catch (e) {
+        const ctx = (e as any).context
+        expect(ctx.code).toBe('actor_fetch_failed')
+        expect(ctx.cause).toContain('upstream timed out')
+      }
+    })
+
     it('code=keyid_mismatch: when fetched publicKey.id does not match the parsed keyId', async () => {
       const { verifyIncomingActivity } = await import('../../src/verifyRequest.js')
       const { createHash } = await import('node:crypto')

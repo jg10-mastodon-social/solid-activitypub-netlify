@@ -127,8 +127,18 @@ export async function fetchActorPublicKey(
       })
 
   if (!response.ok) {
+    let bodySnippet = ''
+    try {
+      if (typeof response.text === 'function') {
+        const text = await response.text()
+        bodySnippet = text.slice(0, 200).replace(/\s+/g, ' ')
+      }
+    } catch {
+      bodySnippet = ''
+    }
     const err = new Error(`Failed to fetch actor: ${response.status}`)
     ;(err as Error & { actorFetchStatus?: number }).actorFetchStatus = response.status
+    ;(err as Error & { actorFetchBody?: string }).actorFetchBody = bodySnippet
     throw err
   }
 
