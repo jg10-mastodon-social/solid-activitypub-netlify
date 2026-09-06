@@ -240,7 +240,7 @@ describe('generate-identity', () => {
       expect(content).not.toContain('{{')
     })
 
-    it('wires the login fragment into public/index.html', async () => {
+    it('wires the actor-controls fragment into public/index.html', async () => {
       await runScript(undefined, undefined, 'alice')
 
       const landingContent = fs.readFileSync(landingPath, 'utf-8')
@@ -254,10 +254,11 @@ describe('generate-identity', () => {
 
       const fragmentPath = path.join(publicDir, 'templates', 'actor-controls', 'actor-controls.html')
       const fragmentContent = fs.readFileSync(fragmentPath, 'utf-8')
-      expect(fragmentContent).toContain('<pos-login>')
-      expect(fragmentContent).toContain('<webid-resource')
+      expect(fragmentContent).toContain('<webid-resource id="webid-loader">')
+      expect(fragmentContent).not.toContain('<pos-login>')
       expect(fragmentContent).not.toContain('<pos-resource id="webid-loader">')
       expect(fragmentContent).toContain('<pos-type-badges>')
+      expect(fragmentContent).toContain('http://www.w3.org/ns/solid/terms#privateTypeIndex')
       expect(fragmentContent).toContain('https://www.w3.org/ns/activitystreams#Service')
       expect(fragmentContent).toContain('https://www.w3.org/ns/activitystreams#Person')
       expect(fragmentContent).toContain('https://www.w3.org/ns/activitystreams#Group')
@@ -323,7 +324,7 @@ describe('generate-identity', () => {
       const outbox = fs.readFileSync(outboxFragmentPath, 'utf-8')
       expect(outbox).toContain('activitystreams#first')
       const header = fs.readFileSync(headerFragmentPath, 'utf-8')
-      expect(header).toContain('Discussion')
+      expect(header).toContain('Activity')
     })
   })
 })
