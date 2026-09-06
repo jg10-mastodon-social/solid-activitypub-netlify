@@ -6,7 +6,8 @@ import {
   fetchActorPublicKey,
   buildSignatureBase,
   verifySignature,
-  verifyActorBinding
+  verifyActorBinding,
+  type ActorFetchSigner
 } from './verifyHttpSignature.js'
 import type { SolidFetch } from './types.js'
 
@@ -82,7 +83,8 @@ export async function verifyIncomingActivity(
   req: Request,
   activity: Record<string, unknown>,
   rawBody: ArrayBuffer | Uint8Array,
-  fetchFn: SolidFetch
+  fetchFn: SolidFetch,
+  signer?: ActorFetchSigner
 ): Promise<{ keyId: string }> {
   const signatureHeader = req.headers.get('Signature')
   if (!signatureHeader) {
@@ -140,7 +142,7 @@ export async function verifyIncomingActivity(
   const actorUrl = parsed.keyId.split('#')[0]
   let actorKey
   try {
-    actorKey = await fetchActorPublicKey(actorUrl, fetchFn)
+    actorKey = await fetchActorPublicKey(actorUrl, fetchFn, signer)
   } catch (e) {
     if (e instanceof Error && e.message.includes('SSRF')) {
       throw new HttpSignatureError('Actor URL blocked', 502, {

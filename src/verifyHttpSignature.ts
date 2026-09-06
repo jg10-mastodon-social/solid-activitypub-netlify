@@ -2,6 +2,7 @@ import { createHash, createVerify } from 'node:crypto'
 
 import type { SolidFetch } from './types.js'
 import { isBlockedUrl } from './ssrf.js'
+import { signActorFetchRequest } from './signing.js'
 
 export interface ParsedSignature {
   keyId: string
@@ -107,17 +108,26 @@ export interface ActorKeyResult {
   publicKeyPem: string
 }
 
+export interface ActorFetchSigner {
+  keyId: string
+  actorUrl: string
+  baseUrl: string
+}
+
 export async function fetchActorPublicKey(
   actorUrl: string,
-  fetchFn: SolidFetch
+  fetchFn: SolidFetch,
+  signer?: ActorFetchSigner
 ): Promise<ActorKeyResult> {
   if (isBlockedUrl(actorUrl)) {
     throw new Error('SSRF: Actor URL points to private network')
   }
 
-  const response = await fetchFn(actorUrl, {
-    headers: { accept: 'application/activity+json, application/ld+json, application/json' }
-  })
+  const response = signer
+    ? await signActorFetchRequest(actorUrl, signer.keyId, signer.actorUrl, signer.baseUrl, fetchFn)
+    : await fetchFn(actorUrl, {
+        headers: { accept: 'application/activity+json, application/ld+json, application/json' }
+      })
 
   if (!response.ok) {
     const err = new Error(`Failed to fetch actor: ${response.status}`)

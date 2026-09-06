@@ -234,6 +234,71 @@ describe('fetchActorPublicKey', () => {
     const { fetchActorPublicKey } = await import('../../src/verifyHttpSignature.js')
     await expect(fetchActorPublicKey('https://example.com/actor', mockFetch)).rejects.toThrow('publicKey')
   })
+
+  it('should send a signed GET when a signer is provided', async () => {
+    const pem = '-----BEGIN PUBLIC KEY-----\nMIIBIjANBg...\n-----END PUBLIC KEY-----'
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        id: 'https://other.example/actor',
+        publicKey: {
+          id: 'https://other.example/actor#main-key',
+          owner: 'https://other.example/actor',
+          publicKeyPem: pem
+        }
+      })
+    })
+    const { fetchActorPublicKey } = await import('../../src/verifyHttpSignature.js')
+    const result = await fetchActorPublicKey('https://other.example/actor', mockFetch, {
+      keyId: 'https://example.com/actor#main-key',
+      actorUrl: 'https://example.com/actor',
+      baseUrl: 'https://example.com'
+    })
+    expect(result.keyId).toBe('https://other.example/actor#main-key')
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://other.example/actor',
+      expect.objectContaining({
+        method: 'GET',
+        headers: expect.objectContaining({
+          'Signature': expect.stringMatching(/keyId="https:\/\/example\.com\/actor#main-key"/),
+          'Date': expect.any(String),
+          'Accept': expect.stringContaining('application/activity+json')
+        })
+      })
+    )
+    expect(mockFetch.mock.calls[0][1].headers['Digest']).toBeUndefined()
+  })
+
+  it('should still report 401 via actorFetchStatus when the signed fetch is rejected', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({ ok: false, status: 401 })
+    const { fetchActorPublicKey } = await import('../../src/verifyHttpSignature.js')
+    try {
+      await fetchActorPublicKey('https://other.example/actor', mockFetch, {
+        keyId: 'https://example.com/actor#main-key',
+        actorUrl: 'https://example.com/actor',
+        baseUrl: 'https://example.com'
+      })
+      throw new Error('expected throw')
+    } catch (e) {
+      expect((e as Error).message).toContain('Failed to fetch actor')
+      expect((e as Error & { actorFetchStatus?: number }).actorFetchStatus).toBe(401)
+    }
+  })
+
+  it('should fall back to unsigned fetch when no signer is provided', async () => {
+    const pem = '-----BEGIN PUBLIC KEY-----\nMIIBIjANBg...\n-----END PUBLIC KEY-----'
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        id: 'https://other.example/actor',
+        publicKey: { id: 'https://other.example/actor#main-key', publicKeyPem: pem }
+      })
+    })
+    const { fetchActorPublicKey } = await import('../../src/verifyHttpSignature.js')
+    await fetchActorPublicKey('https://other.example/actor', mockFetch)
+    const headers = mockFetch.mock.calls[0][1].headers
+    expect(headers['Signature']).toBeUndefined()
+  })
 })
 
 describe('buildSignatureBase', () => {

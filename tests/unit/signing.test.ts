@@ -174,3 +174,152 @@ describe('createSignatureHeader', () => {
     )
   })
 })
+
+describe('signActorFetchRequest', () => {
+  let mockFetch: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    mockFetch = vi.fn()
+  })
+
+  it('should send a GET request', async () => {
+    const { signActorFetchRequest } = await import('../../src/signing.js')
+
+    mockFetch.mockResolvedValue({ ok: true, status: 200, json: () => Promise.resolve({}) })
+
+    await signActorFetchRequest(
+      'https://other.example/users/jg10',
+      'https://example.com/actor#main-key',
+      'https://example.com/actor',
+      'https://example.com',
+      mockFetch as SolidFetch
+    )
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://other.example/users/jg10',
+      expect.objectContaining({ method: 'GET' })
+    )
+  })
+
+  it('should include a Signature header with the local keyId', async () => {
+    const { signActorFetchRequest } = await import('../../src/signing.js')
+
+    mockFetch.mockResolvedValue({ ok: true, status: 200, json: () => Promise.resolve({}) })
+
+    await signActorFetchRequest(
+      'https://other.example/users/jg10',
+      'https://example.com/actor#main-key',
+      'https://example.com/actor',
+      'https://example.com',
+      mockFetch as SolidFetch
+    )
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://other.example/users/jg10',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Signature': expect.stringMatching(/keyId="https:\/\/example\.com\/actor#main-key"/)
+        })
+      })
+    )
+  })
+
+  it('should sign (request-target) host date with rsa-sha256', async () => {
+    const { signActorFetchRequest } = await import('../../src/signing.js')
+
+    mockFetch.mockResolvedValue({ ok: true, status: 200, json: () => Promise.resolve({}) })
+
+    await signActorFetchRequest(
+      'https://other.example/users/jg10',
+      'https://example.com/actor#main-key',
+      'https://example.com/actor',
+      'https://example.com',
+      mockFetch as SolidFetch
+    )
+
+    const call = mockFetch.mock.calls[0]
+    const signatureHeader = call[1].headers['Signature'] as string
+    expect(signatureHeader).toContain('algorithm="rsa-sha256"')
+    expect(signatureHeader).toContain('headers="(request-target) host date"')
+  })
+
+  it('should include a Date header', async () => {
+    const { signActorFetchRequest } = await import('../../src/signing.js')
+
+    mockFetch.mockResolvedValue({ ok: true, status: 200, json: () => Promise.resolve({}) })
+
+    await signActorFetchRequest(
+      'https://other.example/users/jg10',
+      'https://example.com/actor#main-key',
+      'https://example.com/actor',
+      'https://example.com',
+      mockFetch as SolidFetch
+    )
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://other.example/users/jg10',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Date': expect.stringMatching(/^[A-Z][a-z]{2}, /)
+        })
+      })
+    )
+  })
+
+  it('should include Accept header for AS2 JSON', async () => {
+    const { signActorFetchRequest } = await import('../../src/signing.js')
+
+    mockFetch.mockResolvedValue({ ok: true, status: 200, json: () => Promise.resolve({}) })
+
+    await signActorFetchRequest(
+      'https://other.example/users/jg10',
+      'https://example.com/actor#main-key',
+      'https://example.com/actor',
+      'https://example.com',
+      mockFetch as SolidFetch
+    )
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://other.example/users/jg10',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Accept': expect.stringContaining('application/activity+json')
+        })
+      })
+    )
+  })
+
+  it('should not include a Digest header (no body)', async () => {
+    const { signActorFetchRequest } = await import('../../src/signing.js')
+
+    mockFetch.mockResolvedValue({ ok: true, status: 200, json: () => Promise.resolve({}) })
+
+    await signActorFetchRequest(
+      'https://other.example/users/jg10',
+      'https://example.com/actor#main-key',
+      'https://example.com/actor',
+      'https://example.com',
+      mockFetch as SolidFetch
+    )
+
+    const headers = mockFetch.mock.calls[0][1].headers
+    expect(headers['Digest']).toBeUndefined()
+  })
+
+  it('should return response from fetch', async () => {
+    const { signActorFetchRequest } = await import('../../src/signing.js')
+
+    const mockResponse = { ok: true, status: 200, json: () => Promise.resolve({ id: 'x' }) }
+    mockFetch.mockResolvedValue(mockResponse)
+
+    const result = await signActorFetchRequest(
+      'https://other.example/users/jg10',
+      'https://example.com/actor#main-key',
+      'https://example.com/actor',
+      'https://example.com',
+      mockFetch as SolidFetch
+    )
+
+    expect(result).toEqual(mockResponse)
+  })
+})

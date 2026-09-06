@@ -63,6 +63,14 @@ function resolveActor(config: ReturnType<typeof loadConfig>, actorParam: string 
   return config.actorByPath[`/${actorParam}`] ?? null
 }
 
+function resolveSharedInboxSigner(config: ReturnType<typeof loadConfig>) {
+  const firstName = config.actorNames[0]
+  if (!firstName) return undefined
+  const actor = config.actorByPath[`/${firstName}`]
+  if (!actor) return undefined
+  return { keyId: actor.keyId, actorUrl: actor.url, baseUrl: config.baseUrl }
+}
+
 function collectionFromPath(pathname: string): Collection | null {
   if (pathname.endsWith('/inbox') || pathname.includes('/inbox/')) return 'inbox'
   if (pathname.endsWith('/outbox') || pathname.includes('/outbox/')) return 'outbox'
@@ -421,7 +429,11 @@ async function handlePostInbox(
   }
 
   try {
-    await verifyIncomingActivity(req, activity, rawBytes, fetchFn)
+    await verifyIncomingActivity(req, activity, rawBytes, fetchFn, {
+      keyId: actor.keyId,
+      actorUrl: actor.url,
+      baseUrl: config.baseUrl
+    })
   } catch (error) {
     if (error instanceof HttpSignatureError) {
       console.error(formatHttpSignatureError(error))
@@ -497,7 +509,8 @@ async function handlePostSharedInbox(
   }
 
   try {
-    await verifyIncomingActivity(req, activity, rawBytes, fetchFn)
+    const signerActor = resolveSharedInboxSigner(config)
+    await verifyIncomingActivity(req, activity, rawBytes, fetchFn, signerActor)
   } catch (error) {
     if (error instanceof HttpSignatureError) {
       console.error(formatHttpSignatureError(error))
