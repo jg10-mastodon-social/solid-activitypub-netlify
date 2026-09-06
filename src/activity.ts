@@ -1,4 +1,5 @@
 import type { SolidFetch } from './types.js'
+import { signActorFetchRequest, type ActorFetchSigner } from './signing.js'
 // @ts-ignore
 import { baseUrl } from './base-url.js'
 
@@ -81,14 +82,19 @@ export function extractRecipients(activity: Activity): ActivityRecipient[] {
 
 export async function fetchActorInbox(
   actorUrl: string,
-  fetchFn: SolidFetch
+  fetchFn: SolidFetch,
+  signer?: ActorFetchSigner
 ): Promise<string> {
-  const response = await fetchFn(actorUrl, {
-    headers: { accept: 'application/activity+json, application/ld+json, application/json' }
-  })
+  const response = signer
+    ? await signActorFetchRequest(actorUrl, signer.keyId, signer.actorUrl, signer.baseUrl, fetchFn)
+    : await fetchFn(actorUrl, {
+        headers: { accept: 'application/activity+json, application/ld+json, application/json' }
+      })
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch actor document: ${response.status}`)
+    const err = new Error(`Failed to fetch actor document: ${response.status}`)
+    ;(err as Error & { actorFetchStatus?: number }).actorFetchStatus = response.status
+    throw err
   }
 
   const actor = await response.json()

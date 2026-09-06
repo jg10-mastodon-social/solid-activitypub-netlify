@@ -26,14 +26,15 @@ async function distributeActivity(
   activity: Activity,
   fetchFn: SolidFetch,
   actorUrl: string,
-  keyId: string
+  keyId: string,
+  baseUrl: string
 ): Promise<DistributionResult[]> {
   const recipients = extractRecipients(activity)
 
   const results: DistributionResult[] = []
   for (const recipient of recipients) {
     try {
-      const inboxUrl = await fetchActorInbox(recipient, fetchFn)
+      const inboxUrl = await fetchActorInbox(recipient, fetchFn, { keyId, actorUrl, baseUrl })
       const response = await signActivityRequest(
         inboxUrl,
         JSON.stringify(activity),
@@ -64,7 +65,7 @@ export async function handleOutboxActivity(
 
   const normalizedActivity = normalizeActivity(activity as Activity)
 
-  const deliveryResults = await distributeActivity(normalizedActivity, fetch, actorUrl, keyId)
+  const deliveryResults = await distributeActivity(normalizedActivity, fetch, actorUrl, keyId, baseUrl)
 
   if (solidStorageBaseUrl && isActivityPublic(normalizedActivity)) {
     try {
@@ -74,7 +75,7 @@ export async function handleOutboxActivity(
 
       for (const follower of newRecipients) {
         try {
-          const inboxUrl = await fetchActorInbox(follower, fetch)
+          const inboxUrl = await fetchActorInbox(follower, fetch, { keyId, actorUrl, baseUrl })
           const response = await signActivityRequest(
             inboxUrl,
             JSON.stringify(normalizedActivity),

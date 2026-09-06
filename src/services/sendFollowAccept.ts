@@ -15,7 +15,7 @@ export async function sendFollowAccept(
   }
 
   const followerActor = followActivity.actor
-  const followerInbox = await fetchActorInbox(followerActor, fetch)
+  const followerInbox = await fetchActorInbox(followerActor, fetch, { keyId, actorUrl, baseUrl })
 
   const acceptActivity = {
     '@context': 'https://www.w3.org/ns/activitystreams',

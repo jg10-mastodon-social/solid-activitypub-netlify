@@ -5,6 +5,26 @@ vi.mock('../../src/base-url.js', () => ({
   baseUrl: 'https://example.com'
 }))
 
+const mockActorKeys = {
+  actor: {
+    kty: 'RSA',
+    e: 'AQAB',
+    n: '0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw',
+    d: 'X4cTteJY_gn4FYPsXB8rdXix5vwsg1FLN5E3EaG6RJoVH-HLLKD9M7dx5oo7GURknchnrRweUkC7hT5fJLM0WbFAKNLWY2vv7B6NqXSzUvxT0_YSfqijwp3RTzlBaCxWp4doF5SXA5uL3NaK3DAZ-V5-K5XqAvLD5VYr7cVvP7xVcwD5JmcPWNfGVaJrKdl80G9CsKy8-kzIKyN6Ej2FD8Lg2xjvBuKiLQVcT2w9hV3CkBvxLJPc5Md4yJ2cS3C0M2D2t5vOgV9V6K5a7lJqT1s9Y-K5V-5pL0b9RrT9M0cD0T5P4x0Q',
+    p: '0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw',
+    q: '0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw',
+    dp: '0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw',
+    dq: '0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw',
+    qi: '0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw',
+    alg: 'RS256',
+    kid: 'test-key-id'
+  }
+}
+
+vi.mock('../../src/actor-keys.js', () => ({
+  actorKeys: mockActorKeys
+}))
+
 const mockFetch = vi.fn()
 
 describe('activity types', () => {
@@ -181,6 +201,68 @@ describe('fetchActorInbox', () => {
 
     await expect(fetchActorInbox('https://other.example/actor', mockFetchFn))
       .rejects.toThrow('Actor inbox not found')
+  })
+
+  it('should send a signed GET when a signer is provided', async () => {
+    const { fetchActorInbox } = await import('../../src/activity.js')
+    const mockFetchFn = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        id: 'https://other.example/actor',
+        inbox: 'https://other.example/inbox'
+      })
+    })
+
+    const inbox = await fetchActorInbox('https://other.example/actor', mockFetchFn, {
+      keyId: 'https://example.com/actor#main-key',
+      actorUrl: 'https://example.com/actor',
+      baseUrl: 'https://example.com'
+    })
+    expect(inbox).toBe('https://other.example/inbox')
+    expect(mockFetchFn).toHaveBeenCalledWith(
+      'https://other.example/actor',
+      expect.objectContaining({
+        method: 'GET',
+        headers: expect.objectContaining({
+          'Signature': expect.stringMatching(/keyId="https:\/\/example\.com\/actor#main-key"/),
+          'Date': expect.any(String),
+          'Accept': expect.stringContaining('application/activity+json')
+        })
+      })
+    )
+    expect(mockFetchFn.mock.calls[0][1].headers['Digest']).toBeUndefined()
+  })
+
+  it('should report 401 via actorFetchStatus when the signed fetch is rejected', async () => {
+    const { fetchActorInbox } = await import('../../src/activity.js')
+    const mockFetchFn = vi.fn().mockResolvedValue({ ok: false, status: 401 })
+
+    try {
+      await fetchActorInbox('https://other.example/actor', mockFetchFn, {
+        keyId: 'https://example.com/actor#main-key',
+        actorUrl: 'https://example.com/actor',
+        baseUrl: 'https://example.com'
+      })
+      throw new Error('expected throw')
+    } catch (e) {
+      expect((e as Error).message).toContain('Failed to fetch actor document')
+      expect((e as Error & { actorFetchStatus?: number }).actorFetchStatus).toBe(401)
+    }
+  })
+
+  it('should fall back to unsigned fetch when no signer is provided', async () => {
+    const { fetchActorInbox } = await import('../../src/activity.js')
+    const mockFetchFn = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        id: 'https://other.example/actor',
+        inbox: 'https://other.example/inbox'
+      })
+    })
+
+    await fetchActorInbox('https://other.example/actor', mockFetchFn)
+    const headers = mockFetchFn.mock.calls[0][1].headers
+    expect(headers['Signature']).toBeUndefined()
   })
 })
 

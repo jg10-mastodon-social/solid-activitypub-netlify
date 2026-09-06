@@ -108,11 +108,8 @@ export interface ActorKeyResult {
   publicKeyPem: string
 }
 
-export interface ActorFetchSigner {
-  keyId: string
-  actorUrl: string
-  baseUrl: string
-}
+import type { ActorFetchSigner } from './signing.js'
+export type { ActorFetchSigner }
 
 export async function fetchActorPublicKey(
   actorUrl: string,

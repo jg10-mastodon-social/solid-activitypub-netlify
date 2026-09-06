@@ -59,6 +59,12 @@ function importPrivateKey(jwk: Record<string, unknown>): ReturnType<typeof creat
   })
 }
 
+export interface ActorFetchSigner {
+  keyId: string
+  actorUrl: string
+  baseUrl: string
+}
+
 function actorNameFromActorUrl(actorUrl: string, baseUrl: string): string {
   const prefix = `${baseUrl}/`
   if (!actorUrl.startsWith(prefix)) {

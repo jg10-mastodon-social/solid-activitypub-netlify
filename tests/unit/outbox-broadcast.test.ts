@@ -2,7 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { SolidFetch } from '../../src/types.js'
 
 vi.mock('../../src/signing.js', () => ({
-  signActivityRequest: vi.fn().mockResolvedValue(new Response('ok', { status: 200 }))
+  signActivityRequest: vi.fn().mockResolvedValue(new Response('ok', { status: 200 })),
+  signActorFetchRequest: vi.fn(async (url: string, _keyId: string, _localUrl: string, _baseUrl: string, fetchFn: any) =>
+    fetchFn(url, { headers: { accept: 'application/activity+json, application/ld+json, application/json' } })
+  )
 }))
 
 const mockFetch = vi.fn()

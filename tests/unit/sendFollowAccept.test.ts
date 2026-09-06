@@ -60,7 +60,12 @@ describe('sendFollowAccept', () => {
 
     expect(mockFetch).toHaveBeenCalledWith(
       'https://other.example/actor',
-      expect.objectContaining({ headers: expect.objectContaining({ accept: expect.stringContaining('application/activity+json') }) })
+      expect.objectContaining({
+        method: 'GET',
+        headers: expect.objectContaining({
+          'Signature': expect.stringMatching(/keyId="https:\/\/example\.com\/actor#main-key"/)
+        })
+      })
     )
   })
 
