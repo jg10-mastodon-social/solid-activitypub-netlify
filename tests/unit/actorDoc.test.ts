@@ -59,8 +59,7 @@ describe('buildActorSkeleton', () => {
         id: 'https://example.com/alice#main-key',
         owner: 'https://example.com/alice',
         publicKeyPem: 'PEM_PLACEHOLDER'
-      },
-      manuallyApprovesFollowers: false
+      }
     })
   })
 
