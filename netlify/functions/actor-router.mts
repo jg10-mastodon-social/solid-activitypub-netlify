@@ -448,7 +448,7 @@ async function handlePostInbox(
 
   try {
     const podInboxUrl = `${config.solidStorageBaseUrl}${actor.name}/inbox/`
-    const success = await handleInboxActivity(
+    const result = await handleInboxActivity(
       activity,
       fetchFn,
       podInboxUrl,
@@ -457,8 +457,8 @@ async function handlePostInbox(
       actor.keyId,
       config.solidStorageBaseUrl
     )
-    if (!success) {
-      console.log(`[router] inbox reject: ${activitySummary(activity)}`)
+    if (!result.success) {
+      console.log(`[router] inbox reject: ${activitySummary(activity)} reason=${result.reason ?? 'unknown'}`)
       return new Response('Failed to process activity', {
         status: 422,
         headers: corsHeaders
@@ -530,7 +530,7 @@ async function handlePostSharedInbox(
       { actorByPath: config.actorByPath, solidStorageBaseUrl: config.solidStorageBaseUrl }
     )
     if (!result.success) {
-      console.log(`[router] inbox reject: ${activitySummary(activity)}`)
+      console.log(`[router] inbox reject: ${activitySummary(activity)} reason=${result.reason ?? 'unknown'}`)
       return new Response('Failed to process activity', {
         status: 422,
         headers: corsHeaders

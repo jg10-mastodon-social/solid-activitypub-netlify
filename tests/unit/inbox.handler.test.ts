@@ -83,8 +83,59 @@ describe('inbox handler', () => {
       'https://example.com/actor#main-key'
     )
 
-    expect(result).toBe(true)
+    expect(result.success).toBe(true)
     expect(mockFetch).not.toHaveBeenCalled()
+  })
+
+  it('returns reason=missing_context when @context is absent', async () => {
+    const { handleInboxActivity } = await import('../../src/handlers/inbox.js')
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve('')
+    })
+
+    const activity = {
+      type: 'Create',
+      actor: 'https://other.example/actor',
+      object: { type: 'Note', content: 'hi' }
+    } as Record<string, unknown>
+
+    const result = await handleInboxActivity(
+      activity,
+      mockFetch as SolidFetch,
+      'https://example.com/actor/inbox/',
+      'actor',
+      'https://example.com/actor',
+      'https://example.com/actor#main-key'
+    )
+
+    expect(result).toEqual({ success: false, reason: 'missing_context' })
+  })
+
+  it('returns reason=missing_type when type is absent', async () => {
+    const { handleInboxActivity } = await import('../../src/handlers/inbox.js')
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve('')
+    })
+
+    const activity = {
+      '@context': 'https://www.w3.org/ns/activitystreams',
+      actor: 'https://other.example/actor'
+    } as Record<string, unknown>
+
+    const result = await handleInboxActivity(
+      activity,
+      mockFetch as SolidFetch,
+      'https://example.com/actor/inbox/',
+      'actor',
+      'https://example.com/actor',
+      'https://example.com/actor#main-key'
+    )
+
+    expect(result).toEqual({ success: false, reason: 'missing_type' })
   })
 
   it('should return true on success', async () => {
@@ -109,7 +160,7 @@ describe('inbox handler', () => {
       'https://example.com/actor#main-key'
     )
 
-    expect(result).toBe(true)
+    expect(result.success).toBe(true)
   })
 
   it('should return false when derivePageUrl fails', async () => {
@@ -132,7 +183,7 @@ describe('inbox handler', () => {
       'https://example.com/actor#main-key'
     )
 
-    expect(result).toBe(false)
+    expect(result.success).toBe(false)
   })
 
   it('should skip persistence for Follow activities and send Accept', async () => {
@@ -170,7 +221,7 @@ describe('inbox handler', () => {
       'https://example.com/'
     )
 
-    expect(result).toBe(true)
+    expect(result.success).toBe(true)
   })
 
   it('should reject Follow with object not matching the actor URL', async () => {
@@ -198,7 +249,7 @@ describe('inbox handler', () => {
       'https://example.com/'
     )
 
-    expect(result).toBe(false)
+    expect(result.success).toBe(false)
   })
 
   it('should detect Follow with as: prefix', async () => {
@@ -236,7 +287,7 @@ describe('inbox handler', () => {
       'https://example.com/'
     )
 
-    expect(result).toBe(true)
+    expect(result.success).toBe(true)
   })
 
   it('should detect Follow in array type', async () => {
@@ -274,7 +325,7 @@ describe('inbox handler', () => {
       'https://example.com/'
     )
 
-    expect(result).toBe(true)
+    expect(result.success).toBe(true)
   })
 
   it('should detect Undo activity', async () => {
@@ -368,7 +419,7 @@ describe('inbox handler', () => {
       'https://example.com/'
     )
 
-    expect(result).toBe(false)
+    expect(result.success).toBe(false)
   })
 
   it('should handle Undo/Follow by removing from followers without persisting', async () => {
@@ -406,7 +457,7 @@ describe('inbox handler', () => {
       'https://example.com/'
     )
 
-    expect(result).toBe(true)
+    expect(result.success).toBe(true)
 
     const removeCall = mockFetch.mock.calls.find(call =>
       (call[0] as string).includes('followers') && call[1]?.method === 'PATCH'

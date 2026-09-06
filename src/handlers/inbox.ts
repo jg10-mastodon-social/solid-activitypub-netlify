@@ -116,7 +116,22 @@ export function resolveTargetActorFromActivity(
 export interface SharedInboxResult {
   success: boolean
   actorName?: string
-  reason?: 'missing_context' | 'missing_type' | 'no_target_actor'
+  reason?: InboxRejectionReason | 'no_target_actor'
+}
+
+export type InboxRejectionReason =
+  | 'missing_context'
+  | 'missing_type'
+  | 'accept_follow_error'
+  | 'follow_mismatch'
+  | 'undo_follow_error'
+  | 'page_url_error'
+  | 'persist_error'
+  | 'follower_add_error'
+
+export interface InboxActivityResult {
+  success: boolean
+  reason?: InboxRejectionReason
 }
 
 export async function handleSharedInboxActivity(
@@ -142,7 +157,7 @@ export async function handleSharedInboxActivity(
   }
 
   const podInboxUrl = `${config.solidStorageBaseUrl ?? ''}${targetActor.name}/inbox/`
-  const success = await handleInboxActivity(
+  const result = await handleInboxActivity(
     activity,
     fetch,
     podInboxUrl,
@@ -152,7 +167,7 @@ export async function handleSharedInboxActivity(
     config.solidStorageBaseUrl
   )
 
-  return { success, actorName: targetActor.name }
+  return { success: result.success, reason: result.reason, actorName: targetActor.name }
 }
 
 export async function handleInboxActivity(
@@ -163,17 +178,17 @@ export async function handleInboxActivity(
   actorUrl: string,
   keyId: string,
   solidStorageBaseUrl?: string
-): Promise<boolean> {
+): Promise<InboxActivityResult> {
   try {
     validateContext(activity as Parameters<typeof validateContext>[0])
   } catch {
     console.log('[inbox] Activity missing @context')
-    return false
+    return { success: false, reason: 'missing_context' }
   }
 
   if (!activity.type) {
     console.log('[inbox] Activity missing type')
-    return false
+    return { success: false, reason: 'missing_type' }
   }
 
   const activityType = activity.type
@@ -182,7 +197,7 @@ export async function handleInboxActivity(
 
   if (isDelete) {
     console.log('[inbox] Delete activity, skipping persistence')
-    return true
+    return { success: true }
   }
 
   if (isAcceptActivity(activity)) {
@@ -195,30 +210,30 @@ export async function handleInboxActivity(
           try {
             await addToFollowing(target, fetch, solidStorageBaseUrl, actorName)
             console.log(`[inbox] Accept of Follow, added ${target} to ${actorName} following collection`)
-            return true
+            return { success: true }
           } catch (error) {
             console.error(`[inbox] Error: Failed to add to following: ${error}`)
-            return false
+            return { success: false, reason: 'accept_follow_error' }
           }
         }
       }
     }
     console.log('[inbox] Accept activity, no action')
-    return true
+    return { success: true }
   }
 
   const isFollow = isFollowActivity(activity)
   if (isFollow) {
     if (activity.object !== actorUrl) {
       console.log(`[inbox] Follow.object (${activity.object}) does not match actor URL (${actorUrl}); rejecting with 422`)
-      return false
+      return { success: false, reason: 'follow_mismatch' }
     }
     console.log('[inbox] Follow activity, sending Accept')
     try {
       await sendFollowAccept(activity, fetch, actorUrl, keyId)
     } catch (error) {
       console.error(`[inbox] Error: Failed to send Accept: ${error}`)
-      return false
+      return { success: false, reason: 'accept_follow_error' }
     }
     if (solidStorageBaseUrl) {
       try {
@@ -226,10 +241,10 @@ export async function handleInboxActivity(
         await addToFollowers(followerActor, fetch, solidStorageBaseUrl, actorName)
       } catch (error) {
         console.error(`[inbox] Error: Failed to add to followers: ${error}`)
-        return false
+        return { success: false, reason: 'follower_add_error' }
       }
     }
-    return true
+    return { success: true }
   }
 
   const isUndo = isUndoFollow(activity)
@@ -237,7 +252,7 @@ export async function handleInboxActivity(
     const undoObject = activity.object as Record<string, unknown>
     if (undoObject.object !== actorUrl) {
       console.log(`[inbox] Undo/Follow.object (${undoObject.object}) does not match actor URL (${actorUrl}); rejecting with 422`)
-      return false
+      return { success: false, reason: 'undo_follow_error' }
     }
     console.log('[inbox] Undo/Follow activity, removing from followers')
     const followerActor = undoObject.actor as string
@@ -246,10 +261,10 @@ export async function handleInboxActivity(
         await removeFromFollowers(followerActor, fetch, solidStorageBaseUrl, actorName)
       } catch (error) {
         console.error(`[inbox] Error: Failed to remove from followers: ${error}`)
-        return false
+        return { success: false, reason: 'follower_add_error' }
       }
     }
-    return true
+    return { success: true }
   }
 
   let pageUrl: string | undefined
@@ -257,7 +272,7 @@ export async function handleInboxActivity(
     pageUrl = await derivePageUrl(inboxUrl, fetch)
   } catch (error) {
     console.error(`[inbox] Error: Failed to derive page URL: ${error}`)
-    return false
+    return { success: false, reason: 'page_url_error' }
   }
 
   const url = new URL(pageUrl)
@@ -268,8 +283,8 @@ export async function handleInboxActivity(
     console.log(`[inbox] Persisted activity to inbox`)
   } catch (error) {
     console.error(`[inbox] Error: Failed to persist inbox item: ${error}`)
-    return false
+    return { success: false, reason: 'persist_error' }
   }
 
-  return true
+  return { success: true }
 }

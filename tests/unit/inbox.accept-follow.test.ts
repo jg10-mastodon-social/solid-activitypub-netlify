@@ -74,7 +74,7 @@ describe('inbox: Accept of Follow', () => {
       'https://storage.example/'
     )
 
-    expect(result).toBe(true)
+    expect(result.success).toBe(true)
     expect(mockAddToFollowing).toHaveBeenCalledTimes(1)
     expect(mockAddToFollowing).toHaveBeenCalledWith(
       'https://remote.example/bob',
@@ -109,7 +109,7 @@ describe('inbox: Accept of Follow', () => {
       'https://storage.example/'
     )
 
-    expect(result).toBe(true)
+    expect(result.success).toBe(true)
     expect(mockAddToFollowing).not.toHaveBeenCalled()
   })
 
@@ -138,7 +138,7 @@ describe('inbox: Accept of Follow', () => {
       'https://storage.example/'
     )
 
-    expect(result).toBe(true)
+    expect(result.success).toBe(true)
     expect(mockAddToFollowing).not.toHaveBeenCalled()
   })
 
@@ -163,7 +163,7 @@ describe('inbox: Accept of Follow', () => {
       'https://storage.example/'
     )
 
-    expect(result).toBe(true)
+    expect(result.success).toBe(true)
     expect(mockAddToFollowing).not.toHaveBeenCalled()
   })
 
@@ -191,7 +191,7 @@ describe('inbox: Accept of Follow', () => {
       `${actorUrl}#main-key`
     )
 
-    expect(result).toBe(true)
+    expect(result.success).toBe(true)
     expect(mockAddToFollowing).not.toHaveBeenCalled()
   })
 
@@ -220,6 +220,6 @@ describe('inbox: Accept of Follow', () => {
       'https://storage.example/'
     )
 
-    expect(result).toBe(false)
+    expect(result.success).toBe(false)
   })
 })
