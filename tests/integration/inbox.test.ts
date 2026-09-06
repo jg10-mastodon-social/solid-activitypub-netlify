@@ -64,6 +64,20 @@ vi.mock('../../src/services/serializeInboxPage.js', () => ({
   serializeInboxPage: mockSerializeInboxPage
 }))
 
+vi.mock('../../src/signing.js', () => ({
+  signActivityRequest: vi.fn().mockResolvedValue({
+    headers: { 'Signature': 'mock-sig', 'Date': new Date().toUTCString() }
+  }),
+  signActorFetchRequest: vi.fn().mockResolvedValue({
+    ok: true,
+    status: 200,
+    json: () => Promise.resolve({}),
+    headers: { get: () => null }
+  }),
+  buildSigningString: vi.fn().mockReturnValue(''),
+  signRequest: vi.fn().mockResolvedValue({})
+}))
+
 beforeAll(() => {
   process.env.WHITELISTED_ISSUERS = 'https://issuer.example'
   process.env.SOLID_STORAGE_BASE_URL = 'http://localhost:9998/'
