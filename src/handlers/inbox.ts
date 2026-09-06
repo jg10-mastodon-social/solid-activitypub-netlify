@@ -153,6 +153,14 @@ export async function handleSharedInboxActivity(
 
   const targetActor = resolveTargetActorFromActivity(activity, config.actorByPath)
   if (!targetActor) {
+    const addressing = (['to', 'cc', 'bto', 'bcc', 'audience'] as const)
+      .flatMap((field) => {
+        const value = activity[field]
+        if (Array.isArray(value)) return value.filter((v): v is string => typeof v === 'string')
+        if (typeof value === 'string') return [value]
+        return []
+      })
+    console.log(`[inbox] shared inbox no target actor: addressed=${JSON.stringify(addressing)}`)
     return { success: false, reason: 'no_target_actor' }
   }
 

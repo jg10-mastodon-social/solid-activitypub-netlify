@@ -471,6 +471,78 @@ describe('inbox handler', () => {
   })
 })
 
+describe('shared inbox handler', () => {
+  const actorAlice: ActorConfig = {
+    name: 'alice',
+    path: '/alice',
+    url: 'https://example.com/alice',
+    keyId: 'https://example.com/alice#main-key',
+    inboxUrl: 'https://example.com/alice/inbox',
+    outboxUrl: 'https://example.com/alice/outbox',
+    followersUrl: 'https://example.com/alice/followers',
+    followingUrl: 'https://example.com/alice/following',
+    sharedInboxUrl: 'https://example.com/inbox',
+    webfingerResource: 'acct:alice@example.com'
+  }
+  const actorByPath = { '/alice': actorAlice }
+
+  it('returns no_target_actor when addressing does not match any local actor', async () => {
+    const { handleSharedInboxActivity } = await import('../../src/handlers/inbox.js')
+    mockFetch.mockResolvedValue({ ok: true, status: 200, text: () => Promise.resolve('') })
+
+    const activity = {
+      '@context': 'https://www.w3.org/ns/activitystreams',
+      type: 'Delete',
+      actor: 'https://other.example/actor',
+      object: 'https://other.example/status/1',
+      to: ['https://www.w3.org/ns/activitystreams#Public'],
+      cc: ['https://other.example/followers']
+    } as Record<string, unknown>
+
+    const result = await handleSharedInboxActivity(
+      activity,
+      mockFetch as SolidFetch,
+      { actorByPath, solidStorageBaseUrl: 'https://storage.example/' }
+    )
+
+    expect(result.success).toBe(false)
+    expect(result.reason).toBe('no_target_actor')
+  })
+
+  it('logs the addressing envelope when no target actor can be resolved', async () => {
+    const { handleSharedInboxActivity } = await import('../../src/handlers/inbox.js')
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    mockFetch.mockResolvedValue({ ok: true, status: 200, text: () => Promise.resolve('') })
+
+    const activity = {
+      '@context': 'https://www.w3.org/ns/activitystreams',
+      type: 'Delete',
+      actor: 'https://other.example/actor',
+      object: 'https://other.example/status/1',
+      to: ['https://www.w3.org/ns/activitystreams#Public'],
+      cc: ['https://other.example/followers']
+    } as Record<string, unknown>
+
+    await handleSharedInboxActivity(
+      activity,
+      mockFetch as SolidFetch,
+      { actorByPath, solidStorageBaseUrl: 'https://storage.example/' }
+    )
+
+    const addressLog = logSpy.mock.calls.find(call =>
+      typeof call[0] === 'string' && call[0].includes('shared inbox no target actor')
+    )
+    expect(addressLog).toBeDefined()
+    const message = addressLog![0] as string
+    expect(message).toContain('addressed=')
+    expect(message).toContain('https://www.w3.org/ns/activitystreams#Public')
+    expect(message).toContain('https://other.example/followers')
+
+    logSpy.mockRestore()
+  })
+})
+
 import type { ActorConfig } from '../../src/types.js'
 
 describe('resolveTargetActorFromActivity', () => {
