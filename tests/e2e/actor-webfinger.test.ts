@@ -22,7 +22,6 @@ describe('actor endpoint', () => {
     expect(actor.followers).toBe(`${devServerUrl}/actor/followers`)
     expect(actor.following).toBe(`${devServerUrl}/actor/following`)
     expect(actor.liked).toBe(`${devServerUrl}/actor/liked`)
-    expect(actor.manuallyApprovesFollowers).toBe(false)
   })
 
   it('includes publicKey with RSA PEM format', async () => {

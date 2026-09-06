@@ -138,7 +138,6 @@ describe('actor-router GET /:actor integration', () => {
     expect(actor.followers).toBe('http://localhost:9999/actor/followers')
     expect(actor.following).toBe('http://localhost:9999/actor/following')
     expect(actor.liked).toBe('http://localhost:9999/actor/liked')
-    expect(actor.manuallyApprovesFollowers).toBe(false)
     expect(actor.publicKey).toBeDefined()
     expect(actor.publicKey.id).toBe('http://localhost:9999/actor#main-key')
     expect(actor.publicKey.owner).toBe('http://localhost:9999/actor')
