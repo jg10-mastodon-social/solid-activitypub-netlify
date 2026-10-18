@@ -41,26 +41,28 @@ Build time generates:
 | `WEBID` | No | Solid WebID (default: `${BASE_URL}/webid`) |
 | `ISSUER` | No | OIDC issuer (default: `${BASE_URL}`) |
 | `SEND_TO_URL` | No | URL the outbox DPoP token is bound to (default: `${BASE_URL}/outbox`) |
-| `ACTOR_NAME` | No | Comma-separated list of actor names. Default: `actor` (single actor). Examples: `alice`, `alice,bob`, `alice, bob, carol`. Whitespace is trimmed. |
-| `ADMIN_WEBID` | No | Admin WebID |
+| `ADMIN_WEBID` | No | WebID allowed to call the actor admin API. The admin API is disabled when unset. |
+| `ACTOR_KEY_ENCRYPTION_KEY` | Yes | Base64 32-byte key used to envelope-encrypt actor private JWKs before they are stored in Blobs. |
+| `ACTOR_REGISTRY_STORE` | No | Blobs store holding the authoritative actor records (default: `actor-registry`). |
+| `ACTOR_SECRET_STORE` | No | Blobs store holding envelope-encrypted actor private keys (default: `actor-secrets`). |
 | `JWKS` | No | Existing OIDC JWK (JSON) to reuse instead of generating a new keypair |
 
 ## How it works
 
-Each configured actor (named in `ACTOR_NAME`) gets its own RSA signing key, its own outbox/inbox/followers collection on the pod, its own per-actor endpoints, and its own AS2 actor document served by the `actor-router` function (overlay-merged with a profile from the pod on every request). A single server-wide `/inbox` (the shared inbox) is also exposed and advertised on every actor's AS2 document as `endpoints.sharedInbox`.
+Each actor in the runtime registry gets its own RSA signing key, its own outbox/inbox/followers collection on the pod, its own per-actor endpoints, and its own AS2 actor document served by the `actor-router` function (overlay-merged with a profile from the pod on every request). A single server-wide `/inbox` (the shared inbox) is also exposed and advertised on every actor's AS2 document as `endpoints.sharedInbox`.
 
 Every request handled by the actor-router function logs a single `[router] METHOD /path` entry line at the start (e.g. `[router] POST /alice/outbox`), followed by any of the auth-failure / delivery-summary logs documented on each endpoint below. Grepping for `[router]` is the fastest way to follow a single request through the function.
 
 ### Outbox POST `/${actorName}/outbox`
 
-One route per configured actor, e.g. `/alice/outbox`. Solid-OIDC-authenticated. The handler ignores any sub-path — paging is managed internally.
+One route per registered actor, e.g. `/alice/outbox`. Solid-OIDC-authenticated. The handler ignores any sub-path — paging is managed internally.
 
-1. Resolve `actorName` from the path; reject 404 if not a configured actor.
+1. Resolve `actorName` from the path; reject 404 if not a registered actor.
 2. Verify the DPoP token via `verifyDpopToken` (using `@solid/access-token-verifier`); reject with 401/403 on failure or if the token's issuer is not in `WHITELISTED_ISSUERS`. **Debugging:** a DPoP failure logs `[router] POST /${actorName}/outbox auth failed: <reason>` — grep this to distinguish a missing header, an issuer not in `WHITELISTED_ISSUERS`, or a token-verification failure (bad signature, expired token, clock skew).
 3. Parse the body as JSON; reject 400 on parse error.
 4. Validate `@context` and that `activity.actor` equals `${BASE_URL}/${actorName}`; reject 400/403 on failure.
 5. Normalize the activity: assign `id` and `published` if missing.
-6. Resolve explicit recipients from `to`/`cc`/`bto`/`bcc`/`audience`, look up each recipient's `inbox` via their actor document, and POST the activity there with an HTTP signature (`RSA-SHA256`, signed with this actor's key from `src/actor-keys.ts`). **Debugging:** a delivery summary logs `[router] POST /${actorName}/outbox delivered to X/Y recipients` — grep this to see the delivery count without parsing the JSON response body.
+6. Resolve explicit recipients from `to`/`cc`/`bto`/`bcc`/`audience`, look up each recipient's `inbox` via their actor document, and POST the activity there with an HTTP signature (`RSA-SHA256`, signed with this actor's key from the `actor-secrets` Blobs store). **Debugging:** a delivery summary logs `[router] POST /${actorName}/outbox delivered to X/Y recipients` — grep this to see the delivery count without parsing the JSON response body.
 7. If the activity is public, load the followers collection at `${SOLID_STORAGE_BASE_URL}${actorName}/followers/` and POST the activity to every follower not already in the explicit-recipient set.
 8. For `Undo Follow` specifically: remove the `object.object` (the formerly-followed actor URI) from `${SOLID_STORAGE_BASE_URL}${actorName}/following/`, decrementing `as:totalItems` on the collection root via `solid:InsertDeletePatch` (mirror of the followers decrement). Failure to update the collection is non-fatal — log a warning and continue so the outbox POST still returns 200 with its delivery summary.
 9. Derive the next paged-outbox slot under `${SOLID_STORAGE_BASE_URL}${actorName}/outbox/` (creating a new page when the current one is full, and patching the collection's `first`/`next` links).
@@ -82,13 +84,13 @@ Per-actor proxy of the paged outbox collection from the pod. No DPoP token is re
 
 ### Inbox POST
 
-One route per configured actor, e.g. `/alice/inbox`. HTTP-signature-authenticated. The handler ignores any sub-path — paging is managed internally. The URL names the local actor, and the activity is processed as if addressed to that actor. A server-wide shared inbox at `/inbox` is also exposed — see *Shared Inbox POST* below.
+One route per registered actor, e.g. `/alice/inbox`. HTTP-signature-authenticated. The handler ignores any sub-path — paging is managed internally. The URL names the local actor, and the activity is processed as if addressed to that actor. A server-wide shared inbox at `/inbox` is also exposed — see *Shared Inbox POST* below.
 
 - For `Follow`: `object` must equal `${BASE_URL}/${actorName}` (else reject 422).
 - For `Undo` of `Follow`: the inner `object` must equal `${BASE_URL}/${actorName}` (else reject 422).
 - For any other activity: trust the URL and persist to `${actorName}/inbox/`. No content-addressing check.
 
-1. Resolve `actorName` from the path; reject 404 if not a configured actor.
+1. Resolve `actorName` from the path; reject 404 if not a registered actor.
 2. Parse the body as JSON; reject 400 on parse error. **Debugging:** on signature-verification failure (step 3) or handler rejection (step 4 — 422), the inbox logs `[router] inbox reject: type=… actor=… [object=…]` so the rejected activity is identifiable in function logs. Successful processing is intentionally not logged.
 3. Verify the HTTP signature on the request via `verifyIncomingActivity`: require `Signature`/`Date`/`Digest` headers, verify the `Digest` against a SHA-256 of the raw request body (not a re-serialisation of the parsed JSON — this allows pretty-printed or differently-ordered sender bodies to verify), fetch the actor's `publicKeyPem` (signed GET with `(request-target) host date` using the local actor's key — required by Mastodon and other servers that gate actor JSON behind HTTP signatures; with SSRF protection), and cryptographically verify the signature. Also bind the actor: `activity.actor` must equal the URL the signing keyId belongs to, else 400.
    - **Debugging:** a failure logs a single `[router] signature auth failed …` line carrying structured `key=value` context. A `[router] inbox reject: type=… actor=… [object=…]` line follows, identifying the rejected activity. Useful fields to triage:
@@ -149,8 +151,8 @@ Per-actor CORS-enabled public proxy of the followers and following collections o
 
 Per-actor AS2 actor document served by the `actor-router` function.
 
-1. Resolve `actorName` from the path; reject 404 if not a configured actor.
-2. Export the per-actor RSA public key from `src/actor-keys.ts` as a PEM (`importJWK` + `exportSPKI` from `jose`). Computed at cold start and cached in module scope; key rotation therefore requires a redeploy.
+1. Resolve `actorName` from the path; reject 404 if not a registered actor.
+2. Read the actor's RSA public JWK from the runtime registry and export it as a PEM (`importJWK` + `exportSPKI` from `jose`). Cached in module scope per instance and invalidated when the registry record's `updatedAt` changes.
 3. Build the immutable skeleton: `id`, `preferredUsername`, `inbox`, `outbox`, `followers`, `following`, `liked`, `publicKey` (with the PEM and `id: ${BASE_URL}/${actorName}#main-key`, `owner: ${BASE_URL}/${actorName}`), and `manuallyApprovesFollowers: false`. `type` defaults to `Service`.
 4. Attempt to fetch the profile from `${SOLID_STORAGE_BASE_URL}${actorName}/profile` (DPoP-authenticated, `Accept: text/turtle`). On 200, parse with `n3` and overlay any recognized fields onto the skeleton. On non-200 or parse error, log and leave the skeleton unchanged — the response still serves with default `type: 'Service'` and no profile fields.
 5. Return the merged JSON with `Content-Type: application/activity+json` and the CORS headers used elsewhere by the function.
@@ -161,16 +163,54 @@ The same `GET /:actor` route also serves a default browser UI: when the request'
 
 Served by a Netlify Edge Function (`netlify/edge-functions/webfinger.ts`) from the runtime actor registry. It returns JRD JSON describing the matching actor (200), or 404 when the resource is unknown or the actor is disabled. Adding an actor does not require a redeploy.
 
+### Adding actors at runtime
+
+Actor identity is written at runtime through the admin API, not baked into a build. The `netlify/functions/admin-actors.mts` function is reachable at `/admin/actors` and authenticates with a Solid-OIDC DPoP token whose `webid` matches `ADMIN_WEBID`. Writes are allowed only on production deploys.
+
+| Request | Effect |
+|---------|--------|
+| `GET /admin/actors` | List the public actor records. |
+| `POST /admin/actors` | Create an actor: generate an RS256 keypair, write the envelope-encrypted private key to `ACTOR_SECRET_STORE`, then write the public record to `ACTOR_REGISTRY_STORE`. |
+| `POST /admin/actors/:name/disable` | Mark the actor disabled so WebFinger and the actor document stop resolving it. |
+| `POST /admin/actors/:name/rotate` | Replace the actor's RSA keypair and update its registry record. |
+
+The create request body carries only the actor name; the keypair, `keyId`, and endpoints are generated or derived:
+
+```http
+POST /admin/actors
+Content-Type: application/json
+
+{ "name": "alice" }
+```
+
+The response is the new public registry record:
+
+```json
+{
+  "name": "alice",
+  "publicKeyJwk": { "kty": "RSA", "n": "…", "e": "AQAB" },
+  "createdAt": "2026-10-18T00:00:00.000Z",
+  "updatedAt": "2026-10-18T00:00:00.000Z",
+  "disabled": false
+}
+```
+
+`disable` and `rotate` take the actor name in the path and no request body.
+
+Creating an actor makes it discoverable through WebFinger immediately. Pod collections are created lazily on the first activity, and the profile remains an operator-managed document on the pod.
+
 ### Default UI
 
 A browser-friendly interface is shipped as static assets in `static-ui/` and copied into `public/` by `scripts/generate-identity.ts` on every build:
 
-- `GET /` — landing page (`public/index.html`) that lists every actor in `ACTOR_NAME` with a `@name@domain` link to its per-actor page, and embeds `templates/actor-controls/actor-controls.html` so visitors can sign in with their WebID and see the actors they control.
+- `GET /` — landing page (`public/index.html`) that lists the registered actors with a `@name@domain` link to each per-actor page, and embeds `templates/actor-controls/actor-controls.html` so visitors can sign in with their WebID and see the actors they control.
 - `GET /:actor` with `Accept: text/html` — per-actor page (`actor-page.template.html`) rendered by Pod-OS Elements. The page reads the actor JSON-LD at `${BASE_URL}/${actorName}` to display `as:name` and `as:summary`, then follows `as:outbox` to walk the paged outbox collection (the existing outbox GET endpoint already serves Turtle with public-URL rewriting). The page uses Ionic for layout and the `<import-html>` custom element (`public/components/ImportHtml.js`) to inline Pod-OS fragment templates at `public/templates/{actor-controls/actor-controls,discussion/{header,outbox}}.html`. The `<pos-app>` wrapper has the `restore-previous-session` attribute so visitors stay signed in across page reloads; the same `actor-controls` fragment is mounted at the top so authenticated visitors can navigate to other actors they control.
 
 UI sources live in `static-ui/` (tracked). Operators wanting to customise the landing page, per-actor template, or login fragment can edit those files; the next build overwrites the copies in `public/`.
 
 #### Registering actors on the user's pod
+
+Creating the actor identity is handled by the admin API above; this section covers the pod-side Type Index entry that makes the actor appear in the browser UI.
 
 Operators register an actor by adding a `solid:TypeRegistration` entry to their WebID's public Type Index. The fragment matches the five ActivityPub Actor Types — `as:Service`, `as:Person`, `as:Group`, `as:Organization`, `as:Application`. Example for an operator with two actors — one bot (`Service`) and one human account (`Person`) — running on `${BASE_URL}`:
 
@@ -283,7 +323,7 @@ The pod is the source of truth for actor content. All collections are stored as 
 
 ```
 ${SOLID_STORAGE_BASE_URL}/
-├── ${actorName}/           # one container per configured actor
+├── ${actorName}/           # one container per registered actor
 │   ├── profile             # operator-managed Turtle profile (as:type, as:name, as:summary, as:icon, as:image)
 │   ├── inbox/              # inbound activities
 │   ├── outbox/             # published activities
