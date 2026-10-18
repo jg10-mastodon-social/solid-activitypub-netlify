@@ -4,11 +4,12 @@
 
 [![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/jg10-mastodon-social/solid-activitypub-netlify#WHITELISTED_ISSUERS=&SOLID_STORAGE_BASE_URL=)
 
-ActivityPub server using Netlify Functions, with collections stored on a Solid pod.
+ActivityPub server using Netlify Functions and Edge Functions, with collections stored on a Solid pod and actor identity in Netlify Blobs.
 
 - **Outbox** (POST): Solid-OIDC-authenticated. Normalizes the activity, distributes it to explicit recipients via HTTP-signed POSTs, fans out to followers for public posts, and persists to a paged outbox on the pod.
 - **Inbox** (POST): Validates `@context` and binds the authenticated key to `actor`. Sends a signed `Accept` for `Follow` and adds the follower; handles `Undo` `Follow`; persists other activities to a paged inbox.
 - **Shared Inbox** (POST `/inbox`): advertised as `endpoints.sharedInbox` on every actor's AS2 document so remote servers can collapse per-follower deliveries into one POST per origin server. See *Inbox POST* below.
+- **WebFinger** (GET `/.well-known/webfinger`): served by a Netlify Edge Function backed by the runtime actor registry, so actors become discoverable as soon as they are created.
 - **GET**: proxies the paged collection (DPoP-authenticated for the Inbox; unauthenticated for the Outbox — both rewrite pod URLs to the public base URL).
 - **Signatures**: a separate RSA actor key signs outgoing requests and is published in the AS2 actor document for recipients to verify.
 
@@ -158,7 +159,7 @@ The same `GET /:actor` route also serves a default browser UI: when the request'
 
 ### WebFinger `/.well-known/webfinger?resource=acct:${actorName}@${domain}`
 
-Served by the `webfinger` Netlify function. Returns JRD JSON describing the matching configured actor (200) or 404 if the resource is unknown.
+Served by a Netlify Edge Function (`netlify/edge-functions/webfinger.ts`) from the runtime actor registry. It returns JRD JSON describing the matching actor (200), or 404 when the resource is unknown or the actor is disabled. Adding an actor does not require a redeploy.
 
 ### Default UI
 
@@ -213,9 +214,10 @@ npm run test:e2e           # Real `netlify dev` + a mock Solid server (boots bot
 ```
 .
 ├── netlify/
+│   ├── edge-functions/
+│   │   └── webfinger.ts     # /.well-known/webfinger, registry-backed edge handler
 │   └── functions/
-│       ├── actor-router.mts # Per-actor /:actor(/outbox|/inbox|/followers) — also serves /:actor (AS2 profile, profile overlay)
-│       └── webfinger.mts    # /.well-known/webfinger dispatcher
+│       └── actor-router.mts # Per-actor /:actor(/outbox|/inbox|/followers) — also serves /:actor (AS2 profile, profile overlay)
 ├── netlify.toml             # Build config + function routing
 ├── public/                  # Auto-generated at build (gitignored)
 │   ├── webid                # WebID Turtle
@@ -263,7 +265,7 @@ Actors can be added, disabled, or key-rotated without a redeploy. The OIDC servi
 
 ### Components and trust boundaries
 
-- **Netlify functions** (`netlify/functions/{actor-router,webfinger}.mts`): the externally reachable surface for ActivityPub. Stateless across invocations; code is reconstructed on every cold start by the build. `actor-router.mts` resolves actors from the runtime registry and handles the per-actor `/{actorName}` GET (AS2 actor document with profile overlay) and `/{actorName}/{outbox,inbox,followers}` GET/POST routes, plus the single server-wide `/inbox` shared inbox (advertised as `endpoints.sharedInbox` on every actor document); `webfinger.mts` serves the WebFinger dispatcher.
+- **Netlify compute** (`netlify/functions/actor-router.mts`, `netlify/edge-functions/webfinger.ts`): the externally reachable surface for ActivityPub. Stateless across invocations; code is reconstructed on every cold start by the build. `actor-router.mts` resolves actors from the runtime registry and handles the per-actor `/{actorName}` GET (AS2 actor document with profile overlay) and `/{actorName}/{outbox,inbox,followers}` GET/POST routes, plus the single server-wide `/inbox` shared inbox (advertised as `endpoints.sharedInbox` on every actor document). `webfinger.ts` runs at the edge and serves `/.well-known/webfinger` from the same registry.
 - **Netlify Blobs**: durable, site-wide storage for actor identity. The `actor-registry` store is the authoritative public record and `actor-secrets` holds envelope-encrypted private keys. Blobs have no public URL; only site code can read them, and the `actor-router` function is the only runtime consumer of the secret store.
 - **Solid pod** at `${SOLID_STORAGE_BASE_URL}`: durable storage for per-actor containers `${actorName}/inbox/`, `${actorName}/outbox/`, and `${actorName}/followers/` as paged AS2 collections, plus an operator-managed `${actorName}/profile` Turtle document. The function is the only writer for the collections; reads (including the profile) happen via a DPoP-authenticated fetch (`src/solidFetch.ts`).
 - **OIDC issuer**: any issuer in `WHITELISTED_ISSUERS` is trusted to authenticate users who may access the private collections (outbox write + inbox read). The function verifies each request's DPoP-bound access token via `@solid/access-token-verifier` — confirming the client controls the bound key and the token's issuer is in the allowlist.
