@@ -248,22 +248,36 @@ npm run test:e2e           # Real `netlify dev` + a mock Solid server (boots bot
 
 ## Architecture
 
+### Actor identity and storage
+
+Actor identity and actor content have separate sources of truth.
+
+- **Runtime actor identity** lives in Netlify Blobs:
+  - `actor-registry` is the source of truth for whether an actor exists. Each record is keyed by actor name and holds `publicKeyJwk`, `createdAt`, `updatedAt`, and `disabled`.
+  - `actor-secrets` holds each actor's private RSA JWK, envelope-encrypted with `ACTOR_KEY_ENCRYPTION_KEY` before it is written. It is subordinate to the registry: an actor exists only once its public record is present.
+  - Both stores are read with `consistency: "strong"` and written with compare-and-swap (`onlyIfNew` / `onlyIfMatch`), so concurrent create, rotate, and disable operations cannot silently overwrite each other.
+- **Actor content** lives on the Solid pod: the profile and the paged inbox/outbox/followers/following collections. The registry, not the pod, determines whether an actor exists.
+- **Service identity** is build-time: the OIDC ES256 key, `public/jwks.json`, `public/webid`, and OIDC discovery are site-level, not per-actor.
+
+Actors can be added, disabled, or key-rotated without a redeploy. The OIDC service key is generated at build time.
+
 ### Components and trust boundaries
 
-- **Netlify function** (`netlify/functions/{actor-router,webfinger}.mts`): the only externally reachable surface. Stateless across invocations; reconstructed on every cold start by the build. `actor-router.mts` handles the per-actor `/{actorName}` GET (AS2 actor document with profile overlay) and `/{actorName}/{outbox,inbox,followers}` GET/POST routes, plus the single server-wide `/inbox` shared inbox (advertised as `endpoints.sharedInbox` on every actor document); `webfinger.mts` serves the WebFinger dispatcher.
+- **Netlify functions** (`netlify/functions/{actor-router,webfinger}.mts`): the externally reachable surface for ActivityPub. Stateless across invocations; code is reconstructed on every cold start by the build. `actor-router.mts` resolves actors from the runtime registry and handles the per-actor `/{actorName}` GET (AS2 actor document with profile overlay) and `/{actorName}/{outbox,inbox,followers}` GET/POST routes, plus the single server-wide `/inbox` shared inbox (advertised as `endpoints.sharedInbox` on every actor document); `webfinger.mts` serves the WebFinger dispatcher.
+- **Netlify Blobs**: durable, site-wide storage for actor identity. The `actor-registry` store is the authoritative public record and `actor-secrets` holds envelope-encrypted private keys. Blobs have no public URL; only site code can read them, and the `actor-router` function is the only runtime consumer of the secret store.
 - **Solid pod** at `${SOLID_STORAGE_BASE_URL}`: durable storage for per-actor containers `${actorName}/inbox/`, `${actorName}/outbox/`, and `${actorName}/followers/` as paged AS2 collections, plus an operator-managed `${actorName}/profile` Turtle document. The function is the only writer for the collections; reads (including the profile) happen via a DPoP-authenticated fetch (`src/solidFetch.ts`).
 - **OIDC issuer**: any issuer in `WHITELISTED_ISSUERS` is trusted to authenticate users who may access the private collections (outbox write + inbox read). The function verifies each request's DPoP-bound access token via `@solid/access-token-verifier` — confirming the client controls the bound key and the token's issuer is in the allowlist.
 - **Remote ActivityPub servers**: discovered via WebFinger and actor-document fetches (`src/activity.ts`, `src/verifyRequest.ts`).
-- **Static identity** in `public/`: OIDC discovery, WebID, JWKS, and the WebFinger data file. Served by Netlify's CDN, regenerated on every build.
+- **Static service identity** in `public/`: OIDC discovery, WebID, and JWKS. Served by Netlify's CDN, regenerated on every build. Actor identity is read from Blobs at runtime.
 
 ### Per-actor keypairs
 
 - **OIDC ES256** (one): private in `src/private-key.ts`, public in `public/jwks.json`. Verifies incoming DPoP tokens (`auth.ts`) and mints the DPoP token for the function's own pod traffic (`solidFetch.ts`). The public JWK can be supplied via `JWKS` to reuse a keypair across deploys.
-- **Actor RS256** (one per configured actor): private JWKs live in `src/actor-keys.ts` keyed by actor name; the corresponding public PEMs are derived at cold start (`importJWK` + `exportSPKI`) and embedded in the actor document as `publicKey.publicKeyPem` — the AS2 field name remote servers use to verify the HTTP signatures this actor signs on outgoing requests (`signing.ts`).
+- **Actor RS256** (one per actor): private JWKs live envelope-encrypted in the `actor-secrets` Blobs store; the public JWK lives in the `actor-registry` record. The public PEM is derived on demand and embedded in the actor document as `publicKey.publicKeyPem` — the AS2 field name remote servers use to verify the HTTP signatures this actor signs on outgoing requests (`signing.ts`). Keys are created and rotated at runtime.
 
 ### Data on the pod
 
-All collections are stored as paged `as:Collection` + `as:OrderedCollectionPage` resources, grouped under a per-actor container:
+The pod is the source of truth for actor content. All collections are stored as paged `as:Collection` + `as:OrderedCollectionPage` resources, grouped under a per-actor container:
 
 ```
 ${SOLID_STORAGE_BASE_URL}/
@@ -277,7 +291,7 @@ ${SOLID_STORAGE_BASE_URL}/
 
 Each page is a Turtle document with `as:items` quads pointing at its entries; pages are linked via `as:next` and the collection holds a single `as:first` pointing at the head page. Writes are PATCHes of a `solid:InsertDeletePatch` (see `src/services/buildPatch.ts`) — never full-document overwrites — so a single PATCH is the unit of consistency. For the `followers` and `following` collections, each `as:items` value is an actor URI directly (matching the W3C AS2 paged-OrderedCollection shape that Mastodon and other fediverse servers expect).
 
-The `profile` resource is a single Turtle document that the `actor-router` function reads on every `GET /${actorName}` and overlay-merges onto the immutable skeleton it builds from configuration and the per-actor RSA key. 
+The `profile` resource is a single Turtle document that the `actor-router` function reads on every `GET /${actorName}` and overlay-merges onto the skeleton it builds from the actor's registry record and actor RSA public key. 
 
 Example profile:
 
