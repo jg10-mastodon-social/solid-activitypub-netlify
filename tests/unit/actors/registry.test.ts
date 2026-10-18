@@ -401,6 +401,31 @@ describe('compare-and-swap retry', () => {
   })
 })
 
+describe('getEncryptedSecret', () => {
+  it('returns the stored secret for a known name', async () => {
+    const { registry } = makeRegistry()
+    await registry.createActor({
+      name: 'alice',
+      publicKeyJwk: jwk('alice'),
+      encryptedPrivateKey: secret('alice')
+    })
+
+    expect(await registry.getEncryptedSecret('alice')).toEqual(secret('alice'))
+  })
+
+  it('returns null for an unknown name', async () => {
+    const { registry } = makeRegistry()
+
+    expect(await registry.getEncryptedSecret('ghost')).toBeNull()
+  })
+
+  it('returns null when the secrets document does not exist', async () => {
+    const { registry } = makeRegistry()
+
+    expect(await registry.getEncryptedSecret('alice')).toBeNull()
+  })
+})
+
 describe('listOrphanSecretNames', () => {
   it('returns secret names without a corresponding registry record', async () => {
     const { registry, registryStore } = makeRegistry()

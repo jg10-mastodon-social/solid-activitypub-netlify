@@ -23,6 +23,7 @@ export interface ActorRegistry {
     publicKeyJwk: Record<string, unknown>
     encryptedPrivateKey: EncryptedSecret
   }): Promise<ActorRecord>
+  getEncryptedSecret(name: string): Promise<EncryptedSecret | null>
   listOrphanSecretNames(): Promise<string[]>
 }
 
@@ -280,6 +281,11 @@ export function openActorRegistry(
     return record
   }
 
+  async function getEncryptedSecret(name: string): Promise<EncryptedSecret | null> {
+    const doc = await loadSecrets()
+    return doc?.keys[name] ?? null
+  }
+
   async function listOrphanSecretNames(): Promise<string[]> {
     const [registryDoc, secretsDoc] = await Promise.all([loadRegistry(), loadSecrets()])
     const actors = registryDoc?.actors ?? {}
@@ -295,6 +301,7 @@ export function openActorRegistry(
     createActor,
     disableActor,
     rotateActorKey,
+    getEncryptedSecret,
     listOrphanSecretNames
   }
 }
