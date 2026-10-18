@@ -26,11 +26,12 @@ npm install
 netlify build --context=dev
 ```
 
-Build time generates:
+Build time generates the service identity:
 - `src/base-url.ts` - site URL (gitignored)
 - `src/private-key.ts` - OIDC ES256 signing key (gitignored)
-- `src/actor-keys.ts` - per-actor RS256 signing keys (gitignored)
 - `public/webid`, `public/jwks.json`, `public/.well-known/openid-configuration` - OIDC identity files
+
+Actor identity (per-actor RSA keys and WebFinger records) is not generated at build time; it lives in Netlify Blobs and is managed through the admin API. See *Adding actors at runtime* and *Migration and backup*.
 
 ## Environment Variables
 
@@ -46,6 +47,20 @@ Build time generates:
 | `ACTOR_REGISTRY_STORE` | No | Blobs store holding the authoritative actor records (default: `actor-registry`). |
 | `ACTOR_SECRET_STORE` | No | Blobs store holding envelope-encrypted actor private keys (default: `actor-secrets`). |
 | `JWKS` | No | Existing OIDC JWK (JSON) to reuse instead of generating a new keypair |
+
+Runtime variables are frozen per deploy. Set them in the Netlify UI, CLI, or API. `netlify.toml` values are not exposed to functions at runtime.
+
+## Migration and backup
+
+`scripts/actors-backup.ts` manages the offline registry and secret stores. It drives the authenticated Netlify CLI (`netlify blobs:get` / `netlify blobs:set`), so no Blobs credentials live in the application, and it uses the same envelope encryption as the runtime.
+
+```bash
+node scripts/actors-backup.ts backup <dir>                 # export both stores to snapshots
+node scripts/actors-backup.ts restore <dir>                # restore both stores from snapshots
+node scripts/actors-backup.ts restore --from-actor-keys    # seed from src/actor-keys.ts
+```
+
+`restore --from-actor-keys` reads each actor name and private JWK from a saved copy of the build-time `src/actor-keys.ts`, encrypts the JWK with `ACTOR_KEY_ENCRYPTION_KEY`, and writes the registry and secret records. It is the one-time migration and is idempotent, so there is no separate migration script. Secret snapshots contain only envelope-encrypted keys; restoring them also requires the same `ACTOR_KEY_ENCRYPTION_KEY`.
 
 ## How it works
 
@@ -245,9 +260,10 @@ Web components shipped from `static-ui/components/`, copied into `public/compone
 ## Testing
 
 ```bash
-npm run test:unit          # Pure module tests (no HTTP, no pod)
-npm run test:integration   # Netlify function handler tests with mocked dependencies
-npm run test:e2e           # Real `netlify dev` + a mock Solid server (boots both in-process)
+npm run typecheck          # TypeScript
+npm run test:unit          # Pure module tests (registry, crypto, handlers) with Blobs mocked
+npm run test:integration   # Netlify function handlers with mocked dependencies
+npm run test:e2e           # Real `netlify dev` (functions, edge, local Blobs) + a mock Solid server
 ```
 
 
@@ -257,18 +273,21 @@ npm run test:e2e           # Real `netlify dev` + a mock Solid server (boots bot
 │   ├── edge-functions/
 │   │   └── webfinger.ts     # /.well-known/webfinger, registry-backed edge handler
 │   └── functions/
-│       └── actor-router.mts # Per-actor /:actor(/outbox|/inbox|/followers) — also serves /:actor (AS2 profile, profile overlay)
+│       ├── actor-router.mts # Per-actor /:actor(/outbox|/inbox|/followers) — also serves /:actor (AS2 profile, profile overlay)
+│       └── admin-actors.mts # /admin/actors, authenticated runtime actor administration
 ├── netlify.toml             # Build config + function routing
-├── public/                  # Auto-generated at build (gitignored)
+├── public/                  # Auto-generated service identity at build (gitignored)
 │   ├── webid                # WebID Turtle
 │   ├── jwks.json            # OIDC signing key (public)
 │   └── .well-known/         # openid-configuration
 ├── scripts/
-│   └── generate-identity.ts # Generates identity, actor keys, webfinger data
+│   ├── generate-identity.ts # Generates service identity and static UI
+│   └── actors-backup.ts     # Offline backup/restore; --from-actor-keys seeds from a saved src/actor-keys.ts
 ├── src/
 │   ├── activity.ts          # Activity validation, normalization, recipient extraction
+│   ├── actors/              # Runtime registry, encrypted secrets, key lookup
 │   ├── auth.ts              # DPoP token verification
-│   ├── config.ts            # Config loading (actorNames[], actorByPath map)
+│   ├── config.ts            # Service config loading
 │   ├── handlers/            # Inbox/outbox activity handlers (per-actor aware)
 │   ├── services/            # Solid-pod + RDF helpers (paging, patching, followers, following, actorDoc.ts)
 │   ├── signing.ts           # Outgoing HTTP signature signing (per-actor key lookup)
@@ -278,14 +297,13 @@ npm run test:e2e           # Real `netlify dev` + a mock Solid server (boots bot
 │   ├── verifyHttpSignature.ts # HTTP signature parsing + crypto verification primitives
 │   ├── verifyRequest.ts     # End-to-end HTTP signature verification (inbox POST)
 │   ├── base-url.ts          # Generated (gitignored)
-│   ├── private-key.ts       # Generated OIDC ES256 key (gitignored)
-│   └── actor-keys.ts        # Generated per-actor RS256 keys (gitignored)
+│   └── private-key.ts       # Generated OIDC ES256 key (gitignored)
 └── tests/
     ├── helpers.ts
     ├── helpers/             # dev-server + mock Solid server
     ├── unit/                # Pure module tests
     ├── integration/         # Netlify function handler tests with mocked deps
-    └── e2e/                 # Tests against `netlify dev` + mock Solid server
+    └── e2e/                 # Tests against `netlify dev` + mock Solid server, incl. runtime actor lifecycle
 ```
 
 ## Architecture
