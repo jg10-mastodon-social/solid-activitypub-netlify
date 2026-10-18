@@ -1,4 +1,14 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+
+const ORIGINAL_ENV = process.env
+
+beforeEach(() => {
+  process.env = { ...ORIGINAL_ENV }
+})
+
+afterEach(() => {
+  process.env = ORIGINAL_ENV
+})
 
 describe('SSRF protection', () => {
   describe('localhost blocking', () => {
@@ -127,6 +137,51 @@ describe('SSRF protection', () => {
     it('should reject URLs with no hostname', async () => {
       const { isBlockedUrl } = await import('../../src/ssrf.js')
       expect(isBlockedUrl('file:///etc/passwd')).toBe(true)
+    })
+  })
+
+  describe('dev-gated private-host allowlist', () => {
+    it('should ignore the allowlist outside the dev context', async () => {
+      process.env.CONTEXT = 'production'
+      delete process.env.NETLIFY_DEV
+      process.env.ACTOR_FETCH_ALLOW_PRIVATE_HOSTS = 'localhost,127.0.0.1'
+      const { isBlockedUrl } = await import('../../src/ssrf.js')
+      expect(isBlockedUrl('http://localhost/actor')).toBe(true)
+      expect(isBlockedUrl('http://127.0.0.1/actor')).toBe(true)
+    })
+
+    it('should allow listed private hosts in the dev context', async () => {
+      process.env.CONTEXT = 'dev'
+      delete process.env.NETLIFY_DEV
+      process.env.ACTOR_FETCH_ALLOW_PRIVATE_HOSTS = 'localhost, 127.0.0.1'
+      const { isBlockedUrl } = await import('../../src/ssrf.js')
+      expect(isBlockedUrl('http://localhost:9997/remote')).toBe(false)
+      expect(isBlockedUrl('http://127.0.0.1:9997/remote')).toBe(false)
+    })
+
+    it('should still block private hosts not on the dev allowlist', async () => {
+      process.env.CONTEXT = 'dev'
+      delete process.env.NETLIFY_DEV
+      process.env.ACTOR_FETCH_ALLOW_PRIVATE_HOSTS = 'localhost'
+      const { isBlockedUrl } = await import('../../src/ssrf.js')
+      expect(isBlockedUrl('http://127.0.0.1/actor')).toBe(true)
+      expect(isBlockedUrl('http://10.0.0.1/actor')).toBe(true)
+    })
+
+    it('should honor the allowlist when NETLIFY_DEV is set', async () => {
+      delete process.env.CONTEXT
+      process.env.NETLIFY_DEV = 'true'
+      process.env.ACTOR_FETCH_ALLOW_PRIVATE_HOSTS = 'localhost'
+      const { isBlockedUrl } = await import('../../src/ssrf.js')
+      expect(isBlockedUrl('http://localhost/actor')).toBe(false)
+    })
+
+    it('should block private hosts in dev without an allowlist', async () => {
+      process.env.CONTEXT = 'dev'
+      delete process.env.NETLIFY_DEV
+      delete process.env.ACTOR_FETCH_ALLOW_PRIVATE_HOSTS
+      const { isBlockedUrl } = await import('../../src/ssrf.js')
+      expect(isBlockedUrl('http://localhost/actor')).toBe(true)
     })
   })
 })

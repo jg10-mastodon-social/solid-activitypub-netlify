@@ -7,6 +7,7 @@
   node_bundler = "esbuild"
 
 [context.dev.environment]
+  CONTEXT = "dev"
   DEPLOY_URL = "http://localhost:9999"
   WEBID = "http://localhost:9999/webid"
   ISSUER = "http://localhost:9999"
@@ -14,6 +15,7 @@
   SOLID_STORAGE_BASE_URL = "http://localhost:9998/"
   SEND_TO_URL = "http://localhost:9999/outbox"
   ACTOR_NAME = "actor,alice,bob"
+  ACTOR_FETCH_ALLOW_PRIVATE_HOSTS = "localhost,127.0.0.1"
 
 [dev]
   port = 9999

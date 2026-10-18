@@ -2,6 +2,7 @@ import { spawn, ChildProcess } from 'child_process'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { startMockSolidServer, stopMockSolidServer, getMockSolidServer } from './mock-solid-server.js'
+import { startRemoteActorServer, stopRemoteActorServer } from './remote-actor-server.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -67,6 +68,9 @@ export async function startDevServer(): Promise<void> {
   console.log('Starting mock Solid server...')
   await startMockSolidServer(MOCK_SOLID_PORT)
 
+  console.log('Starting remote actor server...')
+  await startRemoteActorServer()
+
   console.log('Starting netlify dev...')
 
   return new Promise((resolve, reject) => {
@@ -111,6 +115,8 @@ export function stopDevServer(): void {
     serverProcess = null
     serverReady = false
   }
+  console.log('Stopping remote actor server...')
+  stopRemoteActorServer()
   console.log('Stopping mock Solid server...')
   stopMockSolidServer()
 }

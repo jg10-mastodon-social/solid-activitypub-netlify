@@ -1,12 +1,32 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { devServerUrl, getMockSolidServer } from '../helpers/dev-server.js'
+import {
+  clearRemoteActors,
+  getRemoteInboxActivities,
+  remoteActorUrl,
+  setRemoteActor
+} from '../helpers/remote-actor-server.js'
+import { buildActorDocument, createRemoteActorKeys, signActivityRequest } from '../helpers/http-signature.js'
+
+const remoteActor = remoteActorUrl('remote')
+const remoteKeys = createRemoteActorKeys(remoteActor)
+
+function signedInboxRequest(activity: unknown) {
+  return signActivityRequest(`${devServerUrl}/actor/inbox`, activity, remoteKeys)
+}
 
 describe('inbox e2e tests', () => {
   beforeEach(() => {
+    clearRemoteActors()
+    setRemoteActor('/remote', buildActorDocument(remoteKeys))
     const mockServer = getMockSolidServer()
     if (mockServer) {
       mockServer.setError(false)
     }
+  })
+
+  afterEach(() => {
+    clearRemoteActors()
   })
 
   it('returns 204 for OPTIONS preflight with CORS headers', async () => {
@@ -34,6 +54,21 @@ describe('inbox e2e tests', () => {
     expect(await res.text()).toBe('Invalid JSON body')
   })
 
+  it('returns 401 for an unsigned activity', async () => {
+    const res = await fetch(`${devServerUrl}/actor/inbox`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/activity+json' },
+      body: JSON.stringify({
+        type: 'Create',
+        '@context': 'https://www.w3.org/ns/activitystreams',
+        actor: remoteActor,
+        object: { type: 'Note', content: 'Hello world' }
+      })
+    })
+
+    expect(res.status).toBe(401)
+  })
+
   it('returns 200 when activity received and persisted to Solid pod', async () => {
     const mockServer = getMockSolidServer()
     expect(mockServer).not.toBeNull()
@@ -41,14 +76,15 @@ describe('inbox e2e tests', () => {
     const activity = {
       type: 'Create',
       '@context': 'https://www.w3.org/ns/activitystreams',
-      actor: 'https://other.example/actor',
+      actor: remoteActor,
       object: { type: 'Note', content: 'Hello world' }
     }
 
+    const { body, headers } = signedInboxRequest(activity)
     const res = await fetch(`${devServerUrl}/actor/inbox`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(activity)
+      headers,
+      body
     })
 
     expect(res.status).toBe(200)
@@ -60,7 +96,7 @@ describe('inbox e2e tests', () => {
     expect(patchedPages[0].body).toContain('Hello world')
   })
 
-  it('returns 500 when Solid pod is unreachable', async () => {
+  it('returns 422 when the activity cannot be persisted because the Solid pod is unreachable', async () => {
     const mockServer = getMockSolidServer()
     expect(mockServer).not.toBeNull()
 
@@ -69,16 +105,18 @@ describe('inbox e2e tests', () => {
     const activity = {
       type: 'Create',
       '@context': 'https://www.w3.org/ns/activitystreams',
-      actor: 'https://other.example/actor'
+      actor: remoteActor,
+      object: { type: 'Note', content: 'Pod is down' }
     }
 
+    const { body, headers } = signedInboxRequest(activity)
     const res = await fetch(`${devServerUrl}/actor/inbox`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(activity)
+      headers,
+      body
     })
 
-    expect(res.status).toBe(500)
+    expect(res.status).toBe(422)
   })
 
   it('returns 200 for GET /inbox/pages/:id after POST seeds a page', async () => {
@@ -127,15 +165,17 @@ describe('inbox e2e tests', () => {
       .setJti(randomUUID())
       .sign(identityPrivateKey)
 
+    const seedActivity = {
+      type: 'Create',
+      '@context': 'https://www.w3.org/ns/activitystreams',
+      actor: remoteActor,
+      object: { type: 'Note', content: 'Seeded for inbox GET test' }
+    }
+    const { body: seedBody, headers: seedHeaders } = signedInboxRequest(seedActivity)
     const postRes = await fetch(`${devServerUrl}/actor/inbox`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        type: 'Create',
-        '@context': 'https://www.w3.org/ns/activitystreams',
-        actor: 'https://other.example/actor',
-        object: { type: 'Note', content: 'Seeded for inbox GET test' }
-      })
+      headers: seedHeaders,
+      body: seedBody
     })
     expect(postRes.status).toBe(200)
 
@@ -176,14 +216,15 @@ describe('inbox e2e tests', () => {
     const activity = {
       type: 'Follow',
       '@context': 'https://www.w3.org/ns/activitystreams',
-      actor: 'http://localhost:9998/actor',
-      object: 'http://localhost:9999/actor'
+      actor: remoteActor,
+      object: `${devServerUrl}/actor`
     }
 
+    const { body, headers } = signedInboxRequest(activity)
     const res = await fetch(`${devServerUrl}/actor/inbox`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(activity)
+      headers,
+      body
     })
 
     expect(res.status).toBe(200)
@@ -193,12 +234,12 @@ describe('inbox e2e tests', () => {
     const followPatches = patchedInboxPages.filter(p => p.body.includes('Follow'))
     expect(followPatches.length).toBe(0)
 
-    const receivedActivities = mockServer!.getReceivedActivities()
+    const receivedActivities = getRemoteInboxActivities()
     expect(receivedActivities.length).toBe(1)
     expect(receivedActivities[0].body).toContain('Accept')
 
     const patchedFollowers = mockServer!.getPatchedFollowers()
     expect(patchedFollowers.length).toBe(1)
-    expect(patchedFollowers[0].body).toContain('http://localhost:9998/actor')
+    expect(patchedFollowers[0].body).toContain(remoteActor)
   })
 })
