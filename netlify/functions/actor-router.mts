@@ -43,6 +43,7 @@ export const config: Config = {
     '/:actor/following/:page*',
   ],
   method: ['POST', 'GET', 'OPTIONS'],
+  excludedPath: ['/admin/*'],
   preferStatic: true,
 }
 
