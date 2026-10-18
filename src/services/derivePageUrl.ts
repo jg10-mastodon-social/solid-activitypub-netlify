@@ -4,6 +4,7 @@ import { getPageInfo } from './getPageInfo.js'
 import { createPage } from './createPage.js'
 import { updateCollectionFirst } from './updateInbox.js'
 import { updatePageNext } from './updatePageNext.js'
+import { ensureCollectionRoot } from './ensureCollectionRoot.js'
 
 function generatePageUrl(inboxUrl: string): string {
   const timestamp = Date.now()
@@ -15,6 +16,8 @@ export async function derivePageUrl(
   fetch: SolidFetch
 ): Promise<string> {
   if (!inboxUrl.endsWith('/')) throw new Error('Inbox url should end with /')
+
+  await ensureCollectionRoot(inboxUrl, fetch)
 
   let firstPageUrl: string | null = null
 

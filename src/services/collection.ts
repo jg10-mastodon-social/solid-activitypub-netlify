@@ -1,6 +1,7 @@
 import type { SolidFetch } from '../types.js'
 import { Parser, Store } from 'n3'
 import { derivePageUrl } from './derivePageUrl.js'
+import { readCollectionRoot } from './ensureCollectionRoot.js'
 import { buildDeleteItemLinkPatch, buildInsertItemLinkPatch, buildUpdateLiteralPatch } from './buildPatch.js'
 import { parseCollectionTurtle, parseFollowersRoot } from './rdfUtils.js'
 import { discoverMetaResourceUrl } from './solidHelpers.js'
@@ -418,15 +419,8 @@ export async function removeFromCollection(
   let currentPageUrl: string | null = null
 
   try {
-    const response = await fetch(collectionUrl, {
-      method: 'GET',
-      headers: {
-        accept: 'text/turtle',
-      },
-    })
-
-    if (response.ok) {
-      const text = await response.text()
+    const text = await readCollectionRoot(collectionUrl, fetch)
+    if (text !== null) {
       const parsed = await parseCollectionTurtle(text, collectionUrl)
       if (parsed && parsed.first) {
         currentPageUrl = parsed.first

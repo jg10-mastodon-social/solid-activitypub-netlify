@@ -14,6 +14,8 @@ export class MockSolidServer {
   private port: number
   private simulateError = false
   private errorType: 'unreachable' | '404' | '500' = '500'
+  private requireCollectionRoot = false
+  private createdCollections = new Set<string>()
   private createdPages: Set<string> = new Set()
   private collectionFirst: Record<string, Record<string, string>> = {
     inbox: {},
@@ -54,6 +56,8 @@ export class MockSolidServer {
       this.server.close()
       this.server = null
     }
+    this.requireCollectionRoot = false
+    this.createdCollections.clear()
     this.createdPages.clear()
     this.collectionFirst = { inbox: {}, outbox: {}, followers: {}, following: {} }
     this.actorProfiles = {}
@@ -77,6 +81,14 @@ export class MockSolidServer {
   setError(simulateError: boolean, errorType?: 'unreachable' | '404' | '500'): void {
     this.simulateError = simulateError
     if (errorType) this.errorType = errorType
+  }
+
+  setRequireCollectionRoot(require: boolean): void {
+    this.requireCollectionRoot = require
+  }
+
+  getCreatedCollections(): string[] {
+    return [...this.createdCollections]
   }
 
 setFollowerActors(actors: string[], actorName: string = 'actor'): void {
@@ -181,6 +193,8 @@ setFollowedActors(actors: string[], actorName: string = 'actor'): void {
 
     if (req.method === 'POST' && isCollectionRoot && collection === 'inbox') {
       this.handlePostActorInbox(req, res)
+    } else if (req.method === 'PUT' && isCollectionRoot) {
+      this.handlePutCollectionRoot(req, res, actorName, collection)
     } else if (req.method === 'GET' && isCollectionRoot) {
       this.handleGetCollection(req, res, collectionUrl, actorName, collection)
     } else if (req.method === 'PUT' && pagePath?.startsWith('pages/')) {
@@ -268,6 +282,16 @@ setFollowedActors(actors: string[], actorName: string = 'actor'): void {
       return
     }
 
+    if (
+      this.requireCollectionRoot &&
+      !this.createdCollections.has(collectionUrl) &&
+      this.collectionFirst[collection][actorName] === undefined
+    ) {
+      res.writeHead(404)
+      res.end('Not Found')
+      return
+    }
+
     let body = `@prefix as: <https://www.w3.org/ns/activitystreams#>.
 <${collectionUrl}> a as:OrderedCollection.`
 
@@ -283,6 +307,21 @@ setFollowedActors(actors: string[], actorName: string = 'actor'): void {
 
     res.writeHead(200, { 'Content-Type': 'text/turtle' })
     res.end(body)
+  }
+
+  private handlePutCollectionRoot(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    actorName: string,
+    collection: Collection
+  ): void {
+    req.on('data', () => {})
+    req.on('end', () => {
+      const collectionUrl = `http://localhost:${this.port}/${actorName}/${collection}/`
+      this.createdCollections.add(collectionUrl)
+      res.writeHead(201)
+      res.end('Created')
+    })
   }
 
   private handlePutPage(
