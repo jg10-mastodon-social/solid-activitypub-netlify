@@ -20,6 +20,8 @@ import { serializeOutboxPage } from '../../src/services/serializeOutboxPage.js'
 import { rewriteBody } from '../../src/services/rewriteBody.js'
 import { wantsAs2Json } from '../../src/wantsAs2Json.js'
 import { buildActorSkeleton, applyProfile, parseProfileTurtle, getPublicKeyPem } from '../../src/services/actorDoc.js'
+import { openActorResolver, type ActorResolver } from '../../src/actors/resolve.js'
+import type { ActorConfig } from '../../src/types.js'
 
 const routerFilename = fileURLToPath(import.meta.url)
 const routerDirname = path.dirname(routerFilename)
@@ -59,15 +61,11 @@ function activitySummary(activity: Record<string, unknown>): string {
   return objId ? `type=${type} actor=${actor} object=${objId}` : `type=${type} actor=${actor}`
 }
 
-function resolveActor(config: ReturnType<typeof loadConfig>, actorParam: string | undefined) {
-  if (!actorParam) return null
-  return config.actorByPath[`/${actorParam}`] ?? null
-}
-
-function resolveSharedInboxSigner(config: ReturnType<typeof loadConfig>) {
-  const firstName = config.actorNames[0]
-  if (!firstName) return undefined
-  const actor = config.actorByPath[`/${firstName}`]
+async function resolveSharedInboxSigner(
+  resolver: ActorResolver,
+  config: ReturnType<typeof loadConfig>
+) {
+  const [actor] = await resolver.listActors()
   if (!actor) return undefined
   return { keyId: actor.keyId, actorUrl: actor.url, baseUrl: config.baseUrl }
 }
@@ -267,7 +265,8 @@ async function handleGet(
 async function handleActorGet(
   config: ReturnType<typeof loadConfig>,
   fetchFn: Awaited<ReturnType<typeof createSolidFetch>>,
-  actor: ReturnType<typeof resolveActor>,
+  actor: ActorConfig | null,
+  resolver: ActorResolver,
   corsHeaders: Record<string, string>,
   req: Request
 ): Promise<Response> {
@@ -287,7 +286,7 @@ async function handleActorGet(
     }
   }
 
-  const pem = await getPublicKeyPem(actor.name)
+  const pem = await resolver.getPublicKeyPem(actor.name)
   const skeleton = buildActorSkeleton(actor, pem)
 
   const profileUrl = `${config.solidStorageBaseUrl}${actor.name}/profile`
@@ -316,7 +315,7 @@ async function handlePostOutbox(
   req: Request,
   config: ReturnType<typeof loadConfig>,
   fetchFn: Awaited<ReturnType<typeof createSolidFetch>>,
-  actor: ReturnType<typeof resolveActor>,
+  actor: ActorConfig | null,
   corsHeaders: Record<string, string>
 ): Promise<Response> {
   if (!actor) return new Response('Unknown actor', { status: 404, headers: corsHeaders })
@@ -396,7 +395,7 @@ async function handlePostInbox(
   req: Request,
   config: ReturnType<typeof loadConfig>,
   fetchFn: Awaited<ReturnType<typeof createSolidFetch>>,
-  actor: ReturnType<typeof resolveActor>,
+  actor: ActorConfig | null,
   corsHeaders: Record<string, string>
 ): Promise<Response> {
   if (!actor) return new Response('Unknown actor', { status: 404, headers: corsHeaders })
@@ -479,6 +478,7 @@ async function handlePostSharedInbox(
   req: Request,
   config: ReturnType<typeof loadConfig>,
   fetchFn: Awaited<ReturnType<typeof createSolidFetch>>,
+  resolver: ActorResolver,
   corsHeaders: Record<string, string>
 ): Promise<Response> {
   let rawBody: ArrayBuffer
@@ -510,7 +510,7 @@ async function handlePostSharedInbox(
   }
 
   try {
-    const signerActor = resolveSharedInboxSigner(config)
+    const signerActor = await resolveSharedInboxSigner(resolver, config)
     await verifyIncomingActivity(req, activity, rawBytes, fetchFn, signerActor)
   } catch (error) {
     if (error instanceof HttpSignatureError) {
@@ -524,11 +524,16 @@ async function handlePostSharedInbox(
     throw error
   }
 
+  const sharedInboxActorByPath: Record<string, ActorConfig> = {}
+  for (const actor of await resolver.listActors()) {
+    sharedInboxActorByPath[actor.path] = actor
+  }
+
   try {
     const result = await handleSharedInboxActivity(
       activity,
       fetchFn,
-      { actorByPath: config.actorByPath, solidStorageBaseUrl: config.solidStorageBaseUrl }
+      { actorByPath: sharedInboxActorByPath, solidStorageBaseUrl: config.solidStorageBaseUrl }
     )
     if (!result.success) {
       console.log(`[router] inbox reject: ${activitySummary(activity)} reason=${result.reason ?? 'unknown'}`)
@@ -562,12 +567,24 @@ export default async (req: Request, context: Context) => {
       return new Response('Method not allowed', { status: 405, headers: corsHeaders })
     }
     const config = loadConfig()
+    const resolver = openActorResolver({
+      baseUrl: config.baseUrl,
+      solidStorageBaseUrl: config.solidStorageBaseUrl,
+      fallbackActorByPath: config.actorByPath,
+      fallbackPublicKeyPem: (name) => getPublicKeyPem(name)
+    })
     const fetchFn = await createSolidFetch(config.webId, config.issuer)
-    return handlePostSharedInbox(req, config, fetchFn, corsHeaders)
+    return handlePostSharedInbox(req, config, fetchFn, resolver, corsHeaders)
   }
 
   const config = loadConfig()
-  const actor = resolveActor(config, context.params.actor)
+  const resolver = openActorResolver({
+    baseUrl: config.baseUrl,
+    solidStorageBaseUrl: config.solidStorageBaseUrl,
+    fallbackActorByPath: config.actorByPath,
+    fallbackPublicKeyPem: (name) => getPublicKeyPem(name)
+  })
+  const actor = context.params.actor ? await resolver.resolveActor(context.params.actor) : null
   if (!actor) {
     return new Response('Unknown actor', { status: 404, headers: corsHeaders })
   }
@@ -576,7 +593,7 @@ export default async (req: Request, context: Context) => {
 
   if (isActorPath(pathname, actor.name)) {
     if (req.method === 'GET') {
-      return handleActorGet(config, fetchFn, actor, corsHeaders, req)
+      return handleActorGet(config, fetchFn, actor, resolver, corsHeaders, req)
     }
     return new Response('Method not allowed', { status: 405, headers: corsHeaders })
   }
