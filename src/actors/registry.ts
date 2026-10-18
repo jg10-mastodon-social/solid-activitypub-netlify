@@ -1,5 +1,5 @@
-import { openJsonStore, type JsonStore } from '../blobs.js'
-import type { EncryptedSecret } from './crypto.js'
+import { openJsonStore, type JsonStore } from '../blobs.ts'
+import type { EncryptedSecret } from './crypto.ts'
 
 export interface ActorRecord {
   name: string
