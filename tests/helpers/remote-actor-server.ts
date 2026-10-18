@@ -5,7 +5,13 @@ const DEFAULT_PORT = 9997
 let server: http.Server | null = null
 let port = DEFAULT_PORT
 const actors = new Map<string, Record<string, unknown>>()
-const receivedInboxes: Array<{ path: string; body: string }> = []
+interface ReceivedDelivery {
+  path: string
+  body: string
+  headers: http.IncomingHttpHeaders
+}
+
+const receivedInboxes: ReceivedDelivery[] = []
 
 export function remoteActorBaseUrl(): string {
   return `http://localhost:${port}`
@@ -24,7 +30,7 @@ export function clearRemoteActors(): void {
   receivedInboxes.length = 0
 }
 
-export function getRemoteInboxActivities(): Array<{ path: string; body: string }> {
+export function getRemoteInboxActivities(): ReceivedDelivery[] {
   return [...receivedInboxes]
 }
 
@@ -47,7 +53,7 @@ export async function startRemoteActorServer(serverPort = DEFAULT_PORT): Promise
         let body = ''
         req.on('data', (chunk) => { body += chunk })
         req.on('end', () => {
-          receivedInboxes.push({ path: url.pathname, body })
+          receivedInboxes.push({ path: url.pathname, body, headers: req.headers })
           res.writeHead(200)
           res.end('OK')
         })

@@ -2,6 +2,17 @@ import { createHash, createSign, createPrivateKey } from 'node:crypto'
 import type { SolidFetch } from './types.js'
 // @ts-ignore
 import { actorKeys } from './actor-keys.js'
+import { openActorRegistry } from './actors/registry.js'
+import { openActorKeys, type ActorKeys } from './actors/keys.js'
+
+let actorKeysProvider: ActorKeys | null = null
+
+function getActorKeysProvider(): ActorKeys {
+  if (actorKeysProvider === null) {
+    actorKeysProvider = openActorKeys(openActorRegistry())
+  }
+  return actorKeysProvider
+}
 
 export function buildSigningString(
   method: string,
@@ -81,6 +92,17 @@ export function getActorPrivateKey(actorName: string): Record<string, unknown> {
   return key
 }
 
+export async function resolveActorPrivateKey(
+  actorName: string
+): Promise<Record<string, unknown>> {
+  try {
+    return await getActorKeysProvider().getPrivateKeyJwk(actorName)
+  } catch {
+    // Transitional fallback to build-time actorKeys; remove at cutover.
+    return getActorPrivateKey(actorName)
+  }
+}
+
 export async function signActivityRequest(
   inboxUrl: string,
   activityBody: string,
@@ -90,7 +112,7 @@ export async function signActivityRequest(
   fetchFn: SolidFetch
 ): Promise<Response> {
   const actorName = actorNameFromActorUrl(actorUrl, baseUrl)
-  const privateKey = getActorPrivateKey(actorName)
+  const privateKey = await resolveActorPrivateKey(actorName)
 
   const url = new URL(inboxUrl)
   const method = 'POST'
@@ -132,7 +154,7 @@ export async function signActorFetchRequest(
   fetchFn: SolidFetch
 ): Promise<Response> {
   const actorName = actorNameFromActorUrl(localActorUrl, baseUrl)
-  const privateKey = getActorPrivateKey(actorName)
+  const privateKey = await resolveActorPrivateKey(actorName)
 
   const url = new URL(actorUrl)
   const method = 'GET'
