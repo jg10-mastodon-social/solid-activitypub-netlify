@@ -22,7 +22,7 @@ implemented, reviewed, and committed. It is not product documentation; see
   `refactor` before the feature commit.
 - **No secrets and no generated artifacts.** Never commit `.env`, private keys,
   or the gitignored generated files (`src/base-url.ts`, `src/private-key.ts`,
-  `src/actor-keys.ts`, `src/webfinger-data.ts`, `public/`).
+  `public/`).
 
 ## Cycle workflow
 
@@ -95,13 +95,14 @@ only carries local development values.
 ## Repo gotchas
 
 - **Generated files and test ordering.** The e2e cleanup deletes
-  `src/actor-keys.ts`, `src/webfinger-data.ts`, and `src/private-key.ts`. Unit
-  tests transitively import some of these, so regenerate identity before
-  running unit tests after an e2e run.
+  `src/private-key.ts` and resets `src/base-url.ts`. Unit tests that transitively
+  import the OIDC key need identity regenerated before running unit tests after
+  an e2e run.
 - **Edge import specifiers.** Netlify's local edge bundler does not map `.js`
   specifiers to `.ts` files, so the edge import chain
-  (`netlify/edge-functions/webfinger.ts` and its `src/actors/*` imports) uses
-  explicit `.ts` specifiers. The rest of the repo uses `.js`.
+  (`netlify/edge-functions/webfinger.ts`, `netlify/edge-functions/actors.ts`,
+  and their `src/actors/*` imports) uses explicit `.ts` specifiers. The rest of
+  the repo uses `.js`.
 - **Blobs are not a database.** The actor registry uses a single JSON document
   per store with strong consistency and compare-and-swap
   (`onlyIfNew` / `onlyIfMatch`). Do not build counters or read-modify-write
