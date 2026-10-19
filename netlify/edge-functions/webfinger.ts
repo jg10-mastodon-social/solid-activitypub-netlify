@@ -1,8 +1,6 @@
 import { baseUrl } from '../../src/base-url.ts'
 import { openActorRegistry } from '../../src/actors/registry.ts'
 import { resolveWebFinger } from '../../src/actors/webfinger.ts'
-// @ts-ignore - generated at build time
-import { webfingerEntries } from '../../src/webfinger-data.ts'
 
 declare const Netlify: { env: { get(key: string): string | undefined } }
 
@@ -50,16 +48,6 @@ export default async (req: Request): Promise<Response> => {
   const entry = await resolveWebFinger(resource, baseUrl, getRegistry())
   if (entry !== null) {
     return new Response(JSON.stringify(entry), {
-      status: 200,
-      headers: corsHeaders
-    })
-  }
-
-  // Transitional fallback to build-time WebFinger entries. Remove at cutover,
-  // once the runtime registry is the sole source of actors.
-  const fallback = webfingerEntries[resource]
-  if (fallback) {
-    return new Response(JSON.stringify(fallback), {
       status: 200,
       headers: corsHeaders
     })

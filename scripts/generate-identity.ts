@@ -12,7 +12,6 @@ const publicDir = path.join(rootDir, 'public')
 const baseUrlPath = path.join(rootDir, 'src/base-url.ts')
 const privateKeyPath = path.join(rootDir, 'src/private-key.ts')
 const actorKeysPath = path.join(rootDir, 'src/actor-keys.ts')
-const webfingerDataPath = path.join(rootDir, 'src/webfinger-data.ts')
 
 const context = process.env.CONTEXT
 let baseUrl: string | undefined
@@ -195,9 +194,8 @@ async function generateIdentity() {
   fs.writeFileSync(privateKeyPath, `export const privateKey = ${JSON.stringify(privateJwk)}\n`)
   console.log(`Written: ${privateKeyPath}`)
 
-  console.log('Generating actor documents, keys, and webfinger data')
+  console.log('Generating actor documents and keys')
   const actorNames = parseActorNames(process.env.ACTOR_NAME)
-  const domain = (baseUrl as string).replace(/^https?:\/\//, '')
 
   // Reuse existing per-actor signing keys when present so that remote servers
   // don't invalidate cached HTTP signatures across deploys. Only keys for
@@ -205,18 +203,10 @@ async function generateIdentity() {
   const existingActorKeys = loadExistingObjectLiteral(actorKeysPath) as Record<string, Record<string, unknown>>
   const actorKeys: Record<string, Record<string, unknown>> = { ...existingActorKeys }
 
-  // Build fresh webfinger entries for the currently-configured actors so URLs
-  // track the current BASE_URL. Entries from the previous file that point at
-  // actors no longer present in ACTOR_NAME are preserved unchanged.
-  const existingWebfingerEntries = loadExistingObjectLiteral(webfingerDataPath)
-  const webfingerEntries: Record<string, unknown> = { ...existingWebfingerEntries }
-
   let reusedActorCount = 0
   let generatedActorCount = 0
 
   for (const actorName of actorNames) {
-    const actorUrl = `${baseUrl}/${actorName}`
-
     if (actorKeys[actorName]) {
       console.log(`actor-keys: reusing existing key for "${actorName}"`)
       reusedActorCount++
@@ -226,28 +216,12 @@ async function generateIdentity() {
       actorKeys[actorName] = actorPrivateJwk
       generatedActorCount++
     }
-
-    const resource = `acct:${actorName}@${domain}`
-    webfingerEntries[resource] = {
-      subject: resource,
-      aliases: [actorUrl],
-      links: [
-        {
-          rel: 'self',
-          type: 'application/activity+json',
-          href: actorUrl
-        }
-      ]
-    }
   }
 
   console.log(`actor-keys: ${reusedActorCount} reused, ${generatedActorCount} newly generated`)
 
   fs.writeFileSync(actorKeysPath, `export const actorKeys: Record<string, Record<string, unknown>> = ${JSON.stringify(actorKeys, null, 2)}\n`)
   console.log(`Written: ${actorKeysPath}`)
-
-  fs.writeFileSync(webfingerDataPath, `export const webfingerEntries: Record<string, unknown> = ${JSON.stringify(webfingerEntries, null, 2)}\n`)
-  console.log(`Written: ${webfingerDataPath}`)
 
   console.log('Copying default UI from static-ui/ into public/')
   const landingTemplatePath = path.join(staticUiDir, 'index.html')

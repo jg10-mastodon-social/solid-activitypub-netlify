@@ -24,10 +24,6 @@ function cleanup() {
   if (fs.existsSync(actorKeysPath)) {
     fs.unlinkSync(actorKeysPath)
   }
-  const webfingerDataPath = path.join(rootDir, 'src/webfinger-data.ts')
-  if (fs.existsSync(webfingerDataPath)) {
-    fs.unlinkSync(webfingerDataPath)
-  }
 }
 
 beforeAll(async () => {

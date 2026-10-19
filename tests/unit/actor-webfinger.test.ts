@@ -1,12 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import fs from 'fs'
 import path from 'path'
-import { publicDir, baseUrlPath, actorKeysPath, webfingerDataPath, runScript } from '../helpers.js'
+import { publicDir, baseUrlPath, actorKeysPath, runScript } from '../helpers.js'
 
 describe('actor and webfinger', () => {
   let originalBaseUrlContent: string | null = null
   let originalActorKeysContent: string | null = null
-  let originalWebfingerDataContent: string | null = null
 
   beforeEach(() => {
     if (fs.existsSync(baseUrlPath)) {
@@ -19,11 +18,6 @@ describe('actor and webfinger', () => {
     } else {
       originalActorKeysContent = null
     }
-    if (fs.existsSync(webfingerDataPath)) {
-      originalWebfingerDataContent = fs.readFileSync(webfingerDataPath, 'utf-8')
-    } else {
-      originalWebfingerDataContent = null
-    }
 
     if (fs.existsSync(publicDir)) {
       fs.rmSync(publicDir, { recursive: true, force: true })
@@ -33,9 +27,6 @@ describe('actor and webfinger', () => {
     }
     if (fs.existsSync(actorKeysPath)) {
       fs.unlinkSync(actorKeysPath)
-    }
-    if (fs.existsSync(webfingerDataPath)) {
-      fs.unlinkSync(webfingerDataPath)
     }
   })
 
@@ -52,11 +43,6 @@ describe('actor and webfinger', () => {
       fs.writeFileSync(actorKeysPath, originalActorKeysContent)
     } else if (fs.existsSync(actorKeysPath)) {
       fs.unlinkSync(actorKeysPath)
-    }
-    if (originalWebfingerDataContent !== null) {
-      fs.writeFileSync(webfingerDataPath, originalWebfingerDataContent)
-    } else if (fs.existsSync(webfingerDataPath)) {
-      fs.unlinkSync(webfingerDataPath)
     }
   })
 
@@ -126,67 +112,6 @@ describe('actor and webfinger', () => {
       expect(content).toContain('"alice"')
       expect(content).toContain('"retired"')
       expect(content).toContain('"n": "seeded-n-value"')
-    })
-  })
-
-  describe('webfinger data', () => {
-    it('creates webfinger data file', async () => {
-      await runScript(undefined, 'production')
-      expect(fs.existsSync(webfingerDataPath)).toBe(true)
-    })
-
-    it('exports webfingerEntries const', async () => {
-      await runScript(undefined, 'production')
-      const content = fs.readFileSync(webfingerDataPath, 'utf-8')
-      expect(content).toContain('export const webfingerEntries')
-    })
-
-    it('contains an entry per configured actor', async () => {
-      await runScript(undefined, 'production', 'alice,bob')
-      const content = fs.readFileSync(webfingerDataPath, 'utf-8')
-      expect(content).toContain('acct:alice@example.com')
-      expect(content).toContain('acct:bob@example.com')
-    })
-
-    it('contains self link with application/activity+json type', async () => {
-      await runScript(undefined, 'production', 'myactor')
-      const content = fs.readFileSync(webfingerDataPath, 'utf-8')
-      expect(content).toContain('https://example.com/myactor')
-      expect(content).toContain('application/activity+json')
-    })
-
-    it('regenerates webfinger entries for currently-configured actors under current BASE_URL', async () => {
-      const seedEntry = { subject: 'acct:alice@example.com', aliases: ['https://old.example/alice'], links: [{ rel: 'self', type: 'application/activity+json', href: 'https://old.example/alice' }] }
-      const seedContent = `export const webfingerEntries: Record<string, unknown> = ${JSON.stringify({ 'acct:alice@example.com': seedEntry }, null, 2)}\n`
-      fs.writeFileSync(webfingerDataPath, seedContent)
-
-      await runScript(undefined, 'production', 'alice')
-
-      const content = fs.readFileSync(webfingerDataPath, 'utf-8')
-      expect(content).toContain('acct:alice@example.com')
-      expect(content).toContain('https://example.com/alice')
-      expect(content).not.toContain('https://old.example/alice')
-    })
-
-    it('preserves webfinger entries for actors no longer in ACTOR_NAME', async () => {
-      const seedEntry = { subject: 'acct:retired@old.example', aliases: ['https://old.example/retired'], links: [{ rel: 'self', type: 'application/activity+json', href: 'https://old.example/retired' }] }
-      const seedContent = `export const webfingerEntries: Record<string, unknown> = ${JSON.stringify({ 'acct:retired@old.example': seedEntry }, null, 2)}\n`
-      fs.writeFileSync(webfingerDataPath, seedContent)
-
-      await runScript(undefined, 'production', 'alice')
-
-      const content = fs.readFileSync(webfingerDataPath, 'utf-8')
-      expect(content).toContain('acct:retired@old.example')
-      expect(content).toContain('acct:alice@example.com')
-    })
-  })
-
-  describe('with ACTOR_NAME env var', () => {
-    it('records webfinger entry using actorName', async () => {
-      await runScript(undefined, 'production', 'myactor')
-      const content = fs.readFileSync(webfingerDataPath, 'utf-8')
-      expect(content).toContain('acct:myactor@example.com')
-      expect(content).toContain('https://example.com/myactor')
     })
   })
 })
