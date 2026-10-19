@@ -62,53 +62,33 @@ describe('openActorResolver.resolveActor', () => {
     expect(actor).toEqual(deriveActorConfig('alice', BASE_URL, POD_BASE))
   })
 
-  it('returns null for a disabled registered actor even when a fallback exists', async () => {
+  it('returns null for a disabled registered actor', async () => {
     hoisted.registry = makeRegistry({ getActor: vi.fn(async (name: string) => makeRecord(name, true)) })
-    const resolver = openActorResolver({
-      baseUrl: BASE_URL,
-      solidStorageBaseUrl: POD_BASE,
-      fallbackActorByPath: { '/alice': deriveActorConfig('alice', BASE_URL, POD_BASE) }
-    })
+    const resolver = openActorResolver({ baseUrl: BASE_URL, solidStorageBaseUrl: POD_BASE })
 
     expect(await resolver.resolveActor('alice')).toBeNull()
   })
 
-  it('uses the fallback map for a registry miss', async () => {
-    const fallbackActor = deriveActorConfig('legacy', BASE_URL, POD_BASE)
-    const resolver = openActorResolver({
-      baseUrl: BASE_URL,
-      solidStorageBaseUrl: POD_BASE,
-      fallbackActorByPath: { '/legacy': fallbackActor }
-    })
+  it('returns null when the registry has no matching actor', async () => {
+    const resolver = openActorResolver({ baseUrl: BASE_URL, solidStorageBaseUrl: POD_BASE })
 
-    expect(await resolver.resolveActor('legacy')).toEqual(fallbackActor)
+    expect(await resolver.resolveActor('ghost')).toBeNull()
   })
 
-  it('uses the fallback map when the registry throws', async () => {
+  it('propagates registry errors instead of falling back', async () => {
     hoisted.registry = makeRegistry({
       getActor: vi.fn(async () => {
         throw new Error('blobs unavailable')
       })
     })
-    const fallbackActor = deriveActorConfig('legacy', BASE_URL, POD_BASE)
-    const resolver = openActorResolver({
-      baseUrl: BASE_URL,
-      solidStorageBaseUrl: POD_BASE,
-      fallbackActorByPath: { '/legacy': fallbackActor }
-    })
-
-    expect(await resolver.resolveActor('legacy')).toEqual(fallbackActor)
-  })
-
-  it('returns null when neither the registry nor the fallback resolve the name', async () => {
     const resolver = openActorResolver({ baseUrl: BASE_URL, solidStorageBaseUrl: POD_BASE })
 
-    expect(await resolver.resolveActor('ghost')).toBeNull()
+    await expect(resolver.resolveActor('alice')).rejects.toThrow('blobs unavailable')
   })
 })
 
 describe('openActorResolver.listActors', () => {
-  it('merges registry and fallback actors, de-duplicating with registry winning', async () => {
+  it('returns derived configs for enabled registry actors only', async () => {
     hoisted.registry = makeRegistry({
       listActors: vi.fn(async () => [
         makeRecord('alice'),
@@ -116,70 +96,37 @@ describe('openActorResolver.listActors', () => {
         makeRecord('disabled', true)
       ])
     })
-    const resolver = openActorResolver({
-      baseUrl: BASE_URL,
-      solidStorageBaseUrl: POD_BASE,
-      fallbackActorByPath: {
-        '/alice': { ...deriveActorConfig('alice', BASE_URL, POD_BASE), url: 'https://legacy.example/alice' },
-        '/legacy': deriveActorConfig('legacy', BASE_URL, POD_BASE)
-      }
-    })
+    const resolver = openActorResolver({ baseUrl: BASE_URL, solidStorageBaseUrl: POD_BASE })
 
     const actors = await resolver.listActors()
 
-    expect(actors.map((a) => a.name).sort()).toEqual(['alice', 'bob', 'legacy'])
-    const alice = actors.find((a) => a.name === 'alice')
-    expect(alice).toEqual(deriveActorConfig('alice', BASE_URL, POD_BASE))
+    expect(actors).toEqual([
+      deriveActorConfig('alice', BASE_URL, POD_BASE),
+      deriveActorConfig('bob', BASE_URL, POD_BASE)
+    ])
   })
 
-  it('returns just the fallback actors when the registry throws', async () => {
+  it('propagates registry errors instead of falling back', async () => {
     hoisted.registry = makeRegistry({
       listActors: vi.fn(async () => {
         throw new Error('blobs unavailable')
       })
     })
-    const fallbackActor = deriveActorConfig('legacy', BASE_URL, POD_BASE)
-    const resolver = openActorResolver({
-      baseUrl: BASE_URL,
-      solidStorageBaseUrl: POD_BASE,
-      fallbackActorByPath: { '/legacy': fallbackActor }
-    })
+    const resolver = openActorResolver({ baseUrl: BASE_URL, solidStorageBaseUrl: POD_BASE })
 
-    expect(await resolver.listActors()).toEqual([fallbackActor])
+    await expect(resolver.listActors()).rejects.toThrow('blobs unavailable')
   })
 })
 
 describe('openActorResolver.getPublicKeyPem', () => {
-  it('prefers the registry keys', async () => {
+  it('returns the registry public key', async () => {
     hoisted.keys = makeKeys({ getPublicKeyPem: vi.fn(async () => 'registry-pem') })
-    const fallback = vi.fn(async () => 'fallback-pem')
-    const resolver = openActorResolver({
-      baseUrl: BASE_URL,
-      solidStorageBaseUrl: POD_BASE,
-      fallbackPublicKeyPem: fallback
-    })
+    const resolver = openActorResolver({ baseUrl: BASE_URL, solidStorageBaseUrl: POD_BASE })
 
     expect(await resolver.getPublicKeyPem('alice')).toBe('registry-pem')
-    expect(fallback).not.toHaveBeenCalled()
   })
 
-  it('falls back to the provided PEM function when the registry keys throw', async () => {
-    hoisted.keys = makeKeys({
-      getPublicKeyPem: vi.fn(async () => {
-        throw new Error('no key')
-      })
-    })
-    const fallback = vi.fn(async () => 'fallback-pem')
-    const resolver = openActorResolver({
-      baseUrl: BASE_URL,
-      solidStorageBaseUrl: POD_BASE,
-      fallbackPublicKeyPem: fallback
-    })
-
-    expect(await resolver.getPublicKeyPem('alice')).toBe('fallback-pem')
-  })
-
-  it('rethrows when the registry keys throw and no fallback is provided', async () => {
+  it('propagates registry key errors instead of falling back', async () => {
     hoisted.keys = makeKeys({
       getPublicKeyPem: vi.fn(async () => {
         throw new Error('no key')

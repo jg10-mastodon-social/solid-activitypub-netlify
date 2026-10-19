@@ -19,7 +19,7 @@ import { serializeOutboxCollection } from '../../src/services/serializeOutboxCol
 import { serializeOutboxPage } from '../../src/services/serializeOutboxPage.js'
 import { rewriteBody } from '../../src/services/rewriteBody.js'
 import { wantsAs2Json } from '../../src/wantsAs2Json.js'
-import { buildActorSkeleton, applyProfile, parseProfileTurtle, getPublicKeyPem } from '../../src/services/actorDoc.js'
+import { buildActorSkeleton, applyProfile, parseProfileTurtle } from '../../src/services/actorDoc.js'
 import { openActorResolver, type ActorResolver } from '../../src/actors/resolve.js'
 import type { ActorConfig } from '../../src/types.js'
 
@@ -569,9 +569,7 @@ export default async (req: Request, context: Context) => {
     const config = loadConfig()
     const resolver = openActorResolver({
       baseUrl: config.baseUrl,
-      solidStorageBaseUrl: config.solidStorageBaseUrl,
-      fallbackActorByPath: config.actorByPath,
-      fallbackPublicKeyPem: (name) => getPublicKeyPem(name)
+      solidStorageBaseUrl: config.solidStorageBaseUrl
     })
     const fetchFn = await createSolidFetch(config.webId, config.issuer)
     return handlePostSharedInbox(req, config, fetchFn, resolver, corsHeaders)
@@ -580,9 +578,7 @@ export default async (req: Request, context: Context) => {
   const config = loadConfig()
   const resolver = openActorResolver({
     baseUrl: config.baseUrl,
-    solidStorageBaseUrl: config.solidStorageBaseUrl,
-    fallbackActorByPath: config.actorByPath,
-    fallbackPublicKeyPem: (name) => getPublicKeyPem(name)
+    solidStorageBaseUrl: config.solidStorageBaseUrl
   })
   const actor = context.params.actor ? await resolver.resolveActor(context.params.actor) : null
   if (!actor) {

@@ -8,6 +8,11 @@ vi.mock('../../src/base-url.js', () => ({
   baseUrl: 'http://localhost:9999'
 }))
 
+vi.mock('../../src/actors/resolve.js', async () => {
+  const { createFakeResolver } = await import('../helpers/mock-runtime-actors.js')
+  return { openActorResolver: () => createFakeResolver() }
+})
+
 vi.mock('../../src/solidFetch.js', () => ({
   createSolidFetch: vi.fn().mockResolvedValue(vi.fn())
 }))
