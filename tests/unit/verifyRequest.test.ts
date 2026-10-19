@@ -1,5 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
+vi.mock('../../src/actors/keys.js', async () => {
+  const { generateKeyPairSync } = await import('node:crypto')
+  const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 })
+  const privateKeyJwk = privateKey.export({ format: 'jwk' }) as Record<string, unknown>
+  return {
+    openActorKeys: () => ({
+      getPrivateKeyJwk: async () => privateKeyJwk
+    })
+  }
+})
+
+vi.mock('../../src/actors/registry.js', () => ({
+  openActorRegistry: () => ({})
+}))
+
 const mockFetch = vi.fn()
 
 describe('verifyIncomingActivity', () => {

@@ -229,7 +229,7 @@ describe('generate-identity', () => {
     const headerFragmentPath = path.join(templatesDir, 'discussion', 'header.html')
 
     it('writes public/index.html with a client-side actor list', async () => {
-      await runScript(undefined, undefined, 'alice,bob')
+      await runScript()
 
       expect(fs.existsSync(landingPath)).toBe(true)
       const content = fs.readFileSync(landingPath, 'utf-8')
@@ -243,7 +243,7 @@ describe('generate-identity', () => {
     })
 
     it('wires the actor-controls fragment into public/index.html', async () => {
-      await runScript(undefined, undefined, 'alice')
+      await runScript()
 
       const landingContent = fs.readFileSync(landingPath, 'utf-8')
       expect(landingContent).toContain('<pos-app restore-previous-session>')
@@ -272,7 +272,7 @@ describe('generate-identity', () => {
     })
 
     it('uses production domain in the actor resource URI', async () => {
-      await runScript(undefined, 'production', 'alice')
+      await runScript(undefined, 'production')
 
       const content = fs.readFileSync(landingPath, 'utf-8')
       expect(content).toContain('<pos-resource uri="https://example.com/actors">')

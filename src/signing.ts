@@ -1,7 +1,5 @@
 import { createHash, createSign, createPrivateKey } from 'node:crypto'
 import type { SolidFetch } from './types.js'
-// @ts-ignore
-import { actorKeys } from './actor-keys.js'
 import { openActorRegistry } from './actors/registry.js'
 import { openActorKeys, type ActorKeys } from './actors/keys.js'
 
@@ -84,23 +82,10 @@ function actorNameFromActorUrl(actorUrl: string, baseUrl: string): string {
   return actorUrl.slice(prefix.length)
 }
 
-export function getActorPrivateKey(actorName: string): Record<string, unknown> {
-  const key = actorKeys[actorName]
-  if (!key) {
-    throw new Error(`No signing key configured for actor "${actorName}"`)
-  }
-  return key
-}
-
 export async function resolveActorPrivateKey(
   actorName: string
 ): Promise<Record<string, unknown>> {
-  try {
-    return await getActorKeysProvider().getPrivateKeyJwk(actorName)
-  } catch {
-    // Transitional fallback to build-time actorKeys; remove at cutover.
-    return getActorPrivateKey(actorName)
-  }
+  return getActorKeysProvider().getPrivateKeyJwk(actorName)
 }
 
 export async function signActivityRequest(

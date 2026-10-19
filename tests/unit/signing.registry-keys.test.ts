@@ -4,15 +4,8 @@ import type { SolidFetch } from '../../src/types.js'
 const mocks = vi.hoisted(() => ({
   getPrivateKeyJwk: vi.fn(),
   openActorKeys: vi.fn(),
-  openActorRegistry: vi.fn(),
-  getBuildKey: vi.fn()
+  openActorRegistry: vi.fn()
 }))
-
-const buildKey = {
-  kty: 'RSA',
-  kid: 'build-key',
-  source: 'build'
-}
 
 const registryKey = {
   kty: 'RSA',
@@ -40,27 +33,17 @@ vi.mock('../../src/actors/registry.js', () => ({
   openActorRegistry: mocks.openActorRegistry
 }))
 
-vi.mock('../../src/actor-keys.js', () => ({
-  actorKeys: {
-    get actor() {
-      mocks.getBuildKey()
-      return buildKey
-    }
-  }
-}))
-
 beforeEach(() => {
   vi.resetModules()
   mocks.getPrivateKeyJwk.mockReset()
   mocks.openActorKeys.mockReset()
   mocks.openActorRegistry.mockReset()
-  mocks.getBuildKey.mockReset()
   mocks.openActorRegistry.mockReturnValue({})
   mocks.openActorKeys.mockReturnValue({ getPrivateKeyJwk: mocks.getPrivateKeyJwk })
 })
 
 describe('resolveActorPrivateKey', () => {
-  it('returns the registry key without consulting the build fallback', async () => {
+  it('returns the registry key', async () => {
     mocks.getPrivateKeyJwk.mockResolvedValue(registryKey)
 
     const { resolveActorPrivateKey } = await import('../../src/signing.js')
@@ -68,28 +51,15 @@ describe('resolveActorPrivateKey', () => {
     const key = await resolveActorPrivateKey('actor')
 
     expect(key).toBe(registryKey)
-    expect(mocks.getBuildKey).not.toHaveBeenCalled()
+    expect(mocks.getPrivateKeyJwk).toHaveBeenCalledWith('actor')
   })
 
-  it('falls back to the build-time key when the registry provider throws', async () => {
+  it('propagates registry provider errors without a build-time fallback', async () => {
     mocks.getPrivateKeyJwk.mockRejectedValue(new Error('registry unavailable'))
 
     const { resolveActorPrivateKey } = await import('../../src/signing.js')
 
-    const key = await resolveActorPrivateKey('actor')
-
-    expect(key).toBe(buildKey)
-    expect(mocks.getBuildKey).toHaveBeenCalled()
-  })
-
-  it('throws the build lookup error when the registry throws and no build key exists', async () => {
-    mocks.getPrivateKeyJwk.mockRejectedValue(new Error('registry unavailable'))
-
-    const { resolveActorPrivateKey } = await import('../../src/signing.js')
-
-    await expect(resolveActorPrivateKey('missing')).rejects.toThrow(
-      'No signing key configured for actor "missing"'
-    )
+    await expect(resolveActorPrivateKey('actor')).rejects.toThrow('registry unavailable')
   })
 })
 
@@ -113,6 +83,5 @@ describe('signActivityRequest with registry keys', () => {
     expect(fetchFn).toHaveBeenCalledOnce()
     const init = fetchFn.mock.calls[0][1] as { headers: Record<string, string> }
     expect(init.headers.Signature).toContain('keyId="https://example.com/actor#main-key"')
-    expect(mocks.getBuildKey).not.toHaveBeenCalled()
   })
 })

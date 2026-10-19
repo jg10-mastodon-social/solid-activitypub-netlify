@@ -20,10 +20,6 @@ function cleanup() {
   if (fs.existsSync(privateKeyPath)) {
     fs.unlinkSync(privateKeyPath)
   }
-  const actorKeysPath = path.join(rootDir, 'src/actor-keys.ts')
-  if (fs.existsSync(actorKeysPath)) {
-    fs.unlinkSync(actorKeysPath)
-  }
 }
 
 beforeAll(async () => {

@@ -41,6 +41,18 @@ vi.mock('../../src/solidFetch.js', () => ({
   createSolidFetch: mockCreateSolidFetch
 }))
 
+vi.mock('../../src/actors/resolve.js', async () => {
+  const { deriveActorConfig } = await import('../../src/actors/config.js')
+  const actor = deriveActorConfig('actor', 'https://example.com', 'https://pod.example.com/')
+  return {
+    openActorResolver: () => ({
+      resolveActor: async (name: string) => (name === actor.name ? actor : null),
+      listActors: async () => [actor],
+      getPublicKeyPem: async () => 'registry-pem'
+    })
+  }
+})
+
 vi.mock('../../src/base-url.js', () => ({
   baseUrl: 'https://example.com'
 }))

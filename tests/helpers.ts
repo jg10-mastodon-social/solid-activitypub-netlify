@@ -9,7 +9,6 @@ export const rootDir = path.resolve(__dirname, '..')
 export const publicDir = path.join(rootDir, 'public')
 export const baseUrlPath = path.join(rootDir, 'src/base-url.ts')
 export const privateKeyPath = path.join(rootDir, 'src/private-key.ts')
-export const actorKeysPath = path.join(rootDir, 'src/actor-keys.ts')
 
 export async function runScript(jwks?: string, context?: string, actorName?: string): Promise<{ exitCode: number, stdout: string, stderr: string }> {
   return new Promise((resolve) => {

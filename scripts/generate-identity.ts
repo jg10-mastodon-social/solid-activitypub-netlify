@@ -11,7 +11,6 @@ const rootDir = path.resolve(__dirname, '..')
 const publicDir = path.join(rootDir, 'public')
 const baseUrlPath = path.join(rootDir, 'src/base-url.ts')
 const privateKeyPath = path.join(rootDir, 'src/private-key.ts')
-const actorKeysPath = path.join(rootDir, 'src/actor-keys.ts')
 
 const context = process.env.CONTEXT
 let baseUrl: string | undefined
@@ -46,57 +45,6 @@ function derivePublicJwk(privateJwk: Record<string, unknown>): Record<string, un
     use: 'sig',
     alg: 'ES256',
     kid: privateJwk.kid,
-  }
-}
-
-function parseActorNames(raw: string | undefined): string[] {
-  if (!raw) return ['actor']
-  const names = raw.split(',').map((s) => s.trim()).filter((s) => s.length > 0)
-  if (names.length === 0) {
-    throw new Error('ACTOR_NAME must contain at least one non-empty actor name')
-  }
-  return names
-}
-
-function loadExistingObjectLiteral(filePath: string): Record<string, unknown> {
-  if (!fs.existsSync(filePath)) return {}
-  const src = fs.readFileSync(filePath, 'utf-8')
-  const eqIdx = src.indexOf('=')
-  if (eqIdx === -1) return {}
-  const startIdx = src.indexOf('{', eqIdx)
-  if (startIdx === -1) return {}
-
-  let depth = 0
-  let quote: '"' | "'" | '`' | null = null
-  let endIdx = -1
-  for (let i = startIdx; i < src.length; i++) {
-    const ch = src[i]
-    if (quote) {
-      if (ch === '\\') { i++; continue }
-      if (ch === quote) quote = null
-      continue
-    }
-    if (ch === '"' || ch === "'" || ch === '`') {
-      quote = ch as '"' | "'" | '`'
-      continue
-    }
-    if (ch === '{') depth++
-    else if (ch === '}') {
-      depth--
-      if (depth === 0) { endIdx = i; break }
-    }
-  }
-
-  if (endIdx === -1 || depth !== 0) {
-    console.warn(`Could not locate object literal in ${filePath}; starting with empty map.`)
-    return {}
-  }
-
-  try {
-    return JSON.parse(src.slice(startIdx, endIdx + 1)) as Record<string, unknown>
-  } catch (err) {
-    console.warn(`Could not parse existing ${filePath} (${(err as Error).message}); starting with empty map.`)
-    return {}
   }
 }
 
@@ -193,35 +141,6 @@ async function generateIdentity() {
 
   fs.writeFileSync(privateKeyPath, `export const privateKey = ${JSON.stringify(privateJwk)}\n`)
   console.log(`Written: ${privateKeyPath}`)
-
-  console.log('Generating actor documents and keys')
-  const actorNames = parseActorNames(process.env.ACTOR_NAME)
-
-  // Reuse existing per-actor signing keys when present so that remote servers
-  // don't invalidate cached HTTP signatures across deploys. Only keys for
-  // newly-listed actor names are generated.
-  const existingActorKeys = loadExistingObjectLiteral(actorKeysPath) as Record<string, Record<string, unknown>>
-  const actorKeys: Record<string, Record<string, unknown>> = { ...existingActorKeys }
-
-  let reusedActorCount = 0
-  let generatedActorCount = 0
-
-  for (const actorName of actorNames) {
-    if (actorKeys[actorName]) {
-      console.log(`actor-keys: reusing existing key for "${actorName}"`)
-      reusedActorCount++
-    } else {
-      const { privateKey: actorPrivateKey } = await generateKeyPair('RS256')
-      const actorPrivateJwk = await exportJWK(actorPrivateKey)
-      actorKeys[actorName] = actorPrivateJwk
-      generatedActorCount++
-    }
-  }
-
-  console.log(`actor-keys: ${reusedActorCount} reused, ${generatedActorCount} newly generated`)
-
-  fs.writeFileSync(actorKeysPath, `export const actorKeys: Record<string, Record<string, unknown>> = ${JSON.stringify(actorKeys, null, 2)}\n`)
-  console.log(`Written: ${actorKeysPath}`)
 
   console.log('Copying default UI from static-ui/ into public/')
   const landingTemplatePath = path.join(staticUiDir, 'index.html')
