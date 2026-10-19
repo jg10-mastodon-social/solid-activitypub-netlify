@@ -37,9 +37,16 @@
               This server hosts ActivityPub actor(s) backed by a Solid pod.
               Follow any handle from your fediverse account.
             </p>
-            <ul id="actors">
-              <!-- one <li> per actor, emitted by scripts/generate-identity.ts -->
-            </ul>
+            <pos-resource uri="{{BASE_URL}}/actors">
+              <pos-list rel="https://www.w3.org/ns/activitystreams#items" fetch>
+                <template>
+                  <li>
+                    <pos-rich-link></pos-rich-link>
+                    <pos-type-badges></pos-type-badges>
+                  </li>
+                </template>
+              </pos-list>
+            </pos-resource>
             <p>
               <small
                 >For machine-readable actor documents, request

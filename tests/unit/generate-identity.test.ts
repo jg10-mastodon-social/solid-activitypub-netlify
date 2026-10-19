@@ -228,15 +228,17 @@ describe('generate-identity', () => {
     const outboxFragmentPath = path.join(templatesDir, 'discussion', 'outbox.html')
     const headerFragmentPath = path.join(templatesDir, 'discussion', 'header.html')
 
-    it('writes public/index.html with one link per actor', async () => {
+    it('writes public/index.html with a client-side actor list', async () => {
       await runScript(undefined, undefined, 'alice,bob')
 
       expect(fs.existsSync(landingPath)).toBe(true)
       const content = fs.readFileSync(landingPath, 'utf-8')
-      expect(content).toContain('href="/alice"')
-      expect(content).toContain('href="/bob"')
-      expect(content).toContain('@alice@localhost:9999')
-      expect(content).toContain('@bob@localhost:9999')
+      expect(content).toContain('<pos-resource uri="http://localhost:9999/actors">')
+      expect(content).toContain('pos-list rel="https://www.w3.org/ns/activitystreams#items"')
+      expect(content).not.toContain('href="/alice"')
+      expect(content).not.toContain('href="/bob"')
+      expect(content).not.toContain('@alice@localhost:9999')
+      expect(content).not.toContain('@bob@localhost:9999')
       expect(content).not.toContain('{{')
     })
 
@@ -249,7 +251,7 @@ describe('generate-identity', () => {
       expect(landingContent).toContain('<pos-resource uri="http://localhost:9999/">')
       expect(landingContent).toContain('<import-html src="/templates/actor-controls/actor-controls.html">')
       expect(landingContent).toContain('src="/components/WebidResource.js"')
-      expect(landingContent).toContain('<ul id="actors">')
+      expect(landingContent).toContain('<pos-resource uri="http://localhost:9999/actors">')
       expect(landingContent).not.toContain('{{')
 
       const fragmentPath = path.join(publicDir, 'templates', 'actor-controls', 'actor-controls.html')
@@ -269,11 +271,11 @@ describe('generate-identity', () => {
       expect(fs.existsSync(jsPath)).toBe(true)
     })
 
-    it('uses production domain in landing links', async () => {
+    it('uses production domain in the actor resource URI', async () => {
       await runScript(undefined, 'production', 'alice')
 
       const content = fs.readFileSync(landingPath, 'utf-8')
-      expect(content).toContain('@alice@example.com')
+      expect(content).toContain('<pos-resource uri="https://example.com/actors">')
     })
 
     it('copies public/actor-page.template.html with placeholders intact', async () => {
