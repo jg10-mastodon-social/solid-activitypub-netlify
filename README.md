@@ -57,7 +57,7 @@ Runtime variables are frozen per deploy. Set them in the Netlify UI, CLI, or API
 ```bash
 node scripts/actors-backup.ts backup <dir>                 # export both stores to snapshots
 node scripts/actors-backup.ts restore <dir>                # restore both stores from snapshots
-node scripts/actors-backup.ts restore --from-actor-keys    # seed from src/actor-keys.ts
+node scripts/actors-backup.ts restore --from-actor-keys    # seed from a saved src/actor-keys.ts
 ```
 
 `restore --from-actor-keys` reads each actor name and private JWK from a saved copy of the build-time `src/actor-keys.ts`, encrypts the JWK with `ACTOR_KEY_ENCRYPTION_KEY`, and writes the registry and secret records. It is the one-time migration and is idempotent, so there is no separate migration script. Secret snapshots contain only envelope-encrypted keys; restoring them also requires the same `ACTOR_KEY_ENCRYPTION_KEY`.
@@ -180,7 +180,7 @@ Served by a Netlify Edge Function (`netlify/edge-functions/webfinger.ts`) from t
 
 ### Adding actors at runtime
 
-Actor identity is written at runtime through the admin API, not baked into a build. The `netlify/functions/admin-actors.mts` function is reachable at `/admin/actors` and authenticates with a Solid-OIDC DPoP token whose `webid` matches `ADMIN_WEBID`. Writes are allowed only on production deploys.
+Actor identity is written at runtime through the admin API, not baked into a build. The `netlify/functions/admin-actors.mts` function is reachable at `/admin/actors` and authenticates with a Solid-OIDC DPoP token whose `webid` matches `ADMIN_WEBID`. Writes are allowed in production and the local dev context; deploy previews and branch deploys are rejected.
 
 | Request | Effect |
 |---------|--------|
@@ -218,7 +218,7 @@ Creating an actor makes it discoverable through WebFinger immediately. Pod colle
 
 A browser-friendly interface is shipped as static assets in `static-ui/` and copied into `public/` by `scripts/generate-identity.ts` on every build:
 
-- `GET /` — landing page (`public/index.html`) that lists the registered actors with a `@name@domain` link to each per-actor page, and embeds `templates/actor-controls/actor-controls.html` so visitors can sign in with their WebID and see the actors they control.
+- `GET /` — static landing page (`public/index.html`) that renders the actor list client-side with PodOS Elements from the public `GET /actors` Turtle collection (`as:Collection` with `as:items`), and embeds `templates/actor-controls/actor-controls.html` so visitors can sign in with their WebID and see the actors they control. The page HTML is static; the actor list follows the registry without a rebuild.
 - `GET /:actor` with `Accept: text/html` — per-actor page (`actor-page.template.html`) rendered by Pod-OS Elements. The page reads the actor JSON-LD at `${BASE_URL}/${actorName}` to display `as:name` and `as:summary`, then follows `as:outbox` to walk the paged outbox collection (the existing outbox GET endpoint already serves Turtle with public-URL rewriting). The page uses Ionic for layout and the `<import-html>` custom element (`public/components/ImportHtml.js`) to inline Pod-OS fragment templates at `public/templates/{actor-controls/actor-controls,discussion/{header,outbox}}.html`. The `<pos-app>` wrapper has the `restore-previous-session` attribute so visitors stay signed in across page reloads; the same `actor-controls` fragment is mounted at the top so authenticated visitors can navigate to other actors they control.
 
 UI sources live in `static-ui/` (tracked). Operators wanting to customise the landing page, per-actor template, or login fragment can edit those files; the next build overwrites the copies in `public/`.
@@ -271,6 +271,7 @@ npm run test:e2e           # Real `netlify dev` (functions, edge, local Blobs) +
 .
 ├── netlify/
 │   ├── edge-functions/
+│   │   ├── actors.ts        # GET /actors, public Turtle actor collection
 │   │   └── webfinger.ts     # /.well-known/webfinger, registry-backed edge handler
 │   └── functions/
 │       ├── actor-router.mts # Per-actor /:actor(/outbox|/inbox|/followers) — also serves /:actor (AS2 profile, profile overlay)
@@ -323,7 +324,7 @@ Actors can be added, disabled, or key-rotated without a redeploy. The OIDC servi
 
 ### Components and trust boundaries
 
-- **Netlify compute** (`netlify/functions/actor-router.mts`, `netlify/edge-functions/webfinger.ts`): the externally reachable surface for ActivityPub. Stateless across invocations; code is reconstructed on every cold start by the build. `actor-router.mts` resolves actors from the runtime registry and handles the per-actor `/{actorName}` GET (AS2 actor document with profile overlay) and `/{actorName}/{outbox,inbox,followers}` GET/POST routes, plus the single server-wide `/inbox` shared inbox (advertised as `endpoints.sharedInbox` on every actor document). `webfinger.ts` runs at the edge and serves `/.well-known/webfinger` from the same registry.
+- **Netlify compute** (`netlify/functions/actor-router.mts`, `netlify/edge-functions/webfinger.ts`, `netlify/edge-functions/actors.ts`): the externally reachable surface for ActivityPub. Stateless across invocations; code is reconstructed on every cold start by the build. `actor-router.mts` resolves actors from the runtime registry and handles the per-actor `/{actorName}` GET (AS2 actor document with profile overlay) and `/{actorName}/{outbox,inbox,followers}` GET/POST routes, plus the single server-wide `/inbox` shared inbox (advertised as `endpoints.sharedInbox` on every actor document). `webfinger.ts` runs at the edge and serves `/.well-known/webfinger` from the same registry; `actors.ts` serves the public `/actors` Turtle collection used by the landing page.
 - **Netlify Blobs**: durable, site-wide storage for actor identity. The `actor-registry` store is the authoritative public record and `actor-secrets` holds envelope-encrypted private keys. Blobs have no public URL; only site code can read them, and the `actor-router` function is the only runtime consumer of the secret store.
 - **Solid pod** at `${SOLID_STORAGE_BASE_URL}`: durable storage for per-actor containers `${actorName}/inbox/`, `${actorName}/outbox/`, and `${actorName}/followers/` as paged AS2 collections, plus an operator-managed `${actorName}/profile` Turtle document. The function is the only writer for the collections; reads (including the profile) happen via a DPoP-authenticated fetch (`src/solidFetch.ts`).
 - **OIDC issuer**: any issuer in `WHITELISTED_ISSUERS` is trusted to authenticate users who may access the private collections (outbox write + inbox read). The function verifies each request's DPoP-bound access token via `@solid/access-token-verifier` — confirming the client controls the bound key and the token's issuer is in the allowlist.
