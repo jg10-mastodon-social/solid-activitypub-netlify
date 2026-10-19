@@ -10,7 +10,7 @@ export const publicDir = path.join(rootDir, 'public')
 export const baseUrlPath = path.join(rootDir, 'src/base-url.ts')
 export const privateKeyPath = path.join(rootDir, 'src/private-key.ts')
 
-export async function runScript(jwks?: string, context?: string, actorName?: string): Promise<{ exitCode: number, stdout: string, stderr: string }> {
+export async function runScript(jwks?: string, context?: string): Promise<{ exitCode: number, stdout: string, stderr: string }> {
   return new Promise((resolve) => {
     const env: Record<string, string | undefined> = {
       ...process.env,
@@ -30,9 +30,6 @@ export async function runScript(jwks?: string, context?: string, actorName?: str
     }
     if (jwks) {
       env.JWKS = jwks
-    }
-    if (actorName) {
-      env.ACTOR_NAME = actorName
     }
 
     const child = spawn('node', [path.join(__dirname, '../scripts/generate-identity.ts')], {

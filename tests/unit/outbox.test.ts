@@ -20,20 +20,7 @@ vi.mock('../../src/config.js', () => ({
     inboxUrl: 'https://pod.example.com/inbox/',
     outboxUrl: 'https://pod.example.com/outbox/',
     solidStorageBaseUrl: 'https://pod.example.com/',
-    adminWebId: '',
-    actorNames: ['actor'],
-    actorByPath: {
-      '/actor': {
-        name: 'actor',
-        path: '/actor',
-        url: 'https://example.com/actor',
-        keyId: 'https://example.com/actor#main-key',
-        inboxUrl: 'https://example.com/actor/inbox',
-        outboxUrl: 'https://example.com/actor/outbox',
-        followersUrl: 'https://example.com/actor/followers',
-        webfingerResource: 'acct:actor@example.com',
-      }
-    }
+    adminWebId: ''
   })
 }))
 

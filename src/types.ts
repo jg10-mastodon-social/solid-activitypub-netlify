@@ -34,8 +34,6 @@ export interface Config {
   adminWebId: string
   inboxUrl: string
   outboxUrl: string
-  actorNames: string[]
-  actorByPath: Record<string, ActorConfig>
 }
 
 export interface TokenPayload {

@@ -1,50 +1,6 @@
-import type { ActorConfig, Config } from './types.js'
+import type { Config } from './types.js'
 // @ts-ignore
 import { baseUrl } from './base-url.js'
-
-export interface EnvConfig {
-  WEBID: string
-  ISSUER: string
-  WHITELISTED_ISSUERS: string
-  SOLID_STORAGE_BASE_URL: string
-  SEND_TO_URL: string
-  ADMIN_WEBID?: string
-}
-
-export function parseActorNames(raw: string | undefined): string[] {
-  if (!raw) return ['actor']
-  const names = raw.split(',').map((s) => s.trim()).filter((s) => s.length > 0)
-  if (names.length === 0) {
-    throw new Error('ACTOR_NAME must contain at least one non-empty actor name')
-  }
-  return names
-}
-
-function buildActorConfigs(
-  baseUrlValue: string,
-  solidStorageBaseUrl: string,
-  names: string[]
-): Record<string, ActorConfig> {
-  const domain = baseUrlValue.replace(/^https?:\/\//, '')
-  const sharedInboxUrl = `${baseUrlValue}/inbox`
-  const byPath: Record<string, ActorConfig> = {}
-  for (const name of names) {
-    const url = `${baseUrlValue}/${name}`
-    byPath[`/${name}`] = {
-      name,
-      path: `/${name}`,
-      url,
-      keyId: `${url}#main-key`,
-      inboxUrl: `${baseUrlValue}/${name}/inbox`,
-      outboxUrl: `${baseUrlValue}/${name}/outbox`,
-      followersUrl: `${baseUrlValue}/${name}/followers`,
-      followingUrl: `${baseUrlValue}/${name}/following`,
-      sharedInboxUrl,
-      webfingerResource: `acct:${name}@${domain}`,
-    }
-  }
-  return byPath
-}
 
 export function loadConfig(): Config {
   const whitelistedIssuersStr = process.env.WHITELISTED_ISSUERS
@@ -67,8 +23,6 @@ export function loadConfig(): Config {
   const solidStorageBaseUrl = process.env.SOLID_STORAGE_BASE_URL
   const inboxUrl = `${solidStorageBaseUrl}inbox/`
   const outboxUrl = `${solidStorageBaseUrl}outbox/`
-  const actorNames = parseActorNames(process.env.ACTOR_NAME)
-  const actorByPath = buildActorConfigs(baseUrl, solidStorageBaseUrl, actorNames)
 
   return {
     webId,
@@ -81,7 +35,5 @@ export function loadConfig(): Config {
     adminWebId,
     inboxUrl,
     outboxUrl,
-    actorNames,
-    actorByPath,
   }
 }

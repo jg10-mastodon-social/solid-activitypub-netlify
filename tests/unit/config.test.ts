@@ -145,41 +145,4 @@ describe('loadConfig', () => {
     expect(() => loadConfig()).toThrow('SOLID_STORAGE_BASE_URL must end with /')
   })
 
-  it('defaults actorNames to ["actor"] when ACTOR_NAME is not set', async () => {
-    delete process.env.ACTOR_NAME
-    process.env.WHITELISTED_ISSUERS = 'https://mocked.example.com'
-    process.env.SOLID_STORAGE_BASE_URL = 'https://pod.example.com/'
-
-    const { loadConfig } = await import('../../src/config.js')
-    const config = loadConfig()
-
-    expect(config.actorNames).toEqual(['actor'])
-    expect(config.actorByPath['/actor']).toBeDefined()
-    expect(config.actorByPath['/actor'].url).toBe('https://mocked.example.com/actor')
-    expect(config.actorByPath['/actor'].keyId).toBe('https://mocked.example.com/actor#main-key')
-  })
-
-  it('parses comma-separated ACTOR_NAME and builds actorByPath entries', async () => {
-    process.env.ACTOR_NAME = 'alice,bob'
-    process.env.WHITELISTED_ISSUERS = 'https://mocked.example.com'
-    process.env.SOLID_STORAGE_BASE_URL = 'https://pod.example.com/'
-
-    const { loadConfig } = await import('../../src/config.js')
-    const config = loadConfig()
-
-    expect(config.actorNames).toEqual(['alice', 'bob'])
-    expect(config.actorByPath['/alice'].url).toBe('https://mocked.example.com/alice')
-    expect(config.actorByPath['/bob'].url).toBe('https://mocked.example.com/bob')
-  })
-
-  it('trims whitespace and rejects empty ACTOR_NAME entries', async () => {
-    process.env.ACTOR_NAME = '  alice , , bob  '
-    process.env.WHITELISTED_ISSUERS = 'https://mocked.example.com'
-    process.env.SOLID_STORAGE_BASE_URL = 'https://pod.example.com/'
-
-    const { loadConfig } = await import('../../src/config.js')
-    const config = loadConfig()
-
-    expect(config.actorNames).toEqual(['alice', 'bob'])
-  })
 })

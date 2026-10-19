@@ -8,8 +8,7 @@ const FAKE_PUBLIC_KEY_PEM =
   '-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtest\n-----END PUBLIC KEY-----\n'
 
 export function createFakeResolver(): ActorResolver {
-  const name = process.env.ACTOR_NAME ?? 'actor'
-  const actor: ActorConfig = deriveActorConfig(name, BASE_URL, SOLID_STORAGE_BASE_URL)
+  const actor: ActorConfig = deriveActorConfig('actor', BASE_URL, SOLID_STORAGE_BASE_URL)
 
   async function resolveActor(requested: string): Promise<ActorConfig | null> {
     return requested === actor.name ? actor : null

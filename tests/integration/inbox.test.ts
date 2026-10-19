@@ -89,7 +89,6 @@ beforeAll(() => {
   process.env.WEBID = 'http://localhost:9999/webid'
   process.env.ISSUER = 'http://localhost:9999'
   process.env.SEND_TO_URL = 'http://localhost:9999/outbox'
-  process.env.ACTOR_NAME = 'actor'
 })
 
 function makeContext(overrides: Partial<Context> = {}): Context {

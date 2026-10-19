@@ -56,7 +56,6 @@ beforeAll(() => {
   process.env.WEBID = 'http://localhost:9999/webid'
   process.env.ISSUER = 'http://localhost:9999'
   process.env.SEND_TO_URL = 'http://localhost:9999/outbox'
-  process.env.ACTOR_NAME = 'actor'
 
   fs.mkdirSync(__test_publicDir, { recursive: true })
   fs.copyFileSync(__test_templateSrc, __test_templateDst)
