@@ -23,6 +23,7 @@ export type SignatureFailureCode =
   | 'missing_signed_header'
   | 'actor_url_blocked'
   | 'actor_fetch_failed'
+  | 'no_local_actor'
   | 'keyid_mismatch'
   | 'signature_invalid'
   | 'actor_binding_mismatch'
@@ -35,6 +36,8 @@ export interface SignatureErrorContext {
   signedHeaders?: string[]
   missingHeaders?: string[]
   actorFetchStatus?: number
+  signedActorFetch?: boolean
+  signerKeyId?: string
   rawSignatureHeader?: string
   dateHeader?: string
   contentType?: string
@@ -68,6 +71,8 @@ export function formatHttpSignatureError(error: HttpSignatureError): string {
     c.signedHeaders !== undefined && `signedHeaders=[${c.signedHeaders.join(',')}]`,
     c.missingHeaders !== undefined && `missingHeaders=[${c.missingHeaders.join(',')}]`,
     c.actorFetchStatus !== undefined && `actorFetchStatus=${c.actorFetchStatus}`,
+    c.signedActorFetch !== undefined && `signedActorFetch=${c.signedActorFetch}`,
+    c.signerKeyId !== undefined && `signerKeyId=${c.signerKeyId}`,
     c.rawSignatureHeader !== undefined && `signatureHeader=${c.rawSignatureHeader}`,
     c.dateHeader !== undefined && `dateHeader=${c.dateHeader}`,
     c.contentType !== undefined && `contentType=${c.contentType}`,
@@ -170,6 +175,8 @@ export async function verifyIncomingActivity(
       keyId: parsed.keyId,
       actorUrl,
       actorFetchStatus: status,
+      signedActorFetch: signer !== undefined,
+      signerKeyId: signer?.keyId,
       cause
     })
   }

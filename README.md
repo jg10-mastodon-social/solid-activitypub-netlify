@@ -111,12 +111,13 @@ One route per registered actor, e.g. `/alice/inbox`. HTTP-signature-authenticate
 
    The signing string is rebuilt from the `headers=` list in the `Signature` header, in the order declared there, with names lowercased as the spec requires: `(request-target)` is the lowercased method, a space, then the path plus its query string when present; `host` uses the `Host` header and falls back to the request URL's host when it is absent. Every other declared header is read by name, so senders that sign extra headers verify — Mastodon signs `Collection-Synchronization` on followers-only status deliveries and on follower sync. A declared header that is missing or empty, or a pseudo-header other than `(request-target)` such as `(created)`, is a hard 400 (`missing_signed_header`) rather than a silently shortened signing string.
    - **Debugging:** a failure logs a single `[router] signature auth failed …` line carrying structured `key=value` context. A `[router] inbox reject: type=… actor=… [object=…]` line follows, identifying the rejected activity. Useful fields to triage:
-     - `code=` — the specific failure (e.g., `missing_signature`, `digest_mismatch`, `actor_url_blocked`, `actor_fetch_failed`, `missing_signed_header`, `signature_invalid`, `actor_binding_mismatch`).
+     - `code=` — the specific failure (e.g., `missing_signature`, `digest_mismatch`, `actor_url_blocked`, `actor_fetch_failed`, `missing_signed_header`, `no_local_actor`, `signature_invalid`, `actor_binding_mismatch`).
      - `keyId=`, `actorUrl=` — who the sender claimed to be.
      - `digestHeader=`, `expectedDigest=`, `actualDigest=`, `bodyLength=` — for `digest_mismatch`, the declared hash vs the hash we computed over the raw body bytes.
      - `algorithm=`, `signedHeaders=`, `signingString=` — for `signature_invalid`, the exact string the signature was computed over (newlines escaped as `\n`).
      - `missingHeaders=` — for `missing_signed_header` (400), the declared headers the request did not carry (or that were empty).
-     - `actorFetchStatus=`, `cause=` — for `actor_fetch_failed`, the remote actor document's HTTP status and underlying error. The fetch itself is HTTP-signed by us; a persistent `actorFetchStatus=401` means the remote server still rejected our signed GET (key not registered, key rotated, clock skew on their `Date` check) — not that the server is unreachable.
+     - `signedActorFetch=`, `signerKeyId=` — for `actor_fetch_failed`, whether the actor-document GET was HTTP-signed and with which local actor key. `signedActorFetch=false` means it went out unsigned; a signature-gated remote such as Mastodon always answers that with 401, so treat it as a local configuration problem, not a remote one.
+     - `actorFetchStatus=`, `cause=` — for `actor_fetch_failed`, the remote actor document's HTTP status and underlying error. With `signedActorFetch=true`, a persistent `actorFetchStatus=401` means the remote server still rejected our signed GET (key not registered, key rotated, clock skew on their `Date` check) — not that the server is unreachable.
 4. Switch on activity type:
    - `Delete` → ack and return (no persistence).
    - `Follow` → send a signed `Accept` (signed with the matched local actor's key) to the follower's inbox, and add the follower to the followers collection at `${SOLID_STORAGE_BASE_URL}${actorName}/followers/`.
@@ -132,6 +133,8 @@ Single server-wide endpoint at `${BASE_URL}/inbox`, HTTP-signature-authenticated
 - `Follow`: `activity.object` must equal a configured `actor.url`.
 - `Undo` `Follow`: `activity.object.object` must equal a configured `actor.url`.
 - Other activities: scan `to`/`cc`/`bto`/`bcc`/`audience` for the first value matching a configured `actor.url` or `actor.followersUrl`.
+
+Signature verification needs a local actor to sign the actor-document GET. The router picks the first registered actor (by name) as that signer; if the registry is empty it logs `code=no_local_actor` and returns 503 without verification instead of falling back to an unsigned fetch, which signature-gated servers such as Mastodon reject with 401. An empty registry after a deploy means the `restore --from-actor-keys` migration has not run.
 
 No match → 422 (never silently drop into the wrong inbox; never persist when the target is ambiguous). GET on `/inbox` is not supported (POST-only, matching Mastodon's behavior).
 

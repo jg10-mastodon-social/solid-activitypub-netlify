@@ -511,6 +511,16 @@ async function handlePostSharedInbox(
 
   try {
     const signerActor = await resolveSharedInboxSigner(resolver, config)
+    if (!signerActor) {
+      const signatureError = new HttpSignatureError(
+        'No local actor available to sign the actor fetch',
+        503,
+        { code: 'no_local_actor' }
+      )
+      console.error(formatHttpSignatureError(signatureError))
+      console.log(`[router] inbox reject: ${activitySummary(activity)}`)
+      return new Response(signatureError.message, { status: 503, headers: corsHeaders })
+    }
     await verifyIncomingActivity(req, activity, rawBytes, fetchFn, signerActor)
   } catch (error) {
     if (error instanceof HttpSignatureError) {

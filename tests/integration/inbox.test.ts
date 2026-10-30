@@ -8,13 +8,18 @@ const mockHandleSharedInboxActivity = vi.fn()
 const mockSerializeInboxCollection = vi.fn()
 const mockSerializeInboxPage = vi.fn()
 
+const resolverState = vi.hoisted(() => ({ empty: false }))
+
 vi.mock('../../src/base-url.js', () => ({
   baseUrl: 'http://localhost:9999'
 }))
 
 vi.mock('../../src/actors/resolve.js', async () => {
-  const { createFakeResolver } = await import('../helpers/mock-runtime-actors.js')
-  return { openActorResolver: () => createFakeResolver() }
+  const { createEmptyResolver, createFakeResolver } = await import('../helpers/mock-runtime-actors.js')
+  return {
+    openActorResolver: () =>
+      resolverState.empty ? createEmptyResolver() : createFakeResolver()
+  }
 })
 
 vi.mock('../../src/solidFetch.js', () => ({
@@ -114,6 +119,7 @@ const TOMBSTONED_ACTOR = 'https://mastodon.social/ap/users/116878551484577684'
 describe('actor-router inbox short-circuit for actor Delete activities', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    resolverState.empty = false
   })
 
   it('returns 200 for a Delete activity whose object is the actor (self-delete) without verifying the signature', async () => {
@@ -242,6 +248,7 @@ describe('actor-router inbox short-circuit for actor Delete activities', () => {
 describe('actor-router shared inbox POST /inbox', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    resolverState.empty = false
   })
 
   it('returns 200 for an actor Delete at /inbox without verifying the signature', async () => {
@@ -336,6 +343,38 @@ describe('actor-router shared inbox POST /inbox', () => {
     expect(res.status).toBe(422)
     expect(mockVerifyIncomingActivity).toHaveBeenCalledTimes(1)
     expect(mockHandleSharedInboxActivity).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns 503 without verifying when no local actor can sign the actor fetch', async () => {
+    resolverState.empty = true
+
+    const { default: handler } = await import('../../netlify/functions/actor-router.mts')
+
+    const activity = {
+      type: 'Create',
+      actor: 'https://other.example/actor',
+      to: ['http://localhost:9999/actor'],
+      object: { type: 'Note', content: 'hi' },
+      '@context': 'https://www.w3.org/ns/activitystreams'
+    }
+
+    const req = new Request('http://localhost/inbox', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(activity)
+    })
+
+    const ctx = makeContext({
+      params: {},
+      url: new URL('http://localhost/inbox')
+    })
+
+    const res = await handler(req, ctx)
+
+    expect(res.status).toBe(503)
+    expect(await res.text()).toBe('No local actor available to sign the actor fetch')
+    expect(mockVerifyIncomingActivity).not.toHaveBeenCalled()
+    expect(mockHandleSharedInboxActivity).not.toHaveBeenCalled()
   })
 
   it('returns 405 for GET /inbox', async () => {

@@ -24,3 +24,19 @@ export function createFakeResolver(): ActorResolver {
 
   return { resolveActor, listActors, getPublicKeyPem }
 }
+
+export function createEmptyResolver(): ActorResolver {
+  async function resolveActor(): Promise<ActorConfig | null> {
+    return null
+  }
+
+  async function listActors(): Promise<ActorConfig[]> {
+    return []
+  }
+
+  async function getPublicKeyPem(): Promise<string> {
+    throw new Error('no public key: registry is empty')
+  }
+
+  return { resolveActor, listActors, getPublicKeyPem }
+}

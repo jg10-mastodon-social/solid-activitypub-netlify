@@ -974,6 +974,8 @@ describe('verifyIncomingActivity', () => {
         expect(ctx.keyId).toBe('https://other.example/actor#main-key')
         expect(ctx.actorUrl).toBe('https://other.example/actor')
         expect(ctx.actorFetchStatus).toBe(503)
+        expect(ctx.signedActorFetch).toBe(false)
+        expect(ctx.signerKeyId).toBeUndefined()
         expect(typeof ctx.cause).toBe('string')
         expect(ctx.cause.length).toBeGreaterThan(0)
       }
@@ -1009,6 +1011,8 @@ describe('verifyIncomingActivity', () => {
         const ctx = (e as any).context
         expect(ctx.code).toBe('actor_fetch_failed')
         expect(ctx.cause).toContain('upstream timed out')
+        expect(ctx.signedActorFetch).toBe(false)
+        expect(ctx.signerKeyId).toBeUndefined()
       }
     })
 
@@ -1200,6 +1204,38 @@ describe('verifyIncomingActivity', () => {
       expect(line.split('\n').length).toBe(1)
       expect(line).toContain('signingString=`a\\nb\\nc`')
     })
+
+    it('renders code=no_local_actor with statusCode=503 and no actor-fetch fields', async () => {
+      const { HttpSignatureError, formatHttpSignatureError } = await import('../../src/verifyRequest.js')
+      const err = new HttpSignatureError('No local actor available to sign the actor fetch', 503, {
+        code: 'no_local_actor'
+      })
+      const line = formatHttpSignatureError(err)
+      expect(line).toContain('[router] signature auth failed')
+      expect(line).toContain('code=no_local_actor')
+      expect(line).toContain('statusCode=503')
+      expect(line).not.toContain('signedActorFetch=')
+      expect(line).not.toContain('signerKeyId=')
+      expect(line.split('\n').length).toBe(1)
+    })
+
+    it('renders signedActorFetch and signerKeyId when populated', async () => {
+      const { HttpSignatureError, formatHttpSignatureError } = await import('../../src/verifyRequest.js')
+      const err = new HttpSignatureError('Failed to fetch actor key', 502, {
+        code: 'actor_fetch_failed',
+        keyId: 'https://other.example/actor#main-key',
+        actorUrl: 'https://other.example/actor',
+        actorFetchStatus: 401,
+        signedActorFetch: false,
+        signerKeyId: 'https://example.com/actor#main-key'
+      })
+      const line = formatHttpSignatureError(err)
+      expect(line).toContain('actorFetchStatus=401')
+      expect(line).toContain('signedActorFetch=false')
+      expect(line).toContain('signerKeyId=https://example.com/actor#main-key')
+      expect(line).toContain('statusCode=502')
+      expect(line.split('\n').length).toBe(1)
+    })
   })
 
   describe('signed actor fetch', () => {
@@ -1318,6 +1354,8 @@ describe('verifyIncomingActivity', () => {
         expect(ctx.code).toBe('actor_fetch_failed')
         expect(ctx.actorFetchStatus).toBe(401)
         expect(ctx.actorUrl).toBe('https://other.example/actor')
+        expect(ctx.signedActorFetch).toBe(true)
+        expect(ctx.signerKeyId).toBe('https://example.com/actor#main-key')
         expect(ctx.cause).toContain('Failed to fetch actor')
         expect((e as InstanceType<typeof HttpSignatureError>).statusCode).toBe(502)
       }
