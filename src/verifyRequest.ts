@@ -7,6 +7,7 @@ import {
   buildSignatureBase,
   verifySignature,
   verifyActorBinding,
+  collectSigningHeaders,
   type ActorFetchSigner
 } from './verifyHttpSignature.js'
 import type { SolidFetch } from './types.js'
@@ -19,6 +20,7 @@ export type SignatureFailureCode =
   | 'unsupported_algorithm'
   | 'timestamp_out_of_range'
   | 'digest_mismatch'
+  | 'missing_signed_header'
   | 'actor_url_blocked'
   | 'actor_fetch_failed'
   | 'keyid_mismatch'
@@ -31,6 +33,7 @@ export interface SignatureErrorContext {
   actorUrl?: string
   algorithm?: string
   signedHeaders?: string[]
+  missingHeaders?: string[]
   actorFetchStatus?: number
   rawSignatureHeader?: string
   dateHeader?: string
@@ -63,6 +66,7 @@ export function formatHttpSignatureError(error: HttpSignatureError): string {
     c.actorUrl !== undefined && `actorUrl=${c.actorUrl}`,
     c.algorithm !== undefined && `algorithm=${c.algorithm}`,
     c.signedHeaders !== undefined && `signedHeaders=[${c.signedHeaders.join(',')}]`,
+    c.missingHeaders !== undefined && `missingHeaders=[${c.missingHeaders.join(',')}]`,
     c.actorFetchStatus !== undefined && `actorFetchStatus=${c.actorFetchStatus}`,
     c.rawSignatureHeader !== undefined && `signatureHeader=${c.rawSignatureHeader}`,
     c.dateHeader !== undefined && `dateHeader=${c.dateHeader}`,
@@ -178,24 +182,23 @@ export async function verifyIncomingActivity(
     })
   }
 
-  const url = new URL(req.url)
-  const headersToSign: Record<string, string> = {}
   const signedHeaders = parsed.headers.split(' ')
-  for (const headerName of signedHeaders) {
-    if (headerName === '(request-target)') {
-      headersToSign[headerName] = `post ${url.pathname}${url.search}`
-    } else if (headerName === 'host') {
-      headersToSign[headerName] = url.host
-    } else if (headerName === 'date') {
-      headersToSign[headerName] = dateHeader
-    } else if (headerName === 'digest') {
-      headersToSign[headerName] = digestHeader
-    } else if (headerName === 'content-type') {
-      headersToSign[headerName] = contentType
-    }
+  const signingHeaders = collectSigningHeaders(signedHeaders, req)
+  if (!signingHeaders.ok) {
+    throw new HttpSignatureError(`Missing signed header(s): ${signingHeaders.missing.join(', ')}`, 400, {
+      code: 'missing_signed_header',
+      keyId: parsed.keyId,
+      actorUrl,
+      algorithm: parsed.algorithm,
+      signedHeaders,
+      missingHeaders: signingHeaders.missing,
+      dateHeader,
+      contentType,
+      digestHeader
+    })
   }
 
-  const signatureBase = buildSignatureBase(headersToSign)
+  const signatureBase = buildSignatureBase(signingHeaders.headers)
 
   const valid = await verifySignature(
     actorKey.publicKeyPem,

@@ -40,20 +40,25 @@ export function signActivityRequest(
   url: string,
   activity: unknown,
   keys: RemoteActorKeys,
-  options: { contentType?: string } = {}
+  options: { contentType?: string; extraHeaders?: Record<string, string> } = {}
 ): { body: string; headers: Record<string, string> } {
   const contentType = options.contentType ?? 'application/activity+json'
+  const extraHeaderEntries = Object.entries(options.extraHeaders ?? {}).map(
+    ([name, value]) => [name.toLowerCase(), value] as const
+  )
   const body = JSON.stringify(activity)
   const parsed = new URL(url)
   const date = new Date().toUTCString()
   const digest = `SHA-256=${createHash('sha256').update(body, 'utf8').digest('base64')}`
 
+  const declaredHeaders = ['(request-target)', 'host', 'date', 'digest', 'content-type']
   const signingString = [
     `(request-target): post ${parsed.pathname}${parsed.search}`,
     `host: ${parsed.host}`,
     `date: ${date}`,
     `digest: ${digest}`,
-    `content-type: ${contentType}`
+    `content-type: ${contentType}`,
+    ...extraHeaderEntries.map(([name, value]) => `${name}: ${value}`)
   ].join('\n')
 
   const sign = createSign('RSA-SHA256')
@@ -67,7 +72,11 @@ export function signActivityRequest(
       'content-type': contentType,
       'date': date,
       'digest': digest,
-      'signature': `keyId="${keys.keyId}",algorithm="rsa-sha256",headers="(request-target) host date digest content-type",signature="${signature}"`
+      ...options.extraHeaders,
+      'signature': `keyId="${keys.keyId}",algorithm="rsa-sha256",headers="${[
+        ...declaredHeaders,
+        ...extraHeaderEntries.map(([name]) => name)
+      ].join(' ')}",signature="${signature}"`
     }
   }
 }

@@ -159,6 +159,52 @@ export async function fetchActorPublicKey(
   return { actorUrl, keyId, publicKeyPem }
 }
 
+export type SigningHeadersResult =
+  | { ok: true; headers: Record<string, string> }
+  | { ok: false; missing: string[] }
+
+export function collectSigningHeaders(
+  declaredHeaders: string[],
+  request: { method: string; url: string; headers: Headers }
+): SigningHeadersResult {
+  const url = new URL(request.url)
+  const headers: Record<string, string> = {}
+  const missing: string[] = []
+
+  for (const declared of declaredHeaders) {
+    const name = declared.trim().toLowerCase()
+
+    if (name === '(request-target)') {
+      headers[name] = `${request.method.toLowerCase()} ${url.pathname}${url.search}`
+      continue
+    }
+
+    if (name === 'host') {
+      const hostHeader = request.headers.get('host')
+      headers[name] = hostHeader ? hostHeader.trim() : url.host
+      continue
+    }
+
+    if (name.startsWith('(')) {
+      // Unsupported pseudo-headers (e.g. (created), (expires)) fail closed.
+      missing.push(name)
+      continue
+    }
+
+    const value = request.headers.get(name)?.trim()
+    if (!value) {
+      missing.push(name)
+      continue
+    }
+    headers[name] = value
+  }
+
+  if (missing.length > 0) {
+    return { ok: false, missing }
+  }
+  return { ok: true, headers }
+}
+
 export function buildSignatureBase(headers: Record<string, string>): string {
   const lines: string[] = []
   for (const [key, value] of Object.entries(headers)) {

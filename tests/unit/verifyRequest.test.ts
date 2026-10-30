@@ -433,6 +433,135 @@ describe('verifyIncomingActivity', () => {
       const result = await verifyIncomingActivity(req, activity, new TextEncoder().encode(body), mockFetch)
       expect(result.keyId).toBe('https://other.example/actor#main-key')
     })
+
+    it('should verify a signature covering a non-whitelisted header (Mastodon Collection-Synchronization)', async () => {
+      const { verifyIncomingActivity } = await import('../../src/verifyRequest.js')
+      const { generateKeyPairSync, createSign, createHash } = await import('node:crypto')
+
+      const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 })
+      const privateKeyPem = privateKey.export({ type: 'pkcs8', format: 'pem' }) as string
+      const publicKeyPem = publicKey.export({ type: 'spki', format: 'pem' }) as string
+
+      const activity = { type: 'Create', actor: 'https://other.example/actor' }
+      const body = JSON.stringify(activity)
+      const digest = 'SHA-256=' + createHash('sha256').update(body, 'utf8').digest('base64')
+
+      const url = new URL('https://example.com/inbox')
+      const dateHeader = new Date().toUTCString()
+      const collectionSynchronization = 'collectionId="https://mastodon.social/users/jg10", digest="abc123", url="https://mastodon.social/users/jg10/followers_synchronization"'
+      const signingString = [
+        `host: ${url.host}`,
+        `date: ${dateHeader}`,
+        'content-type: application/activity+json',
+        `collection-synchronization: ${collectionSynchronization}`,
+        `digest: ${digest}`,
+        '(request-target): post /inbox'
+      ].join('\n')
+
+      const sign = createSign('RSA-SHA256')
+      sign.update(signingString)
+      sign.end()
+      const signatureBase64 = sign.sign(privateKeyPem, 'base64')
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          id: 'https://other.example/actor',
+          publicKey: {
+            id: 'https://other.example/actor#main-key',
+            owner: 'https://other.example/actor',
+            publicKeyPem: publicKeyPem
+          }
+        })
+      })
+
+      const req = new Request('https://example.com/inbox', {
+        method: 'POST',
+        headers: {
+          'Signature': `keyId="https://other.example/actor#main-key",algorithm="rsa-sha256",headers="host date content-type collection-synchronization digest (request-target)",signature="${signatureBase64}"`,
+          'Date': dateHeader,
+          'Digest': digest,
+          'Content-Type': 'application/activity+json',
+          'Collection-Synchronization': collectionSynchronization
+        },
+        body
+      })
+
+      const result = await verifyIncomingActivity(req, activity, new TextEncoder().encode(body), mockFetch)
+      expect(result).toEqual({ keyId: 'https://other.example/actor#main-key' })
+    })
+
+    it('should reject with missing_signed_header when a declared header is absent from the request', async () => {
+      const { verifyIncomingActivity } = await import('../../src/verifyRequest.js')
+      const { generateKeyPairSync, createSign, createHash } = await import('node:crypto')
+
+      const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 })
+      const privateKeyPem = privateKey.export({ type: 'pkcs8', format: 'pem' }) as string
+      const publicKeyPem = publicKey.export({ type: 'spki', format: 'pem' }) as string
+
+      const activity = { type: 'Create', actor: 'https://other.example/actor' }
+      const body = JSON.stringify(activity)
+      const digest = 'SHA-256=' + createHash('sha256').update(body, 'utf8').digest('base64')
+
+      const dateHeader = new Date().toUTCString()
+      const signingString = [
+        'host: example.com',
+        `date: ${dateHeader}`,
+        'content-type: application/activity+json',
+        `digest: ${digest}`,
+        '(request-target): post /inbox'
+      ].join('\n')
+
+      const sign = createSign('RSA-SHA256')
+      sign.update(signingString)
+      sign.end()
+      const signatureBase64 = sign.sign(privateKeyPem, 'base64')
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          id: 'https://other.example/actor',
+          publicKey: {
+            id: 'https://other.example/actor#main-key',
+            owner: 'https://other.example/actor',
+            publicKeyPem: publicKeyPem
+          }
+        })
+      })
+
+      const req = new Request('https://example.com/inbox', {
+        method: 'POST',
+        headers: {
+          'Signature': `keyId="https://other.example/actor#main-key",algorithm="rsa-sha256",headers="host date content-type collection-synchronization digest (request-target)",signature="${signatureBase64}"`,
+          'Date': dateHeader,
+          'Digest': digest,
+          'Content-Type': 'application/activity+json'
+        },
+        body
+      })
+
+      try {
+        await verifyIncomingActivity(req, activity, new TextEncoder().encode(body), mockFetch)
+        throw new Error('expected throw')
+      } catch (e) {
+        expect(e).toMatchObject({
+          name: 'HttpSignatureError',
+          message: 'Missing signed header(s): collection-synchronization',
+          statusCode: 400
+        })
+        const ctx = (e as { context: Record<string, unknown> }).context
+        expect(ctx.code).toBe('missing_signed_header')
+        expect(ctx.missingHeaders).toEqual(['collection-synchronization'])
+        expect(ctx.signedHeaders).toEqual([
+          'host',
+          'date',
+          'content-type',
+          'collection-synchronization',
+          'digest',
+          '(request-target)'
+        ])
+      }
+    })
   })
 
   describe('digest verification over raw bytes (regression: HTTP signature auth must use the raw body, not re-serialised JSON)', () => {

@@ -470,6 +470,194 @@ describe('verifyDigest (raw-bytes contract)', () => {
   })
 })
 
+describe('collectSigningHeaders', () => {
+  it('should read a non-whitelisted header and preserve the declared order', async () => {
+    const { collectSigningHeaders } = await import('../../src/verifyHttpSignature.js')
+    const collectionSynchronization = 'collectionId="https://mastodon.social/users/jg10", digest="abc123", url="https://mastodon.social/users/jg10/followers_synchronization"'
+    const req = new Request('https://example.com/inbox', {
+      method: 'POST',
+      headers: {
+        'Date': 'Sat, 25 Oct 2014 07:24:34 GMT',
+        'Digest': 'SHA-256=X48E9Y9D4tnIzrmI04jXjNnk4N=',
+        'Content-Type': 'application/activity+json',
+        'Collection-Synchronization': collectionSynchronization
+      }
+    })
+
+    const result = collectSigningHeaders(
+      ['(request-target)', 'host', 'content-type', 'collection-synchronization', 'digest'],
+      req
+    )
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(Object.keys(result.headers)).toEqual([
+        '(request-target)',
+        'host',
+        'content-type',
+        'collection-synchronization',
+        'digest'
+      ])
+      expect(result.headers['(request-target)']).toBe('post /inbox')
+      expect(result.headers['host']).toBe('example.com')
+      expect(result.headers['content-type']).toBe('application/activity+json')
+      expect(result.headers['collection-synchronization']).toBe(collectionSynchronization)
+      expect(result.headers['digest']).toBe('SHA-256=X48E9Y9D4tnIzrmI04jXjNnk4N=')
+    }
+  })
+
+  it('should fall back to the URL host when the request has no host header', async () => {
+    const { collectSigningHeaders } = await import('../../src/verifyHttpSignature.js')
+    const result = collectSigningHeaders(['host'], {
+      method: 'POST',
+      url: 'https://example.com/inbox',
+      headers: new Headers()
+    })
+
+    expect(result).toEqual({ ok: true, headers: { host: 'example.com' } })
+  })
+
+  it('should prefer the host header when it is present', async () => {
+    const { collectSigningHeaders } = await import('../../src/verifyHttpSignature.js')
+    const result = collectSigningHeaders(['host'], {
+      method: 'POST',
+      url: 'https://example.com/inbox',
+      headers: new Headers({ host: 'proxy.internal:8443' })
+    })
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.headers['host']).toBe('proxy.internal:8443')
+    }
+  })
+
+  it('should report declared headers that are absent from the request', async () => {
+    const { collectSigningHeaders } = await import('../../src/verifyHttpSignature.js')
+    const req = new Request('https://example.com/inbox', {
+      method: 'POST',
+      headers: {
+        'Date': 'Sat, 25 Oct 2014 07:24:34 GMT',
+        'Digest': 'SHA-256=X48E9Y9D4tnIzrmI04jXjNnk4N=',
+        'Content-Type': 'application/activity+json'
+      }
+    })
+
+    const result = collectSigningHeaders(
+      ['(request-target)', 'host', 'date', 'content-type', 'collection-synchronization', 'digest'],
+      req
+    )
+
+    expect(result).toEqual({ ok: false, missing: ['collection-synchronization'] })
+  })
+
+  it('should treat an empty declared header as missing', async () => {
+    const { collectSigningHeaders } = await import('../../src/verifyHttpSignature.js')
+    const result = collectSigningHeaders(['date', 'collection-synchronization'], {
+      method: 'POST',
+      url: 'https://example.com/inbox',
+      headers: new Headers({
+        date: 'Sat, 25 Oct 2014 07:24:34 GMT',
+        'collection-synchronization': '   '
+      })
+    })
+
+    expect(result).toEqual({ ok: false, missing: ['collection-synchronization'] })
+  })
+
+  it('should lowercase declared header names as the signing string requires', async () => {
+    const { collectSigningHeaders } = await import('../../src/verifyHttpSignature.js')
+    const result = collectSigningHeaders(['(Request-Target)', 'Host', 'Content-Type'], {
+      method: 'post',
+      url: 'https://example.com/inbox?page=2',
+      headers: new Headers({ 'content-type': 'application/activity+json' })
+    })
+
+    expect(result).toEqual({
+      ok: true,
+      headers: {
+        '(request-target)': 'post /inbox?page=2',
+        host: 'example.com',
+        'content-type': 'application/activity+json'
+      }
+    })
+  })
+
+  it('should fail closed on unsupported pseudo-headers', async () => {
+    const { collectSigningHeaders } = await import('../../src/verifyHttpSignature.js')
+    const result = collectSigningHeaders(['(created)', 'date'], {
+      method: 'POST',
+      url: 'https://example.com/inbox',
+      headers: new Headers({ date: 'Sat, 25 Oct 2014 07:24:34 GMT' })
+    })
+
+    expect(result).toEqual({ ok: false, missing: ['(created)'] })
+  })
+})
+
+describe('signActivityRequest (tests helper)', () => {
+  it('should keep the legacy signing string and declared header list when no extra headers are given', async () => {
+    const { createVerify } = await import('node:crypto')
+    const { createRemoteActorKeys, signActivityRequest } = await import('../helpers/http-signature.js')
+    const keys = createRemoteActorKeys('https://other.example/actor')
+
+    const { headers } = signActivityRequest(
+      'https://example.com/inbox?a=b',
+      { type: 'Create', actor: keys.actorUrl },
+      keys
+    )
+
+    expect(headers.signature).toContain('headers="(request-target) host date digest content-type"')
+
+    const signingString = [
+      '(request-target): post /inbox?a=b',
+      'host: example.com',
+      `date: ${headers.date}`,
+      `digest: ${headers.digest}`,
+      `content-type: ${headers['content-type']}`
+    ].join('\n')
+    const verifier = createVerify('RSA-SHA256')
+    verifier.update(signingString)
+    verifier.end()
+    const signature = headers.signature.match(/signature="([^"]+)"/)![1]
+    expect(verifier.verify(keys.publicKeyPem, signature, 'base64')).toBe(true)
+  })
+
+  it('should send, sign, and declare extra headers after content-type', async () => {
+    const { createVerify } = await import('node:crypto')
+    const { createRemoteActorKeys, signActivityRequest } = await import('../helpers/http-signature.js')
+    const keys = createRemoteActorKeys('https://other.example/actor')
+    const extraHeaders = {
+      'Collection-Synchronization': 'collectionId="https://mastodon.social/users/jg10", digest="abc123", url="https://mastodon.social/users/jg10/followers_synchronization"'
+    }
+
+    const { headers } = signActivityRequest(
+      'https://example.com/inbox',
+      { type: 'Create', actor: keys.actorUrl },
+      keys,
+      { extraHeaders }
+    )
+
+    expect(headers['Collection-Synchronization']).toBe(extraHeaders['Collection-Synchronization'])
+    expect(headers.signature).toContain(
+      'headers="(request-target) host date digest content-type collection-synchronization"'
+    )
+
+    const signingString = [
+      '(request-target): post /inbox',
+      'host: example.com',
+      `date: ${headers.date}`,
+      `digest: ${headers.digest}`,
+      `content-type: ${headers['content-type']}`,
+      `collection-synchronization: ${extraHeaders['Collection-Synchronization']}`
+    ].join('\n')
+    const verifier = createVerify('RSA-SHA256')
+    verifier.update(signingString)
+    verifier.end()
+    const signature = headers.signature.match(/signature="([^"]+)"/)![1]
+    expect(verifier.verify(keys.publicKeyPem, signature, 'base64')).toBe(true)
+  })
+})
+
 describe('verifyActorBinding', () => {
   it('should accept when activity.actor matches keyId actor', async () => {
     const { verifyActorBinding } = await import('../../src/verifyHttpSignature.js')
